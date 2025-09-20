@@ -15,15 +15,8 @@
     header {
       background: linear-gradient(135deg, #ff4e50, #f9d423);
       color: white;
-      padding: 20px;
+      padding: 40px 20px;
       text-align: center;
-    }
-    header img {
-      max-width: 100%;
-      height: auto;
-      border-radius: 12px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-      margin-bottom: 20px;
     }
     header h1 {
       margin: 0;
@@ -32,6 +25,11 @@
     header p {
       font-size: 1.2em;
       margin-top: 10px;
+    }
+    header img {
+      max-width: 100%;
+      border-radius: 12px;
+      margin-top: 20px;
     }
     section {
       padding: 40px 20px;
@@ -53,6 +51,26 @@
       border-radius: 12px;
       box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     }
+    .buttons {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 15px;
+      margin-top: 30px;
+    }
+    a.button {
+      display: inline-block;
+      padding: 12px 24px;
+      background: #ff4e50;
+      color: white;
+      border-radius: 8px;
+      text-decoration: none;
+      transition: background 0.3s;
+      font-weight: bold;
+    }
+    a.button:hover {
+      background: #e33b3f;
+    }
     footer {
       text-align: center;
       background: #333;
@@ -60,25 +78,14 @@
       padding: 20px;
       margin-top: 40px;
     }
-    a.button {
-      display: inline-block;
-      margin-top: 20px;
-      padding: 12px 24px;
-      background: #ff4e50;
-      color: white;
-      border-radius: 8px;
-      text-decoration: none;
-      transition: background 0.3s;
-    }
-    a.button:hover {
-      background: #e33b3f;
-    }
   </style>
 </head>
 <body>
 
   <header>
-    <img src="qtr_banner.jpeg" alt="QTR Challenge Banner">
+    <h1>QTR Challenge</h1>
+    <p>Câu lạc bộ chạy bộ Quảng Trị Runners</p>
+    <img src="qtr_banner.jpeg" alt="QTR Banner">
   </header>
 
   <section>
@@ -108,18 +115,11 @@
       </div>
     </div>
 
-    <h2>Tải ứng dụng</h2>
-<p>Bạn có thể tải <strong>QTR Challenge</strong> trên cả Android và iOS:</p>
-
-<div style="display:flex; gap:20px; flex-wrap:wrap; margin-top:20px;">
-  <a href="https://apkpure.com/p/ebacson.echiptime" class="button" style="flex:1; min-width:200px; text-align:center;">
-    📱 Tải về cho Android
-  </a>
-  <a href="https://apps.apple.com/vn/app/qtr-challenge/id6743984712?l=vi" class="button" style="flex:1; min-width:200px; text-align:center; background:#007aff;">
-    🍎 Tải về cho iOS
-  </a>
-</div>
-
+    <div class="buttons">
+      <a href="https://apkpure.com/p/ebacson.echiptime" class="button">📲 Tải về cho Android</a>
+      <a href="https://apps.apple.com/vn/app/qtr-challenge/id6743984712?l=vi" class="button">🍏 Tải về cho iOS</a>
+      <a href="https://www.facebook.com/QuangTriRunners/" class="button">🏃‍♂️ Tham gia Câu lạc bộ</a>
+    </div>
   </section>
 
   <footer>

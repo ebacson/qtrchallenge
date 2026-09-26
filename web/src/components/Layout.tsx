@@ -107,6 +107,7 @@ export function Layout() {
           {profile && (
             <span className="user-chip">
               {profile.fullName || profile.email || 'Runner'}
+              {profile.admin && <span className="admin-badge prominent">Admin</span>}
               {profile.level > 0 && (
                 <span
                   className={`level-badge level-${profile.level >= 16 ? 'platinum' : profile.level >= 11 ? 'gold' : profile.level >= 6 ? 'silver' : 'bronze'}`}

@@ -88,8 +88,11 @@ export function ProfilePage() {
 
   async function onAvatarPick(file: File | undefined) {
     if (!user || !file) return
-    if (!file.type.startsWith('image/')) {
-      setError('Chọn file ảnh (JPG/PNG).')
+    const looksLikeImage =
+      file.type.startsWith('image/') ||
+      /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(file.name)
+    if (!looksLikeImage) {
+      setError('Chọn file ảnh (JPG/PNG/WEBP).')
       return
     }
     setAvatarBusy(true)

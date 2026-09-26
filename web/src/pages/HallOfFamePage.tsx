@@ -134,9 +134,9 @@ export function HallOfFamePage() {
         <p className="empty">Chưa có PR đã xác minh cho bộ lọc này.</p>
       ) : (
         <>
-          <section className="section">
+          <section className="section hof-top-section">
             <h2>Top 10</h2>
-            <div className="hof-laureate-grid">
+            <div className="hof-laureate-column">
               {top10.map((a, index) => (
                 <TopLaureateCard
                   key={a.id}

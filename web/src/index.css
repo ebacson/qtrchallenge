@@ -852,21 +852,29 @@ code {
   font-size: 1.25rem;
 }
 
-.hof-laureate-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
-  gap: 18px 12px;
+.hof-top-section h2 {
+  text-align: center;
+}
+
+.hof-laureate-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  max-width: 320px;
+  margin: 0 auto;
 }
 
 .hof-laureate {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   text-align: center;
   text-decoration: none;
   color: inherit;
-  padding: 8px 4px;
+  width: 100%;
+  padding: 12px 8px 16px;
   border-radius: 14px;
   transition: transform 0.15s ease;
 }
@@ -876,12 +884,14 @@ code {
   text-decoration: none;
 }
 
+/* Match iOS: ring 180, avatar 90 on top, slight upward offset */
 .hof-wreath {
   position: relative;
-  width: 112px;
-  height: 112px;
+  width: 180px;
+  height: 180px;
   display: grid;
   place-items: center;
+  flex-shrink: 0;
 }
 
 .hof-wreath-img {
@@ -891,7 +901,7 @@ code {
   height: 100%;
   object-fit: contain;
   pointer-events: none;
-  z-index: 1;
+  z-index: 0;
 }
 
 .hof-face {
@@ -901,9 +911,11 @@ code {
 }
 
 .hof-face.lg {
-  width: 68px;
-  height: 68px;
-  z-index: 0;
+  position: relative;
+  z-index: 1;
+  width: 90px;
+  height: 90px;
+  margin-top: -5px;
 }
 
 .hof-face.sm {
@@ -920,32 +932,31 @@ code {
 }
 
 .hof-face.placeholder.lg {
-  font-size: 1.5rem;
+  font-size: 2rem;
   font-family: var(--display);
 }
 
 .hof-laureate-rank {
-  margin: 2px 0 0;
+  margin: 4px 0 0;
   font-family: var(--display);
-  font-size: 1.1rem;
+  font-size: 1.35rem;
   font-weight: 700;
   color: #b8860b;
 }
 
 .hof-laureate-name {
-  font-size: 0.92rem;
-  line-height: 1.2;
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.25;
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .hof-laureate-time {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   font-family: var(--display);
-  font-size: 1.15rem;
+  font-size: 1.5rem;
+  color: var(--teal);
 }
 
 .pr-grid {

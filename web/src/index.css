@@ -583,6 +583,78 @@ select {
   transition: width 0.35s ease;
 }
 
+.progress-fill.fill-start {
+  background: #ef4444;
+}
+.progress-fill.fill-low {
+  background: #f97316;
+}
+.progress-fill.fill-mid {
+  background: #eab308;
+}
+.progress-fill.fill-high {
+  background: #22c55e;
+}
+.progress-fill.fill-done {
+  background: linear-gradient(90deg, #16a34a, #0d7377);
+}
+
+.participant-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.participant-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.participant-row.me {
+  border-color: rgba(232, 93, 4, 0.4);
+  background: rgba(255, 248, 239, 0.95);
+}
+
+.participant-rank {
+  width: 28px;
+  text-align: center;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--ink-soft);
+  flex-shrink: 0;
+}
+
+.participant-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.participant-meta .progress-track {
+  margin-top: 2px;
+}
+
+.participant-km {
+  font-family: var(--display);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95rem;
+  color: var(--teal);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .empty {
   color: var(--ink-soft);
   padding: 24px 0;

@@ -60,7 +60,7 @@ export function HomePage() {
           </div>
           <div className="stat">
             <strong>{activityCount}</strong>
-            <span>Activities</span>
+            <span>Hoạt động</span>
           </div>
           <div className="stat">
             <strong>{profile?.member ? 'Official' : 'Guest'}</strong>

@@ -14,7 +14,7 @@ const tabs = [
 const menuItems = [
   { to: '/', label: 'Home', end: true },
   { to: '/challenges', label: 'Challenge' },
-  { to: '/activities', label: 'Activities' },
+  { to: '/activities', label: 'Hoạt động' },
   { to: '/events', label: 'Events' },
   { to: '/hall-of-fame', label: 'Bảng vàng' },
   { to: '/notifications', label: 'Thông báo' },

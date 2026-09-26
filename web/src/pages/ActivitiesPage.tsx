@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { onValue, ref } from 'firebase/database'
 import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
@@ -22,6 +21,26 @@ function mapActivity(id: string, data: Record<string, unknown>): Activity {
   }
 }
 
+/** Parse `dd-MM-yyyy HH:mm:ss` (định dạng lưu từ Strava sync). */
+function activityTimeMs(startDate: string): number {
+  const m = startDate
+    .trim()
+    .match(/^(\d{2})-(\d{2})-(\d{4})(?:\s+(\d{2}):(\d{2}):(\d{2}))?/)
+  if (!m) {
+    const fallback = Date.parse(startDate)
+    return Number.isNaN(fallback) ? 0 : fallback
+  }
+  const [, dd, mm, yyyy, hh = '0', min = '0', ss = '0'] = m
+  return new Date(
+    Number(yyyy),
+    Number(mm) - 1,
+    Number(dd),
+    Number(hh),
+    Number(min),
+    Number(ss),
+  ).getTime()
+}
+
 export function ActivitiesPage() {
   const { user } = useAuth()
   const [activities, setActivities] = useState<Activity[]>([])
@@ -35,7 +54,7 @@ export function ActivitiesPage() {
       const val = (snap.val() ?? {}) as Record<string, Record<string, unknown>>
       const list = Object.entries(val)
         .map(([id, dict]) => mapActivity(id, dict))
-        .sort((a, b) => b.startDate.localeCompare(a.startDate))
+        .sort((a, b) => activityTimeMs(b.startDate) - activityTimeMs(a.startDate))
       setActivities(list)
       setLoading(false)
     })
@@ -55,11 +74,7 @@ export function ActivitiesPage() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1>Activities</h1>
-        <p className="lede">
-          Dữ liệu từ <code>users/…/strava_activities</code>. Sync qua tab{' '}
-          <Link to="/strava">Strava</Link> (OAuth web + api-v3).
-        </p>
+        <h1>Hoạt động</h1>
       </header>
 
       <div className="filter-row">
@@ -78,7 +93,7 @@ export function ActivitiesPage() {
       {loading ? (
         <p className="empty">Đang tải…</p>
       ) : filtered.length === 0 ? (
-        <p className="empty">Chưa có activity. Hãy sync Strava trên app iOS/Android.</p>
+        <p className="empty">Chưa có hoạt động. Hãy sync Strava.</p>
       ) : (
         <ul className="activity-list">
           {filtered.map((a) => (

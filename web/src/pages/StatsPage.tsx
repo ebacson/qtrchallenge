@@ -95,7 +95,7 @@ export function StatsPage() {
           <div className="stat-row">
             <div className="stat">
               <strong>{stats.count}</strong>
-              <span>Activities</span>
+              <span>Hoạt động</span>
             </div>
             <div className="stat">
               <strong>{stats.totalKm}</strong>

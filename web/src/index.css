@@ -852,6 +852,102 @@ code {
   font-size: 1.25rem;
 }
 
+.hof-laureate-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 18px 12px;
+}
+
+.hof-laureate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  text-decoration: none;
+  color: inherit;
+  padding: 8px 4px;
+  border-radius: 14px;
+  transition: transform 0.15s ease;
+}
+
+.hof-laureate:hover {
+  transform: translateY(-2px);
+  text-decoration: none;
+}
+
+.hof-wreath {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  display: grid;
+  place-items: center;
+}
+
+.hof-wreath-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.hof-face {
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.hof-face.lg {
+  width: 68px;
+  height: 68px;
+  z-index: 0;
+}
+
+.hof-face.sm {
+  width: 100%;
+  height: 100%;
+}
+
+.hof-face.placeholder {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--teal), var(--accent));
+  color: #fff;
+  font-weight: 700;
+}
+
+.hof-face.placeholder.lg {
+  font-size: 1.5rem;
+  font-family: var(--display);
+}
+
+.hof-laureate-rank {
+  margin: 2px 0 0;
+  font-family: var(--display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #b8860b;
+}
+
+.hof-laureate-name {
+  font-size: 0.92rem;
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hof-laureate-time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-family: var(--display);
+  font-size: 1.15rem;
+}
+
 .pr-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

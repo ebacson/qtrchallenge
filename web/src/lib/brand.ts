@@ -1,2 +1,4 @@
-export const brandLogoSrc = `${import.meta.env.BASE_URL}full_logo.png`
+import qtrLogo from '../assets/QTR.png'
+
+export const brandLogoSrc = qtrLogo
 export const brandTitle = 'QTR Challenge'

@@ -666,8 +666,27 @@ select {
   margin: 0;
 }
 
-.challenge-description {
-  margin-top: 12px;
+.quota-option-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(15, 28, 36, 0.03);
+}
+
+.quota-option-label {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+@media (min-width: 640px) {
+  .quota-option-row {
+    grid-template-columns: auto 1fr 1fr auto;
+    align-items: end;
+  }
 }
 
 .empty {

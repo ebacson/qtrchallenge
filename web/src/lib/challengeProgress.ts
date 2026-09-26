@@ -4,6 +4,7 @@ import {
   calculateProgress,
   calculateStatus,
   parseChallengeDay,
+  parseDayQuotaLabel,
   progressOptionsFromDict,
   STATUS_FINISHED,
 } from './challengeRules'
@@ -61,33 +62,72 @@ export async function syncOngoingChallengeProgress(
         if (!shouldRecalculate(status)) return
 
         const userChallenges = challenge.user_challenges as
-          | Record<string, unknown>
+          | Record<string, Record<string, unknown>>
           | undefined
-        if (!userChallenges?.[uid]) return
+        const userRow = userChallenges?.[uid]
+        if (!userRow) return
 
         const startDate = parseChallengeDay(startStr)
         const endDate = parseChallengeDay(endStr)
         if (!startDate || !endDate) return
 
+        const mode = String(challenge.challengeMode ?? '')
+        const baseOpts = progressOptionsFromDict(challenge) ?? {}
+
+        if (mode === 'day_quota') {
+          const fromFields = {
+            daysRequired: Number(userRow.daysRequired),
+            kmPerDay: Number(userRow.kmPerDay),
+          }
+          const fromLabel = parseDayQuotaLabel(String(userRow.userTarget ?? ''))
+          const daysRequired =
+            Number.isFinite(fromFields.daysRequired) && fromFields.daysRequired > 0
+              ? fromFields.daysRequired
+              : fromLabel?.daysRequired
+          const kmPerDay =
+            Number.isFinite(fromFields.kmPerDay) && fromFields.kmPerDay > 0
+              ? fromFields.kmPerDay
+              : fromLabel?.kmPerDay
+          if (!daysRequired || !kmPerDay) return
+
+          const result = calculateProgress(activities, startDate, endDate, {
+            ...baseOpts,
+            kmPerDay,
+          })
+          const daysCompleted = result.daysCompleted ?? 0
+          await update(
+            ref(db, `challenges/${challengeId}/user_challenges/${uid}`),
+            {
+              progress: `${daysCompleted}/${daysRequired} ngày`,
+              totalactiviti: String(daysCompleted),
+              totalpace: result.hasEligibleActivities
+                ? String(result.totalPaceMinutes)
+                : '0',
+              daysRequired,
+              kmPerDay,
+            },
+          )
+          updatedChallengeIds.push(challengeId)
+          return
+        }
+
         const result = calculateProgress(
           activities,
           startDate,
           endDate,
-          progressOptionsFromDict(challenge),
+          baseOpts,
         )
-        const updates = {
-          progress: result.hasEligibleActivities
-            ? `${result.totalDistanceKm.toFixed(2)} km`
-            : '0.00 km',
-          totalactiviti: String(result.totalActivities),
-          totalpace: result.hasEligibleActivities
-            ? String(result.totalPaceMinutes)
-            : '0',
-        }
-
         await update(
           ref(db, `challenges/${challengeId}/user_challenges/${uid}`),
-          updates,
+          {
+            progress: result.hasEligibleActivities
+              ? `${result.totalDistanceKm.toFixed(2)} km`
+              : '0.00 km',
+            totalactiviti: String(result.totalActivities),
+            totalpace: result.hasEligibleActivities
+              ? String(result.totalPaceMinutes)
+              : '0',
+          },
         )
         updatedChallengeIds.push(challengeId)
       }),

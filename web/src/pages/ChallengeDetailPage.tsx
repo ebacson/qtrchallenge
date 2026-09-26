@@ -10,6 +10,7 @@ import {
   joinBlockedMessage,
   listDisplayText,
   parseChallenge,
+  parseDayQuotaLabel,
   progressPercent,
   STATUS_UPCOMING,
   statusClass,
@@ -175,9 +176,16 @@ export function ChallengeDetailPage() {
 
     setBusy(true)
     try {
+      const quota = parseDayQuotaLabel(selectedTarget)
       await update(ref(db, `challenges/${id}/user_challenges/${user.uid}`), {
         userTarget: selectedTarget,
-        progress: '0.0 km',
+        progress:
+          challenge.challengeMode === 'day_quota' && quota
+            ? `0/${quota.daysRequired} ngày`
+            : '0.0 km',
+        ...(quota
+          ? { daysRequired: quota.daysRequired, kmPerDay: quota.kmPerDay }
+          : {}),
       })
       setMessage('Đã tham gia thử thách thành công!')
       setPassword('')
@@ -261,9 +269,11 @@ export function ChallengeDetailPage() {
               </p>
             )}
             <p>
-              {challenge.challengeMode === 'activity_count'
-                ? `${challenge.totalactiviti ?? '0'} / ${challenge.requiredActivities ?? '?'} hoạt động (≥ ${challenge.minActivityDistanceKm ?? 1} km)`
-                : `${challenge.progress ?? '0 km'} / ${challenge.userTarget}`}
+              {challenge.challengeMode === 'day_quota'
+                ? `${challenge.progress ?? `0/${challenge.userDaysRequired ?? '?'} ngày`} · ${challenge.userKmPerDay ?? '?'} km/ngày`
+                : challenge.challengeMode === 'activity_count'
+                  ? `${challenge.totalactiviti ?? '0'} / ${challenge.requiredActivities ?? '?'} hoạt động (≥ ${challenge.minActivityDistanceKm ?? 1} km)`
+                  : `${challenge.progress ?? '0 km'} / ${challenge.userTarget}`}
             </p>
             <div className="progress-track large">
               <div

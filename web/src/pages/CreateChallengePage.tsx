@@ -11,17 +11,21 @@ import {
   uploadChallengeIcon,
 } from '../lib/adminOps'
 import {
+  countInclusiveDays,
+  formatDayQuotaLabel,
   formatPaceMinutes,
   parsePaceInput,
   STATUS_UPCOMING,
 } from '../lib/challengeRules'
 import { db } from '../lib/firebase'
-import type { Challenge } from '../types'
+import type { DayQuotaOption } from '../types'
 
 const PRESET_DISTANCES = ['50 km', '100 km', '150 km', '200 km', '250 km', '300 km']
 const JOIN_DEADLINE_OPTIONS = [3, 7, 14, 21, 30, 45, 60]
 
-type Mode = Challenge['challengeMode']
+type Mode = 'monthly_pace' | 'day_quota'
+
+type QuotaDraft = { daysRequired: string; kmPerDay: string }
 
 export function CreateChallengePage() {
   const { user } = useAuth()
@@ -35,8 +39,9 @@ export function CreateChallengePage() {
   const [endDate, setEndDate] = useState(todayInputValue)
   const [paceMinInput, setPaceMinInput] = useState('04:00')
   const [paceMaxInput, setPaceMaxInput] = useState('08:00')
-  const [requiredActivities, setRequiredActivities] = useState('12')
-  const [minActivityKm, setMinActivityKm] = useState('5')
+  const [quotaOptions, setQuotaOptions] = useState<QuotaDraft[]>([
+    { daysRequired: '', kmPerDay: '5' },
+  ])
   const [selected, setSelected] = useState<string[]>([])
   const [customKm, setCustomKm] = useState('')
   const [customOn, setCustomOn] = useState(false)
@@ -55,12 +60,39 @@ export function CreateChallengePage() {
     setEndDate(bounds.end)
   }, [mode, monthValue])
 
+  const totalDays = useMemo(() => {
+    if (mode !== 'day_quota') return 0
+    if (!startDate || !endDate || endDate < startDate) return 0
+    return countInclusiveDays(
+      inputDateToChallengeDay(startDate),
+      inputDateToChallengeDay(endDate),
+    )
+  }, [mode, startDate, endDate])
+
+  useEffect(() => {
+    if (mode !== 'day_quota' || totalDays <= 0) return
+    setQuotaOptions((prev) =>
+      prev.map((o, i) =>
+        i === 0 && !o.daysRequired
+          ? { ...o, daysRequired: String(totalDays) }
+          : o,
+      ),
+    )
+  }, [mode, totalDays])
+
   const distances = useMemo(() => {
-    if (mode === 'activity_count') {
-      const n = Number(requiredActivities)
-      const d = Number(minActivityKm.replace(',', '.'))
-      if (n > 0 && d > 0) return [`${n} hoạt động × ${d} km`]
-      return []
+    if (mode === 'day_quota') {
+      if (totalDays <= 0) return []
+      return quotaOptions
+        .map((o) => {
+          const days = Number(o.daysRequired)
+          const km = Number(o.kmPerDay.replace(',', '.'))
+          if (!Number.isFinite(days) || days < 1 || !Number.isFinite(km) || km <= 0) {
+            return null
+          }
+          return formatDayQuotaLabel(days, totalDays, km)
+        })
+        .filter((x): x is string => Boolean(x))
     }
     const list = [...selected]
     if (customOn && customKm.trim()) {
@@ -68,7 +100,22 @@ export function CreateChallengePage() {
       if (n > 0) list.push(`${n} km`)
     }
     return list
-  }, [mode, selected, customOn, customKm, requiredActivities, minActivityKm])
+  }, [mode, selected, customOn, customKm, quotaOptions, totalDays])
+
+  const parsedQuotaOptions: DayQuotaOption[] = useMemo(() => {
+    return quotaOptions
+      .map((o) => ({
+        daysRequired: Number(o.daysRequired),
+        kmPerDay: Number(o.kmPerDay.replace(',', '.')),
+      }))
+      .filter(
+        (o) =>
+          Number.isFinite(o.daysRequired) &&
+          o.daysRequired > 0 &&
+          Number.isFinite(o.kmPerDay) &&
+          o.kmPerDay > 0,
+      )
+  }, [quotaOptions])
 
   const preview = useMemo(() => {
     const startLabel = inputDateToChallengeDay(startDate)
@@ -82,7 +129,7 @@ export function CreateChallengePage() {
           : 'pace …'
       return `${startLabel} → ${endLabel} · ${pace} · mục tiêu ${distances.join(', ') || '…'}`
     }
-    return `${startLabel} → ${endLabel} · ${requiredActivities || '?'} hoạt động ≥ ${minActivityKm || '?'} km`
+    return `${startLabel} → ${endLabel} (${totalDays} ngày) · ${distances.join(' | ') || 'chưa có tùy chọn'}`
   }, [
     mode,
     startDate,
@@ -90,8 +137,7 @@ export function CreateChallengePage() {
     paceMinInput,
     paceMaxInput,
     distances,
-    requiredActivities,
-    minActivityKm,
+    totalDays,
   ])
 
   function toggleDistance(d: string) {
@@ -111,6 +157,28 @@ export function CreateChallengePage() {
     setError('')
   }
 
+  function updateQuota(index: number, patch: Partial<QuotaDraft>) {
+    setQuotaOptions((prev) =>
+      prev.map((o, i) => (i === index ? { ...o, ...patch } : o)),
+    )
+  }
+
+  function addQuotaOption() {
+    setQuotaOptions((prev) => [
+      ...prev,
+      {
+        daysRequired: totalDays > 0 ? String(Math.max(1, totalDays - prev.length)) : '',
+        kmPerDay: '5',
+      },
+    ])
+  }
+
+  function removeQuotaOption(index: number) {
+    setQuotaOptions((prev) =>
+      prev.length <= 1 ? prev : prev.filter((_, i) => i !== index),
+    )
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     if (!user) return
@@ -127,8 +195,6 @@ export function CreateChallengePage() {
 
     let paceMinMinutes: number | undefined
     let paceMaxMinutes: number | undefined
-    let required: number | undefined
-    let minKm: number | undefined
 
     if (mode === 'monthly_pace') {
       paceMinMinutes = parsePaceInput(paceMinInput) ?? undefined
@@ -146,15 +212,19 @@ export function CreateChallengePage() {
         return
       }
     } else {
-      required = Number(requiredActivities)
-      minKm = Number(minActivityKm.replace(',', '.'))
-      if (!Number.isFinite(required) || required < 1) {
-        setError('Số hoạt động phải ≥ 1.')
+      if (totalDays < 1) {
+        setError('Khoảng ngày không hợp lệ.')
         return
       }
-      if (!Number.isFinite(minKm) || minKm <= 0) {
-        setError('Cự ly mỗi hoạt động phải > 0 km.')
+      if (parsedQuotaOptions.length === 0) {
+        setError('Thêm ít nhất một tùy chọn (số ngày / km mỗi ngày).')
         return
+      }
+      for (const [i, o] of parsedQuotaOptions.entries()) {
+        if (o.daysRequired > totalDays) {
+          setError(`Tùy chọn ${i + 1}: số ngày hoàn thành không được vượt ${totalDays}.`)
+          return
+        }
       }
     }
 
@@ -183,8 +253,8 @@ export function CreateChallengePage() {
         payload.paceMinMinutes = paceMinMinutes
         payload.paceMaxMinutes = paceMaxMinutes
       } else {
-        payload.requiredActivities = required
-        payload.minActivityDistanceKm = minKm
+        payload.totalDays = totalDays
+        payload.dayQuotaOptions = parsedQuotaOptions
       }
 
       const newRef = push(ref(db, 'challenges'))
@@ -237,16 +307,16 @@ export function CreateChallengePage() {
             </button>
             <button
               type="button"
-              className={mode === 'activity_count' ? 'chip active' : 'chip'}
-              onClick={() => setMode('activity_count')}
+              className={mode === 'day_quota' ? 'chip active' : 'chip'}
+              onClick={() => setMode('day_quota')}
             >
-              Khoảng ngày + số hoạt động
+              Khoảng ngày + tùy chọn ngày/km
             </button>
           </div>
           <p className="tiny muted" style={{ marginTop: 8 }}>
             {mode === 'monthly_pace'
               ? 'Tự lấy ngày đầu → cuối tháng; chỉ tính hoạt động trong khoảng pace A–B.'
-              : 'Từ ngày → đến ngày; phải hoàn thành N hoạt động, mỗi lần ≥ D km.'}
+              : 'Từ ngày → đến ngày; nhiều tùy chọn như 15/15 ngày × 5 km/ngày, 13/15 × 8 km/ngày…'}
           </p>
         </fieldset>
 
@@ -364,30 +434,66 @@ export function CreateChallengePage() {
                 />
               </label>
             </div>
-            <div className="pr-edit-grid">
-              <label>
-                Số hoạt động phải hoàn thành
-                <input
-                  type="number"
-                  min={1}
-                  step={1}
-                  value={requiredActivities}
-                  onChange={(e) => setRequiredActivities(e.target.value)}
-                  required
-                />
-              </label>
-              <label>
-                Cự ly tối thiểu mỗi hoạt động (km)
-                <input
-                  type="number"
-                  min={0.1}
-                  step={0.1}
-                  value={minActivityKm}
-                  onChange={(e) => setMinActivityKm(e.target.value)}
-                  required
-                />
-              </label>
-            </div>
+            <p className="tiny muted">
+              Tổng số ngày trong khoảng: <strong>{totalDays || '—'}</strong>
+            </p>
+
+            <fieldset className="distance-fieldset">
+              <legend>Các tùy chọn hoàn thành</legend>
+              <p className="tiny muted" style={{ marginBottom: 10 }}>
+                Ví dụ 15 ngày: tùy chọn 1 = 15/15 ngày × 5 km/ngày; tùy chọn 2 =
+                13/15 ngày × 8 km/ngày.
+              </p>
+              {quotaOptions.map((o, index) => (
+                <div key={index} className="quota-option-row">
+                  <span className="quota-option-label">Tùy chọn {index + 1}</span>
+                  <label>
+                    Số ngày phải hoàn thành
+                    <input
+                      type="number"
+                      min={1}
+                      max={totalDays || undefined}
+                      step={1}
+                      value={o.daysRequired}
+                      onChange={(e) =>
+                        updateQuota(index, { daysRequired: e.target.value })
+                      }
+                      placeholder={totalDays ? String(totalDays) : '15'}
+                      required
+                    />
+                  </label>
+                  <label>
+                    Km mỗi ngày
+                    <input
+                      type="number"
+                      min={0.1}
+                      step={0.1}
+                      value={o.kmPerDay}
+                      onChange={(e) =>
+                        updateQuota(index, { kmPerDay: e.target.value })
+                      }
+                      placeholder="5"
+                      required
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="btn ghost compact danger"
+                    disabled={quotaOptions.length <= 1}
+                    onClick={() => removeQuotaOption(index)}
+                  >
+                    Xóa
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={addQuotaOption}
+              >
+                + Thêm tùy chọn
+              </button>
+            </fieldset>
           </>
         )}
 

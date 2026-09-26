@@ -1,4 +1,4 @@
-import type { Challenge, ChallengeProgressResult } from '../types'
+import type { Challenge, ChallengeProgressResult, DayQuotaOption } from '../types'
 
 export const STATUS_UPCOMING = 'Sắp diễn ra'
 export const STATUS_ONGOING = 'Đang diễn ra'
@@ -154,12 +154,64 @@ export function challengeRulesSummary(challenge: Challenge): string {
         : 'theo tháng'
     return `Tháng · ${pace}`
   }
+  if (challenge.challengeMode === 'day_quota') {
+    const total = challenge.totalDays ?? '?'
+    const n = challenge.dayQuotaOptions?.length ?? 0
+    return `${total} ngày · ${n} tùy chọn`
+  }
   if (challenge.challengeMode === 'activity_count') {
     const n = challenge.requiredActivities ?? 0
     const d = challenge.minActivityDistanceKm ?? MIN_DISTANCE_KM
     return `${n} hoạt động ≥ ${d} km`
   }
   return ''
+}
+
+export function countInclusiveDays(startDate: string, endDate: string): number {
+  const a = parseChallengeDayStartMs(startDate)
+  const b = parseChallengeDayStartMs(endDate)
+  if (a == null || b == null || b < a) return 0
+  return Math.floor((b - a) / 86_400_000) + 1
+}
+
+export function formatDayQuotaLabel(
+  daysRequired: number,
+  totalDays: number,
+  kmPerDay: number,
+): string {
+  const km = Number.isInteger(kmPerDay) ? String(kmPerDay) : kmPerDay.toFixed(1)
+  return `${daysRequired}/${totalDays} ngày · ${km} km/ngày`
+}
+
+export function parseDayQuotaLabel(label: string): DayQuotaOption | null {
+  const m = label.match(/(\d+)\s*\/\s*\d+\s*ngày\s*·\s*([\d.]+)\s*km/i)
+  if (!m) return null
+  const daysRequired = Number(m[1])
+  const kmPerDay = Number(m[2])
+  if (!Number.isFinite(daysRequired) || !Number.isFinite(kmPerDay)) return null
+  return { daysRequired, kmPerDay }
+}
+
+export function parseDayQuotaOptions(
+  raw: unknown,
+): DayQuotaOption[] | undefined {
+  if (!Array.isArray(raw)) return undefined
+  const list: DayQuotaOption[] = []
+  for (const row of raw) {
+    if (!row || typeof row !== 'object') continue
+    const o = row as Record<string, unknown>
+    const daysRequired = Number(o.daysRequired)
+    const kmPerDay = Number(o.kmPerDay)
+    if (
+      Number.isFinite(daysRequired) &&
+      daysRequired > 0 &&
+      Number.isFinite(kmPerDay) &&
+      kmPerDay > 0
+    ) {
+      list.push({ daysRequired, kmPerDay })
+    }
+  }
+  return list.length ? list : undefined
 }
 
 export function formatPaceMinutes(min: number): string {
@@ -186,6 +238,8 @@ export type ProgressOptions = {
   paceMin?: number
   paceMax?: number
   minActivityDistanceKm?: number
+  /** Đếm ngày đạt đủ kmPerDay trong khoảng */
+  kmPerDay?: number
 }
 
 export function convertPaceToMinutesPerKm(pace: string): number {
@@ -214,10 +268,12 @@ export function calculateProgress(
   const paceMin = options?.paceMin ?? MIN_PACE
   const paceMax = options?.paceMax ?? MAX_PACE
   const minDist = options?.minActivityDistanceKm ?? MIN_DISTANCE_KM
+  const kmPerDay = options?.kmPerDay
 
   let totalDistance = 0
   let totalActivities = 0
   let totalPace = 0
+  const dayTotals = new Map<number, number>()
 
   for (const activity of activities) {
     const type = String(activity.type ?? '')
@@ -226,9 +282,10 @@ export function calculateProgress(
     const activityDateStr = String(activity.startDate ?? '')
     const distance = Number(activity.distance)
     const paceStr = String(activity.pace ?? '')
-    if (!activityDateStr || Number.isNaN(distance) || distance < minDist) {
-      continue
-    }
+    if (!activityDateStr || Number.isNaN(distance)) continue
+
+    // For day_quota, keep all distances in day bucket; filter day later by kmPerDay
+    if (kmPerDay == null && distance < minDist) continue
 
     const dayMs = activityDayMs(activityDateStr)
     if (dayMs == null) continue
@@ -240,6 +297,15 @@ export function calculateProgress(
       totalDistance += distance
       totalPace += pace
       totalActivities += 1
+      dayTotals.set(dayMs, (dayTotals.get(dayMs) ?? 0) + distance)
+    }
+  }
+
+  let daysCompleted: number | undefined
+  if (kmPerDay != null && kmPerDay > 0) {
+    daysCompleted = 0
+    for (const km of dayTotals.values()) {
+      if (km >= kmPerDay) daysCompleted += 1
     }
   }
 
@@ -248,6 +314,7 @@ export function calculateProgress(
     totalActivities,
     totalPaceMinutes: totalPace,
     hasEligibleActivities: totalActivities > 0,
+    daysCompleted,
   }
 }
 
@@ -272,7 +339,12 @@ export function progressOptionsFromDict(
 function parseChallengeMode(
   raw: unknown,
 ): Challenge['challengeMode'] {
-  if (raw === 'monthly_pace' || raw === 'activity_count' || raw === 'distance') {
+  if (
+    raw === 'monthly_pace' ||
+    raw === 'activity_count' ||
+    raw === 'day_quota' ||
+    raw === 'distance'
+  ) {
     return raw
   }
   return 'distance'
@@ -296,6 +368,18 @@ export function parseChallenge(
   const paceMax = Number(dict.paceMaxMinutes)
   const requiredActivities = Number(dict.requiredActivities)
   const minActivityDistanceKm = Number(dict.minActivityDistanceKm)
+  const totalDaysRaw = Number(dict.totalDays)
+  const dayQuotaOptions = parseDayQuotaOptions(dict.dayQuotaOptions)
+  const totalDays =
+    Number.isFinite(totalDaysRaw) && totalDaysRaw > 0
+      ? totalDaysRaw
+      : countInclusiveDays(startDate, endDate) || undefined
+
+  const userDaysRequired = Number(userData?.daysRequired)
+  const userKmPerDay = Number(userData?.kmPerDay)
+  const parsedFromTarget = userData?.userTarget
+    ? parseDayQuotaLabel(String(userData.userTarget))
+    : null
 
   return {
     id,
@@ -324,7 +408,17 @@ export function parseChallenge(
       Number.isFinite(minActivityDistanceKm) && minActivityDistanceKm > 0
         ? minActivityDistanceKm
         : undefined,
+    totalDays,
+    dayQuotaOptions,
     userTarget: userData?.userTarget != null ? String(userData.userTarget) : undefined,
+    userDaysRequired:
+      Number.isFinite(userDaysRequired) && userDaysRequired > 0
+        ? userDaysRequired
+        : parsedFromTarget?.daysRequired,
+    userKmPerDay:
+      Number.isFinite(userKmPerDay) && userKmPerDay > 0
+        ? userKmPerDay
+        : parsedFromTarget?.kmPerDay,
     progress: userData?.progress != null ? String(userData.progress) : undefined,
     totalpace: userData?.totalpace != null ? String(userData.totalpace) : undefined,
     totalactiviti:
@@ -347,6 +441,12 @@ export function statusClass(status: string): string {
 
 export function progressPercent(progress?: string, target?: string): number {
   if (!progress || !target) return 0
+  const dayMatch = String(progress).match(/(\d+)\s*\/\s*(\d+)/)
+  if (dayMatch) {
+    const a = Number(dayMatch[1])
+    const b = Number(dayMatch[2])
+    if (b > 0) return Math.min(100, Math.round((a / b) * 100))
+  }
   const p = Number(String(progress).replace(/[^0-9.]/g, ''))
   const t = Number(String(target).replace(/[^0-9.]/g, ''))
   if (!t || Number.isNaN(p) || Number.isNaN(t)) return 0
@@ -354,6 +454,14 @@ export function progressPercent(progress?: string, target?: string): number {
 }
 
 export function challengeProgressPercent(challenge: Challenge): number {
+  if (challenge.challengeMode === 'day_quota' && challenge.userDaysRequired) {
+    const m = String(challenge.progress ?? '').match(/(\d+)\s*\//)
+    const done = m ? Number(m[1]) : Number(challenge.totalactiviti ?? 0) || 0
+    return Math.min(
+      100,
+      Math.round((done / challenge.userDaysRequired) * 100),
+    )
+  }
   if (
     challenge.challengeMode === 'activity_count' &&
     challenge.requiredActivities &&

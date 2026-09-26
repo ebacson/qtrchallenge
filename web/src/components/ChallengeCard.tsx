@@ -30,9 +30,11 @@ export function ChallengeCard({ challenge }: { challenge: Challenge }) {
           <div className="progress-block">
             <div className="progress-meta">
               <span>
-                {challenge.challengeMode === 'activity_count'
-                  ? `${challenge.totalactiviti ?? '0'} / ${challenge.requiredActivities ?? '?'} hoạt động`
-                  : `${challenge.progress ?? '0 km'} / ${challenge.userTarget}`}
+                {challenge.challengeMode === 'day_quota'
+                  ? `${challenge.totalactiviti ?? '0'} / ${challenge.requiredActivities ?? challenge.userDaysRequired ?? '?'} ngày`
+                  : challenge.challengeMode === 'activity_count'
+                    ? `${challenge.totalactiviti ?? '0'} / ${challenge.requiredActivities ?? '?'} hoạt động`
+                    : `${challenge.progress ?? '0 km'} / ${challenge.userTarget}`}
               </span>
               <span>{pct}%</span>
             </div>

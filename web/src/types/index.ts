@@ -32,6 +32,12 @@ export interface UserProfile {
   level: number
 }
 
+/** Tùy chọn thử thách khoảng ngày: hoàn thành X/totalDays ngày, mỗi ngày ≥ kmPerDay */
+export interface DayQuotaOption {
+  daysRequired: number
+  kmPerDay: number
+}
+
 export interface Challenge {
   id: string
   name: string
@@ -44,13 +50,17 @@ export interface Challenge {
   creator?: string
   password?: string
   joinDeadlineDays: number
-  /** distance | monthly_pace | activity_count */
-  challengeMode: 'distance' | 'monthly_pace' | 'activity_count'
+  challengeMode: 'distance' | 'monthly_pace' | 'activity_count' | 'day_quota'
   paceMinMinutes?: number
   paceMaxMinutes?: number
   requiredActivities?: number
   minActivityDistanceKm?: number
+  totalDays?: number
+  dayQuotaOptions?: DayQuotaOption[]
+  /** Fields from current user's join row */
   userTarget?: string
+  userDaysRequired?: number
+  userKmPerDay?: number
   progress?: string
   totalpace?: string
   totalactiviti?: string
@@ -61,4 +71,5 @@ export interface ChallengeProgressResult {
   totalActivities: number
   totalPaceMinutes: number
   hasEligibleActivities: boolean
+  daysCompleted?: number
 }

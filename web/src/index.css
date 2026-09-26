@@ -1436,6 +1436,27 @@ code {
   margin-top: 12px;
 }
 
+.challenge-preview {
+  margin: 4px 0 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(15, 28, 36, 0.05);
+  font-size: 0.92rem;
+  line-height: 1.4;
+  color: var(--ink-soft);
+}
+
+.challenge-rules-tag {
+  margin: 6px 0 0;
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(13, 115, 119, 0.12);
+  color: var(--teal);
+}
+
 @media (min-width: 640px) {
   .shortcut-grid {
     grid-template-columns: repeat(3, 1fr);

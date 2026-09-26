@@ -4,6 +4,7 @@ import {
   calculateProgress,
   calculateStatus,
   parseChallengeDay,
+  progressOptionsFromDict,
   STATUS_FINISHED,
 } from './challengeRules'
 import { calculateLevelFromChallenges } from './levelCalculator'
@@ -68,7 +69,12 @@ export async function syncOngoingChallengeProgress(
         const endDate = parseChallengeDay(endStr)
         if (!startDate || !endDate) return
 
-        const result = calculateProgress(activities, startDate, endDate)
+        const result = calculateProgress(
+          activities,
+          startDate,
+          endDate,
+          progressOptionsFromDict(challenge),
+        )
         const updates = {
           progress: result.hasEligibleActivities
             ? `${result.totalDistanceKm.toFixed(2)} km`

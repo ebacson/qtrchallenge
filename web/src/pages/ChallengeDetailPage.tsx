@@ -5,10 +5,11 @@ import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
 import {
   canJoin,
+  challengeProgressPercent,
+  challengeRulesSummary,
   joinBlockedMessage,
   listDisplayText,
   parseChallenge,
-  progressPercent,
   statusClass,
 } from '../lib/challengeRules'
 import type { Challenge } from '../types'
@@ -49,8 +50,9 @@ export function ChallengeDetailPage() {
   }
 
   const joined = Boolean(challenge.userTarget)
-  const pct = progressPercent(challenge.progress, challenge.userTarget)
+  const pct = challengeProgressPercent(challenge)
   const needsPassword = Boolean(challenge.password)
+  const rules = challengeRulesSummary(challenge)
 
   async function onJoin(e: FormEvent) {
     e.preventDefault()
@@ -122,6 +124,7 @@ export function ChallengeDetailPage() {
             {challenge.startDate} → {challenge.endDate}
           </p>
           <p className="tiny muted">{listDisplayText(challenge)}</p>
+          {rules && <p className="challenge-rules-tag">{rules}</p>}
         </div>
       </div>
 
@@ -136,7 +139,9 @@ export function ChallengeDetailPage() {
         <section className="section panel">
           <h2>Tiến độ của bạn</h2>
           <p>
-            {challenge.progress ?? '0 km'} / {challenge.userTarget}
+            {challenge.challengeMode === 'activity_count'
+              ? `${challenge.totalactiviti ?? '0'} / ${challenge.requiredActivities ?? '?'} hoạt động (≥ ${challenge.minActivityDistanceKm ?? 1} km)`
+              : `${challenge.progress ?? '0 km'} / ${challenge.userTarget}`}
           </p>
           <div className="progress-track large">
             <div className="progress-fill" style={{ width: `${pct}%` }} />

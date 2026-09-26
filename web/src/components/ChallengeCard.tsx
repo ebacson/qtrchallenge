@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom'
 import type { Challenge } from '../types'
-import { listDisplayText, progressPercent, statusClass } from '../lib/challengeRules'
+import { listDisplayText, challengeProgressPercent, statusClass } from '../lib/challengeRules'
 
 export function ChallengeCard({ challenge }: { challenge: Challenge }) {
   const joined = Boolean(challenge.userTarget)
-  const pct = progressPercent(challenge.progress, challenge.userTarget)
+  const pct = challengeProgressPercent(challenge)
 
   return (
     <Link to={`/challenges/${challenge.id}`} className="challenge-card">
@@ -30,7 +30,9 @@ export function ChallengeCard({ challenge }: { challenge: Challenge }) {
           <div className="progress-block">
             <div className="progress-meta">
               <span>
-                {challenge.progress ?? '0 km'} / {challenge.userTarget}
+                {challenge.challengeMode === 'activity_count'
+                  ? `${challenge.totalactiviti ?? '0'} / ${challenge.requiredActivities ?? '?'} hoạt động`
+                  : `${challenge.progress ?? '0 km'} / ${challenge.userTarget}`}
               </span>
               <span>{pct}%</span>
             </div>

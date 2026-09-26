@@ -125,17 +125,67 @@ export function joinBlockedMessage(challenge: Challenge): string {
 }
 
 export function listDisplayText(challenge: Challenge): string {
-  if (challenge.status === STATUS_FINISHED) return 'Hạn đăng ký: đã hết'
+  const rules = challengeRulesSummary(challenge)
+  if (challenge.status === STATUS_FINISHED) {
+    return rules ? `${rules} · Hạn đăng ký: đã hết` : 'Hạn đăng ký: đã hết'
+  }
   const deadline = joinDeadlineDate(challenge.startDate, challenge.joinDeadlineDays)
   if (!deadline) {
-    return `Hạn đăng ký: ${challenge.joinDeadlineDays} ngày từ ngày bắt đầu`
+    const join = `Hạn đăng ký: ${challenge.joinDeadlineDays} ngày từ ngày bắt đầu`
+    return rules ? `${rules} · ${join}` : join
   }
   const dateStr = formatDay(deadline)
+  let join: string
   if (challenge.status === STATUS_UPCOMING) {
-    return `Hạn đăng ký: đến ${dateStr} (${challenge.joinDeadlineDays} ngày sau khi bắt đầu)`
+    join = `Hạn đăng ký: đến ${dateStr} (${challenge.joinDeadlineDays} ngày sau khi bắt đầu)`
+  } else if (canJoin(challenge)) {
+    join = `Hạn đăng ký: đến ${dateStr}`
+  } else {
+    join = `Hạn đăng ký: đã qua (${dateStr})`
   }
-  if (canJoin(challenge)) return `Hạn đăng ký: đến ${dateStr}`
-  return `Hạn đăng ký: đã qua (${dateStr})`
+  return rules ? `${rules} · ${join}` : join
+}
+
+export function challengeRulesSummary(challenge: Challenge): string {
+  if (challenge.challengeMode === 'monthly_pace') {
+    const pace =
+      challenge.paceMinMinutes != null && challenge.paceMaxMinutes != null
+        ? `pace ${formatPaceMinutes(challenge.paceMinMinutes)}–${formatPaceMinutes(challenge.paceMaxMinutes)}`
+        : 'theo tháng'
+    return `Tháng · ${pace}`
+  }
+  if (challenge.challengeMode === 'activity_count') {
+    const n = challenge.requiredActivities ?? 0
+    const d = challenge.minActivityDistanceKm ?? MIN_DISTANCE_KM
+    return `${n} hoạt động ≥ ${d} km`
+  }
+  return ''
+}
+
+export function formatPaceMinutes(min: number): string {
+  if (!Number.isFinite(min) || min < 0) return '—'
+  const m = Math.floor(min)
+  const s = Math.round((min - m) * 60)
+  const ss = s === 60 ? 0 : s
+  const mm = s === 60 ? m + 1 : m
+  return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
+}
+
+export function parsePaceInput(value: string): number | null {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  if (trimmed.includes(':')) {
+    const pace = convertPaceToMinutesPerKm(trimmed)
+    return pace < 0 ? null : pace
+  }
+  const n = Number(trimmed.replace(',', '.'))
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
+export type ProgressOptions = {
+  paceMin?: number
+  paceMax?: number
+  minActivityDistanceKm?: number
 }
 
 export function convertPaceToMinutesPerKm(pace: string): number {
@@ -159,7 +209,12 @@ export function calculateProgress(
   activities: Record<string, unknown>[],
   startDate: Date,
   endDate: Date,
+  options?: ProgressOptions,
 ): ChallengeProgressResult {
+  const paceMin = options?.paceMin ?? MIN_PACE
+  const paceMax = options?.paceMax ?? MAX_PACE
+  const minDist = options?.minActivityDistanceKm ?? MIN_DISTANCE_KM
+
   let totalDistance = 0
   let totalActivities = 0
   let totalPace = 0
@@ -171,7 +226,7 @@ export function calculateProgress(
     const activityDateStr = String(activity.startDate ?? '')
     const distance = Number(activity.distance)
     const paceStr = String(activity.pace ?? '')
-    if (!activityDateStr || Number.isNaN(distance) || distance < MIN_DISTANCE_KM) {
+    if (!activityDateStr || Number.isNaN(distance) || distance < minDist) {
       continue
     }
 
@@ -179,7 +234,7 @@ export function calculateProgress(
     if (dayMs == null) continue
 
     const pace = convertPaceToMinutesPerKm(paceStr)
-    if (pace < MIN_PACE || pace > MAX_PACE) continue
+    if (pace < paceMin || pace > paceMax) continue
 
     if (dayMs >= startDate.getTime() && dayMs <= endDate.getTime()) {
       totalDistance += distance
@@ -196,6 +251,33 @@ export function calculateProgress(
   }
 }
 
+export function progressOptionsFromDict(
+  dict: Record<string, unknown>,
+): ProgressOptions | undefined {
+  const paceMin =
+    dict.paceMinMinutes != null ? Number(dict.paceMinMinutes) : NaN
+  const paceMax =
+    dict.paceMaxMinutes != null ? Number(dict.paceMaxMinutes) : NaN
+  const minDist =
+    dict.minActivityDistanceKm != null
+      ? Number(dict.minActivityDistanceKm)
+      : NaN
+  const opts: ProgressOptions = {}
+  if (Number.isFinite(paceMin) && paceMin > 0) opts.paceMin = paceMin
+  if (Number.isFinite(paceMax) && paceMax > 0) opts.paceMax = paceMax
+  if (Number.isFinite(minDist) && minDist > 0) opts.minActivityDistanceKm = minDist
+  return Object.keys(opts).length ? opts : undefined
+}
+
+function parseChallengeMode(
+  raw: unknown,
+): Challenge['challengeMode'] {
+  if (raw === 'monthly_pace' || raw === 'activity_count' || raw === 'distance') {
+    return raw
+  }
+  return 'distance'
+}
+
 export function parseChallenge(
   id: string,
   dict: Record<string, unknown>,
@@ -210,6 +292,10 @@ export function parseChallenge(
   const startDate = String(dict.startDate ?? '')
   const endDate = String(dict.endDate ?? '')
   const computedStatus = calculateStatus(startDate, endDate)
+  const paceMin = Number(dict.paceMinMinutes)
+  const paceMax = Number(dict.paceMaxMinutes)
+  const requiredActivities = Number(dict.requiredActivities)
+  const minActivityDistanceKm = Number(dict.minActivityDistanceKm)
 
   return {
     id,
@@ -225,6 +311,19 @@ export function parseChallenge(
     creator: dict.creator != null ? String(dict.creator) : undefined,
     password: dict.password ? String(dict.password) : undefined,
     joinDeadlineDays: joinDeadlineDaysFrom(dict),
+    challengeMode: parseChallengeMode(dict.challengeMode),
+    paceMinMinutes:
+      Number.isFinite(paceMin) && paceMin > 0 ? paceMin : undefined,
+    paceMaxMinutes:
+      Number.isFinite(paceMax) && paceMax > 0 ? paceMax : undefined,
+    requiredActivities:
+      Number.isFinite(requiredActivities) && requiredActivities > 0
+        ? requiredActivities
+        : undefined,
+    minActivityDistanceKm:
+      Number.isFinite(minActivityDistanceKm) && minActivityDistanceKm > 0
+        ? minActivityDistanceKm
+        : undefined,
     userTarget: userData?.userTarget != null ? String(userData.userTarget) : undefined,
     progress: userData?.progress != null ? String(userData.progress) : undefined,
     totalpace: userData?.totalpace != null ? String(userData.totalpace) : undefined,
@@ -252,4 +351,19 @@ export function progressPercent(progress?: string, target?: string): number {
   const t = Number(String(target).replace(/[^0-9.]/g, ''))
   if (!t || Number.isNaN(p) || Number.isNaN(t)) return 0
   return Math.min(100, Math.round((p / t) * 100))
+}
+
+export function challengeProgressPercent(challenge: Challenge): number {
+  if (
+    challenge.challengeMode === 'activity_count' &&
+    challenge.requiredActivities &&
+    challenge.requiredActivities > 0
+  ) {
+    const n = Number(challenge.totalactiviti ?? 0) || 0
+    return Math.min(
+      100,
+      Math.round((n / challenge.requiredActivities) * 100),
+    )
+  }
+  return progressPercent(challenge.progress, challenge.userTarget)
 }

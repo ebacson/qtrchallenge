@@ -57,10 +57,28 @@ export async function deleteUserAvatar(uid: string): Promise<void> {
   }
 }
 
-/** Format Date → dd-MM-yyyy (giống iOS create challenge). */
-export function formatChallengeDay(date: Date): string {
+/** HTML month input (yyyy-MM) → first/last day as yyyy-MM-dd */
+export function monthInputBounds(monthValue: string): {
+  start: string
+  end: string
+} | null {
+  const m = monthValue.match(/^(\d{4})-(\d{2})$/)
+  if (!m) return null
+  const year = Number(m[1])
+  const month = Number(m[2])
+  if (!year || month < 1 || month > 12) return null
+  const lastDay = new Date(year, month, 0).getDate()
   const pad = (n: number) => String(n).padStart(2, '0')
-  return `${pad(date.getDate())}-${pad(date.getMonth() + 1)}-${date.getFullYear()}`
+  return {
+    start: `${year}-${pad(month)}-01`,
+    end: `${year}-${pad(month)}-${pad(lastDay)}`,
+  }
+}
+
+export function currentMonthInputValue(): string {
+  const d = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`
 }
 
 export function todayInputValue(): string {

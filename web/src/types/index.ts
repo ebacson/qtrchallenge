@@ -44,6 +44,12 @@ export interface Challenge {
   creator?: string
   password?: string
   joinDeadlineDays: number
+  /** distance | monthly_pace | activity_count */
+  challengeMode: 'distance' | 'monthly_pace' | 'activity_count'
+  paceMinMinutes?: number
+  paceMaxMinutes?: number
+  requiredActivities?: number
+  minActivityDistanceKm?: number
   userTarget?: string
   progress?: string
   totalpace?: string

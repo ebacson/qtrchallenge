@@ -741,3 +741,248 @@ code {
   padding: 2px 6px;
   border-radius: 6px;
 }
+
+.gold-eyebrow {
+  color: #b8860b;
+}
+
+.chip.active.gold {
+  background: linear-gradient(135deg, #d4a017, #f0c040);
+  color: #1a1408;
+  border-color: transparent;
+}
+
+.shortcut-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.shortcut-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.15s ease;
+}
+
+.shortcut-card:hover {
+  transform: translateY(-2px);
+  text-decoration: none;
+}
+
+.hof-list,
+.member-list,
+.noti-list,
+.history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hof-row,
+.member-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.hof-row.top {
+  border-color: rgba(212, 160, 23, 0.45);
+  box-shadow: 0 8px 20px rgba(212, 160, 23, 0.12);
+}
+
+.hof-rank {
+  width: 28px;
+  text-align: center;
+  font-family: var(--display);
+  font-size: 1.2rem;
+  color: var(--ink-soft);
+}
+
+.hof-rank.gold {
+  color: #b8860b;
+}
+
+.hof-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--teal), var(--accent));
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.hof-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hof-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hof-time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-family: var(--display);
+  font-size: 1.25rem;
+}
+
+.pr-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.pr-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: rgba(15, 28, 36, 0.03);
+  border-radius: 12px;
+}
+
+.verify-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  width: fit-content;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.verify-pill.yes {
+  background: rgba(27, 127, 78, 0.15);
+  color: var(--ok);
+}
+
+.verify-pill.no {
+  background: rgba(184, 134, 11, 0.15);
+  color: var(--warn);
+}
+
+.noti-card {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: 14px;
+  padding: 14px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.noti-card.unread {
+  border-color: rgba(232, 93, 4, 0.35);
+  background: rgba(255, 248, 239, 0.95);
+}
+
+.noti-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.noti-card .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.member-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.search-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.search-field input {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #fff;
+}
+
+.event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.event-card {
+  display: block;
+  padding: 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: inherit;
+}
+
+.event-card h3 {
+  margin: 8px 0 4px;
+}
+
+.results-table-wrap {
+  overflow-x: auto;
+}
+
+.results-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.results-table th,
+.results-table td {
+  text-align: left;
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.history-list li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+@media (min-width: 640px) {
+  .shortcut-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+

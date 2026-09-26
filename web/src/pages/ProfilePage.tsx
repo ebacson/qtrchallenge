@@ -11,6 +11,8 @@ export function ProfilePage() {
   const [phone, setPhone] = useState('')
   const [gender, setGender] = useState('')
   const [dob, setDob] = useState('')
+  const [fmTime, setFmTime] = useState('')
+  const [hmTime, setHmTime] = useState('')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -21,22 +23,34 @@ export function ProfilePage() {
     setPhone(profile.phone)
     setGender(profile.gender)
     setDob(profile.dob)
+    setFmTime(profile.fullMarathonTime)
+    setHmTime(profile.halfMarathonTime)
   }, [profile])
 
   async function onSave(e: FormEvent) {
     e.preventDefault()
-    if (!user) return
+    if (!user || !profile) return
     setBusy(true)
     setError('')
     setMessage('')
     try {
+      const fmChanged = fmTime.trim() !== (profile.fullMarathonTime || '')
+      const hmChanged = hmTime.trim() !== (profile.halfMarathonTime || '')
       await update(ref(db, `users/${user.uid}`), {
         fullName: fullName.trim(),
         phone: phone.trim(),
         gender,
         dob: dob.trim(),
+        fullMarathonTime: fmTime.trim(),
+        halfMarathonTime: hmTime.trim(),
+        ...(fmChanged ? { isFullMarathonVerified: false } : {}),
+        ...(hmChanged ? { isHalfMarathonVerified: false } : {}),
       })
-      setMessage('Đã lưu hồ sơ.')
+      setMessage(
+        fmChanged || hmChanged
+          ? 'Đã lưu. PR đổi sẽ cần admin xác minh lại để lên Bảng vàng.'
+          : 'Đã lưu hồ sơ.',
+      )
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không lưu được')
     } finally {
@@ -84,11 +98,8 @@ export function ProfilePage() {
         <p className="body-text">
           {profile.user_strava
             ? `Đã kết nối: ${profile.user_strava}`
-            : 'Chưa kết nối Strava. Vào tab Sync để OAuth trực tiếp (phase 2).'}
+            : 'Chưa kết nối Strava.'}
         </p>
-        {profile.id_strava && (
-          <p className="tiny muted">Athlete ID: {profile.id_strava}</p>
-        )}
         <p style={{ marginTop: 12 }}>
           <Link className="btn ghost" to="/strava">
             Mở Strava Sync
@@ -124,6 +135,26 @@ export function ProfilePage() {
               placeholder="dd-MM-yyyy"
             />
           </label>
+          <label>
+            Full Marathon (hh:mm:ss)
+            <input
+              value={fmTime}
+              onChange={(e) => setFmTime(e.target.value)}
+              placeholder="3:45:00"
+            />
+          </label>
+          <label>
+            Half Marathon (hh:mm:ss)
+            <input
+              value={hmTime}
+              onChange={(e) => setHmTime(e.target.value)}
+              placeholder="1:45:00"
+            />
+          </label>
+          <p className="tiny muted">
+            FM verified: {profile.isFullMarathonVerified ? 'có' : 'không'} · HM
+            verified: {profile.isHalfMarathonVerified ? 'có' : 'không'}
+          </p>
           {error && <p className="form-error">{error}</p>}
           {message && <p className="form-info">{message}</p>}
           <button type="submit" className="btn primary" disabled={busy}>

@@ -72,7 +72,6 @@ async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
     )
   }
 
-  const contentType = res.headers.get('content-type') || ''
   const rawText = await res.text()
   let data: T & { error?: string }
   try {

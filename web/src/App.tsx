@@ -9,6 +9,12 @@ import { ChallengeDetailPage } from './pages/ChallengeDetailPage'
 import { ActivitiesPage } from './pages/ActivitiesPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { StravaCallbackPage, StravaPage } from './pages/StravaPage'
+import { HallOfFamePage } from './pages/HallOfFamePage'
+import { AthletePrPage } from './pages/AthletePrPage'
+import { NotificationsPage } from './pages/NotificationsPage'
+import { MembersPage } from './pages/MembersPage'
+import { EventsPage, EventDetailPage } from './pages/EventsPage'
+import { StatsPage } from './pages/StatsPage'
 import type { ReactNode } from 'react'
 
 function Protected({ children }: { children: ReactNode }) {
@@ -42,6 +48,13 @@ function AppRoutes() {
         <Route path="activities" element={<ActivitiesPage />} />
         <Route path="challenges" element={<ChallengesPage />} />
         <Route path="challenges/:id" element={<ChallengeDetailPage />} />
+        <Route path="events" element={<EventsPage />} />
+        <Route path="events/:eventId" element={<EventDetailPage />} />
+        <Route path="hall-of-fame" element={<HallOfFamePage />} />
+        <Route path="hall-of-fame/:uid" element={<AthletePrPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
+        <Route path="members" element={<MembersPage />} />
+        <Route path="stats" element={<StatsPage />} />
         <Route path="strava" element={<StravaPage />} />
         <Route path="strava/callback" element={<StravaCallbackPage />} />
         <Route path="profile" element={<ProfilePage />} />

@@ -7,6 +7,15 @@ import { parseChallenge, STATUS_ONGOING } from '../lib/challengeRules'
 import type { Challenge } from '../types'
 import { ChallengeCard } from '../components/ChallengeCard'
 
+const shortcuts = [
+  { to: '/hall-of-fame', title: 'Bảng vàng', desc: 'PR Full / Half' },
+  { to: '/notifications', title: 'Thông báo', desc: 'Tin club' },
+  { to: '/members', title: 'Thành viên', desc: 'Danh sách runners' },
+  { to: '/stats', title: 'Thống kê', desc: 'Km & pace' },
+  { to: '/events', title: 'Events', desc: 'Giải & kết quả' },
+  { to: '/strava', title: 'Strava', desc: 'Kết nối & sync' },
+]
+
 export function HomePage() {
   const { profile, user } = useAuth()
   const [ongoing, setOngoing] = useState<Challenge[]>([])
@@ -42,7 +51,7 @@ export function HomePage() {
         <p className="eyebrow">Xin chào</p>
         <h1>{profile?.fullName || 'Runner'}</h1>
         <p className="lede">
-          Theo dõi thử thách QTR và hoạt động Strava đã đồng bộ từ app.
+          Club QTR — thử thách, bảng vàng, events và Strava sync.
         </p>
         <div className="stat-row">
           <div className="stat">
@@ -58,13 +67,17 @@ export function HomePage() {
             <span>Member</span>
           </div>
         </div>
-        <div className="cta-row">
-          <Link className="btn primary" to="/challenges">
-            Xem thử thách
-          </Link>
-          <Link className="btn ghost" to="/activities">
-            Activities
-          </Link>
+      </section>
+
+      <section className="section">
+        <h2>Lối tắt</h2>
+        <div className="shortcut-grid">
+          {shortcuts.map((s) => (
+            <Link key={s.to} to={s.to} className="shortcut-card">
+              <strong>{s.title}</strong>
+              <span className="tiny muted">{s.desc}</span>
+            </Link>
+          ))}
         </div>
       </section>
 

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { onValue, ref } from 'firebase/database'
 import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
-import { parseChallenge, STATUS_ONGOING } from '../lib/challengeRules'
+import { parseChallenge, parseChallengeDayStartMs, STATUS_ONGOING } from '../lib/challengeRules'
 import type { Challenge } from '../types'
 import { ChallengeCard } from '../components/ChallengeCard'
 
@@ -29,6 +29,11 @@ export function HomePage() {
       const list = Object.entries(val)
         .map(([id, dict]) => parseChallenge(id, dict, user.uid))
         .filter((c) => c.status === STATUS_ONGOING && c.userTarget)
+        .sort(
+          (a, b) =>
+            (parseChallengeDayStartMs(b.startDate) ?? 0) -
+            (parseChallengeDayStartMs(a.startDate) ?? 0),
+        )
         .slice(0, 3)
       setOngoing(list)
     })

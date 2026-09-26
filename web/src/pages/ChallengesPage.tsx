@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
 import {
   parseChallenge,
+  parseChallengeDayStartMs,
   STATUS_FINISHED,
   STATUS_ONGOING,
   STATUS_UPCOMING,
@@ -13,6 +14,19 @@ import type { Challenge } from '../types'
 import { ChallengeCard } from '../components/ChallengeCard'
 
 type Filter = 'all' | 'joined' | 'ongoing' | 'upcoming' | 'finished'
+
+function startMs(c: Challenge): number {
+  return parseChallengeDayStartMs(c.startDate) ?? 0
+}
+
+/** Upcoming: nearest start first. Others: newest start first. */
+function sortChallenges(list: Challenge[], forUpcoming: boolean): Challenge[] {
+  return [...list].sort((a, b) => {
+    const da = startMs(a)
+    const db = startMs(b)
+    return forUpcoming ? da - db : db - da
+  })
+}
 
 export function ChallengesPage() {
   const { user, profile } = useAuth()
@@ -25,9 +39,9 @@ export function ChallengesPage() {
     const challengesRef = ref(db, 'challenges')
     const unsub = onValue(challengesRef, (snap) => {
       const val = (snap.val() ?? {}) as Record<string, Record<string, unknown>>
-      const list = Object.entries(val)
-        .map(([id, dict]) => parseChallenge(id, dict, user.uid))
-        .sort((a, b) => b.startDate.localeCompare(a.startDate))
+      const list = Object.entries(val).map(([id, dict]) =>
+        parseChallenge(id, dict, user.uid),
+      )
       setChallenges(list)
       setLoading(false)
     })
@@ -35,7 +49,7 @@ export function ChallengesPage() {
   }, [user])
 
   const filtered = useMemo(() => {
-    return challenges.filter((c) => {
+    const list = challenges.filter((c) => {
       switch (filter) {
         case 'joined':
           return Boolean(c.userTarget)
@@ -49,6 +63,37 @@ export function ChallengesPage() {
           return true
       }
     })
+
+    if (filter === 'upcoming') {
+      return sortChallenges(list, true)
+    }
+
+    if (filter === 'all' || filter === 'joined') {
+      const upcoming = sortChallenges(
+        list.filter((c) => c.status === STATUS_UPCOMING),
+        true,
+      )
+      const ongoing = sortChallenges(
+        list.filter((c) => c.status === STATUS_ONGOING),
+        false,
+      )
+      const finished = sortChallenges(
+        list.filter((c) => c.status === STATUS_FINISHED),
+        false,
+      )
+      const other = sortChallenges(
+        list.filter(
+          (c) =>
+            c.status !== STATUS_ONGOING &&
+            c.status !== STATUS_UPCOMING &&
+            c.status !== STATUS_FINISHED,
+        ),
+        false,
+      )
+      return [...ongoing, ...upcoming, ...finished, ...other]
+    }
+
+    return sortChallenges(list, false)
   }, [challenges, filter])
 
   return (

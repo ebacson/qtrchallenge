@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { ref, set } from 'firebase/database'
 import { useAuth } from '../context/AuthContext'
+import { brandLogoSrc, brandTitle } from '../lib/brand'
 import { db } from '../lib/firebase'
 
 export function RegisterPage() {
@@ -52,8 +53,9 @@ export function RegisterPage() {
     <div className="auth-page">
       <div className="auth-atmosphere" aria-hidden />
       <div className="auth-panel">
-        <p className="brand-name hero-brand">QTR</p>
-        <p className="auth-tagline">Tạo tài khoản echiptime</p>
+        <img src={brandLogoSrc} alt="" className="brand-logo auth-logo" />
+        <p className="brand-name hero-brand">{brandTitle}</p>
+        <p className="auth-tagline">Tạo tài khoản</p>
 
         <form className="auth-form" onSubmit={onSubmit}>
           <label>

@@ -89,22 +89,36 @@ select {
   gap: 10px;
 }
 
-.brand-dot {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background:
-    conic-gradient(from 210deg, var(--accent), var(--teal), var(--accent));
-  box-shadow: 0 0 0 3px rgba(232, 93, 4, 0.2);
+.brand-logo {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.brand-logo.auth-logo {
+  width: 96px;
+  height: 96px;
+  border-radius: 22px;
+  margin: 0 auto 8px;
+  display: block;
+}
+
+.brand-logo.boot-logo {
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
+  margin-bottom: 12px;
 }
 
 .brand-name {
   font-family: var(--display);
   font-weight: 700;
-  font-size: 1.5rem;
-  letter-spacing: 0.06em;
+  font-size: 1.25rem;
+  letter-spacing: 0.04em;
   margin: 0;
-  line-height: 1;
+  line-height: 1.1;
 }
 
 .brand-sub {
@@ -116,8 +130,9 @@ select {
 }
 
 .hero-brand {
-  font-size: 4.5rem;
-  letter-spacing: 0.12em;
+  font-size: 2.4rem;
+  letter-spacing: 0.06em;
+  text-align: center;
 }
 
 .topbar-right {

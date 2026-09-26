@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { brandLogoSrc, brandTitle } from '../lib/brand'
 
 export function LoginPage() {
   const { user, loading, login, resetPassword } = useAuth()
@@ -45,8 +46,9 @@ export function LoginPage() {
     <div className="auth-page">
       <div className="auth-atmosphere" aria-hidden />
       <div className="auth-panel">
-        <p className="brand-name hero-brand">QTR</p>
-        <p className="auth-tagline">Club challenge · Strava · echiptime</p>
+        <img src={brandLogoSrc} alt="" className="brand-logo auth-logo" />
+        <p className="brand-name hero-brand">{brandTitle}</p>
+        <p className="auth-tagline">Club challenge · Strava</p>
 
         <form className="auth-form" onSubmit={onSubmit}>
           <label>

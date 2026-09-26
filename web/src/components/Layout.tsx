@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { brandLogoSrc, brandTitle } from '../lib/brand'
 
 const tabs = [
   { to: '/', label: 'Home', end: true },
@@ -16,11 +17,8 @@ export function Layout() {
     <div className="app-shell">
       <header className="topbar">
         <div className="brand-mark">
-          <span className="brand-dot" aria-hidden />
-          <div>
-            <p className="brand-name">QTR</p>
-            <p className="brand-sub">echiptime</p>
-          </div>
+          <img src={brandLogoSrc} alt="" className="brand-logo" />
+          <p className="brand-name">{brandTitle}</p>
         </div>
         <div className="topbar-right">
           {profile && (

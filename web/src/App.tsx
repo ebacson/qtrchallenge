@@ -16,13 +16,15 @@ import { MembersPage } from './pages/MembersPage'
 import { EventsPage, EventDetailPage } from './pages/EventsPage'
 import { StatsPage } from './pages/StatsPage'
 import type { ReactNode } from 'react'
+import { brandLogoSrc, brandTitle } from './lib/brand'
 
 function Protected({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()
   if (loading) {
     return (
       <div className="boot-screen">
-        <p className="brand-name">QTR</p>
+        <img src={brandLogoSrc} alt="" className="brand-logo boot-logo" />
+        <p className="brand-name">{brandTitle}</p>
         <p className="muted">Đang tải…</p>
       </div>
     )

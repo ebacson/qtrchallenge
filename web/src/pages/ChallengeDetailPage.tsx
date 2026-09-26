@@ -51,11 +51,16 @@ export function ChallengeDetailPage() {
   const [profiles, setProfiles] = useState<
     Record<string, { fullName: string; avatar: string }>
   >({})
+  const [showDescription, setShowDescription] = useState(false)
   const [selectedTarget, setSelectedTarget] = useState('')
   const [password, setPassword] = useState('')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    setShowDescription(false)
+  }, [id])
 
   useEffect(() => {
     if (!id || !user) return
@@ -223,9 +228,21 @@ export function ChallengeDetailPage() {
       </div>
 
       {challenge.description && (
-        <section className="section">
-          <h2>Mô tả</h2>
-          <p className="body-text">{challenge.description}</p>
+        <section className="section panel">
+          <div className="desc-toggle-row">
+            <h2>Mô tả</h2>
+            <button
+              type="button"
+              className="btn ghost compact"
+              onClick={() => setShowDescription((v) => !v)}
+              aria-expanded={showDescription}
+            >
+              {showDescription ? 'Ẩn nội dung' : 'Xem nội dung'}
+            </button>
+          </div>
+          {showDescription && (
+            <p className="body-text challenge-description">{challenge.description}</p>
+          )}
         </section>
       )}
 

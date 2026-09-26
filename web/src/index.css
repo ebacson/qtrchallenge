@@ -655,6 +655,21 @@ select {
   white-space: nowrap;
 }
 
+.desc-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.desc-toggle-row h2 {
+  margin: 0;
+}
+
+.challenge-description {
+  margin-top: 12px;
+}
+
 .empty {
   color: var(--ink-soft);
   padding: 24px 0;

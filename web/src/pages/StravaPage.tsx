@@ -36,10 +36,13 @@ export function StravaCallbackPage() {
     const code = params.get('code')
     const state = params.get('state')
     const oauthError = params.get('error')
+    const oauthErrorDesc = params.get('error_description')
 
     async function finish() {
       if (oauthError) {
-        setError(`Strava từ chối: ${oauthError}`)
+        setError(
+          `Strava từ chối: ${oauthError}${oauthErrorDesc ? ` — ${oauthErrorDesc}` : ''}`,
+        )
         return
       }
       if (!code) {

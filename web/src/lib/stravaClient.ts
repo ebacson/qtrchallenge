@@ -1,4 +1,4 @@
-/** Client Strava — all Strava HTTP goes through /api/strava/* (no browser CORS). */
+/** Client Strava — routes through local Vite proxy or Cloud Functions. */
 
 const STATE_KEY = 'strava_oauth_state'
 
@@ -10,11 +10,6 @@ export type StravaConfig = {
   apiBase?: string
   policyNotes?: string[]
   error?: string
-  debug?: {
-    hasClientId?: boolean
-    hasClientSecret?: boolean
-    hasRedirectUri?: boolean
-  }
 }
 
 export type StravaTokens = {
@@ -43,10 +38,28 @@ export type StravaActivityRecord = {
   pace: string
 }
 
+/**
+ * Local: `/api/strava/...` via Vite middleware.
+ * Pages: `VITE_STRAVA_API_BASE` → Cloud Function, e.g.
+ * `https://us-central1-echiptime.cloudfunctions.net/stravaApi`
+ */
+function apiUrl(path: string): string {
+  const remote = (import.meta.env.VITE_STRAVA_API_BASE as string | undefined)?.replace(
+    /\/$/,
+    '',
+  )
+  if (remote) return `${remote}${path}`
+  // Keep relative to Vite base when on GitHub Pages without remote API
+  // (will 404 — caller should handle configured:false)
+  const pageBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
+  return `${pageBase}${path}`
+}
+
 async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const url = apiUrl(path)
   let res: Response
   try {
-    res = await fetch(path, {
+    res = await fetch(url, {
       ...init,
       headers: {
         'Content-Type': 'application/json',
@@ -55,17 +68,21 @@ async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
     })
   } catch {
     throw new Error(
-      'Failed to fetch — mở đúng cổng Vite (thường http://localhost:5173) và đảm bảo npm run dev đang chạy.',
+      'Không gọi được Strava API. Local: chạy npm run dev. Production: cần Cloud Function (VITE_STRAVA_API_BASE).',
     )
   }
 
-  let data: T & { error?: string }
-  try {
-    data = (await res.json()) as T & { error?: string }
-  } catch {
+  const contentType = res.headers.get('content-type') || ''
+  if (!contentType.includes('application/json')) {
+    if (res.status === 404) {
+      throw new Error(
+        'Strava API chưa có trên GitHub Pages (404). Đang dùng Cloud Functions — đợi deploy xong hoặc chạy local.',
+      )
+    }
     throw new Error(`Server returned non-JSON (${res.status})`)
   }
 
+  const data = (await res.json()) as T & { error?: string }
   if (!res.ok) {
     throw new Error(data.error || `Request failed (${res.status})`)
   }
@@ -73,7 +90,14 @@ async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export async function fetchStravaConfig(): Promise<StravaConfig> {
-  return apiJson('/api/strava/config')
+  try {
+    return await apiJson('/api/strava/config')
+  } catch (err) {
+    return {
+      configured: false,
+      error: err instanceof Error ? err.message : 'Strava API unavailable',
+    }
+  }
 }
 
 export async function startStravaConnect(): Promise<void> {

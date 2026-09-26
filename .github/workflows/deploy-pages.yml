@@ -40,7 +40,11 @@ jobs:
             if [ -f "$f" ]; then cp "$f" _site/; fi
           done
           cp -R web/dist/. _site/web/
-          # SPA deep-link fallback on GitHub Pages
+          # GitHub Pages serves ONLY site-root 404.html for missing paths (SPA deep links)
+          cp web/spa-404-root.html _site/404.html
+          # Belt-and-suspenders: ensure Strava OAuth callback is a real directory index
+          mkdir -p _site/web/strava/callback
+          cp web/dist/index.html _site/web/strava/callback/index.html
           cp web/dist/index.html _site/web/404.html
 
       - uses: actions/upload-pages-artifact@v3

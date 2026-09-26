@@ -20,17 +20,60 @@ export type AthletePrRow = {
   personalRecord: PersonalRecord
 }
 
-/** Parse "hh:mm:ss" or "h:mm:ss" / "mm:ss" into total seconds. Invalid → Infinity. */
-export function timeToSeconds(time: string): number {
-  const parts = time.trim().split(':').map((p) => Number(p))
-  if (parts.some((n) => Number.isNaN(n) || n < 0)) return Number.POSITIVE_INFINITY
-  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]
-  if (parts.length === 2) return parts[0] * 60 + parts[1]
-  return Number.POSITIVE_INFINITY
+function asBool(value: unknown): boolean {
+  if (value === true || value === 1) return true
+  if (typeof value === 'string') {
+    const v = value.trim().toLowerCase()
+    return v === 'true' || v === '1' || v === 'yes'
+  }
+  return false
 }
 
+/**
+ * Parse marathon PR time to total seconds.
+ * Accepts hh:mm:ss / h:mm:ss (and fullwidth ： or . as separators).
+ * Invalid → +Infinity (sorts last).
+ */
+export function timeToSeconds(time: string): number {
+  const normalized = time
+    .trim()
+    .replace(/[：﹒．]/g, ':')
+    .replace(/[^\d:]/g, '')
+
+  const parts = normalized.split(':').filter((p) => p.length > 0)
+  if (parts.length !== 3) return Number.POSITIVE_INFINITY
+
+  const hours = Number(parts[0])
+  const minutes = Number(parts[1])
+  const seconds = Number(parts[2])
+
+  if (
+    !Number.isFinite(hours) ||
+    !Number.isFinite(minutes) ||
+    !Number.isFinite(seconds) ||
+    hours < 0 ||
+    minutes < 0 ||
+    minutes >= 60 ||
+    seconds < 0 ||
+    seconds >= 60
+  ) {
+    return Number.POSITIVE_INFINITY
+  }
+
+  return hours * 3600 + minutes * 60 + seconds
+}
+
+/** Normalize display to hh:mm:ss (zero-padded). */
 export function formatRankTime(time: string): string {
-  return time.trim() || '—'
+  const sec = timeToSeconds(time)
+  if (!Number.isFinite(sec) || sec === Number.POSITIVE_INFINITY) {
+    const raw = time.trim()
+    return raw || '—'
+  }
+  const h = Math.floor(sec / 3600)
+  const m = Math.floor((sec % 3600) / 60)
+  const s = Math.floor(sec % 60)
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
 export function parsePersonalRecord(
@@ -38,10 +81,10 @@ export function parsePersonalRecord(
 ): PersonalRecord | null {
   if (!raw || typeof raw !== 'object') return null
   return {
-    fullMarathonTime: String(raw.fullMarathonTime ?? ''),
-    halfMarathonTime: String(raw.halfMarathonTime ?? ''),
-    isFullMarathonVerified: Boolean(raw.isFullMarathonVerified),
-    isHalfMarathonVerified: Boolean(raw.isHalfMarathonVerified),
+    fullMarathonTime: String(raw.fullMarathonTime ?? '').trim(),
+    halfMarathonTime: String(raw.halfMarathonTime ?? '').trim(),
+    isFullMarathonVerified: asBool(raw.isFullMarathonVerified),
+    isHalfMarathonVerified: asBool(raw.isHalfMarathonVerified),
     submittedAt: raw.submittedAt ? String(raw.submittedAt) : undefined,
   }
 }
@@ -67,6 +110,14 @@ export function mapAthleteFromUser(
   }
 }
 
+function prSeconds(athlete: AthletePrRow, distance: DistanceKey): number {
+  const raw =
+    distance === 'FM'
+      ? athlete.personalRecord.fullMarathonTime
+      : athlete.personalRecord.halfMarathonTime
+  return timeToSeconds(raw)
+}
+
 export function rankAthletes(
   athletes: AthletePrRow[],
   distance: DistanceKey,
@@ -77,20 +128,23 @@ export function rankAthletes(
     .filter((a) => {
       const pr = a.personalRecord
       if (distance === 'FM') {
-        return pr.isFullMarathonVerified && Boolean(pr.fullMarathonTime.trim())
+        return (
+          pr.isFullMarathonVerified &&
+          pr.fullMarathonTime.length > 0 &&
+          Number.isFinite(timeToSeconds(pr.fullMarathonTime))
+        )
       }
-      return pr.isHalfMarathonVerified && Boolean(pr.halfMarathonTime.trim())
+      return (
+        pr.isHalfMarathonVerified &&
+        pr.halfMarathonTime.length > 0 &&
+        Number.isFinite(timeToSeconds(pr.halfMarathonTime))
+      )
     })
     .sort((a, b) => {
-      const ta =
-        distance === 'FM'
-          ? timeToSeconds(a.personalRecord.fullMarathonTime)
-          : timeToSeconds(a.personalRecord.halfMarathonTime)
-      const tb =
-        distance === 'FM'
-          ? timeToSeconds(b.personalRecord.fullMarathonTime)
-          : timeToSeconds(b.personalRecord.halfMarathonTime)
-      return ta - tb
+      const ta = prSeconds(a, distance)
+      const tb = prSeconds(b, distance)
+      if (ta !== tb) return ta - tb
+      return a.fullName.localeCompare(b.fullName, 'vi')
     })
 }
 

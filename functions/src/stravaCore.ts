@@ -2,6 +2,8 @@
  * Shared Strava server logic for Vite middleware + Firebase Cloud Functions.
  */
 export const STRAVA_API_BASE = 'https://www.api-v3.strava.com'
+/** Legacy host — fallback if api-v3 is unreachable from Cloud Functions. */
+export const STRAVA_API_BASE_FALLBACK = 'https://www.strava.com/api/v3'
 export const STRAVA_OAUTH_TOKEN_URL = 'https://www.strava.com/oauth/token'
 export const STRAVA_AUTHORIZE_URL = 'https://www.strava.com/oauth/authorize'
 export const STRAVA_SCOPE = 'read,activity:read'
@@ -51,25 +53,33 @@ async function parseJson(res: Response): Promise<unknown> {
 async function postStravaToken(
   params: Record<string, string>,
 ): Promise<{ ok: true; data: StravaTokenResponse } | { ok: false; status: number; error: string }> {
-  const res = await fetch(STRAVA_OAUTH_TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams(params),
-  })
-  const data = (await parseJson(res)) as StravaTokenResponse & {
-    message?: string
-    error?: string
-    error_description?: string
+  try {
+    const res = await fetch(STRAVA_OAUTH_TOKEN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(params),
+    })
+    const data = (await parseJson(res)) as StravaTokenResponse & {
+      message?: string
+      error?: string
+      error_description?: string
+    }
+    if (!res.ok || !data.access_token) {
+      const detail =
+        data.error_description ||
+        data.message ||
+        data.error ||
+        `Token request failed (${res.status})`
+      return { ok: false, status: res.status, error: detail }
+    }
+    return { ok: true, data }
+  } catch (err) {
+    return {
+      ok: false,
+      status: 502,
+      error: err instanceof Error ? `Token request network error: ${err.message}` : 'Token request network error',
+    }
   }
-  if (!res.ok || !data.access_token) {
-    const detail =
-      data.error_description ||
-      data.message ||
-      data.error ||
-      `Token request failed (${res.status})`
-    return { ok: false, status: res.status, error: detail }
-  }
-  return { ok: true, data }
 }
 
 export async function exchangeAuthorizationCode(
@@ -100,29 +110,38 @@ export async function refreshAccessToken(
 export async function revokeAccessToken(
   accessToken: string,
 ): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
-  const revokeRes = await fetch(`${STRAVA_API_BASE}/oauth/revoke`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({}),
-  })
-  if (revokeRes.ok || revokeRes.status === 204) return { ok: true }
+  const bases = [STRAVA_API_BASE, STRAVA_API_BASE_FALLBACK]
+  let lastStatus = 0
+  for (const base of bases) {
+    try {
+      const revokeRes = await fetch(`${base}/oauth/revoke`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      })
+      if (revokeRes.ok || revokeRes.status === 204) return { ok: true }
 
-  const deauthRes = await fetch(`${STRAVA_API_BASE}/oauth/deauthorize`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({ access_token: accessToken }),
-  })
-  if (deauthRes.ok || deauthRes.status === 204) return { ok: true }
+      const deauthRes = await fetch(`${base}/oauth/deauthorize`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({ access_token: accessToken }),
+      })
+      if (deauthRes.ok || deauthRes.status === 204) return { ok: true }
+      lastStatus = deauthRes.status || revokeRes.status
+    } catch {
+      // try next host
+    }
+  }
   return {
     ok: false,
-    status: deauthRes.status || revokeRes.status,
-    error: `Revoke failed (${revokeRes.status}/${deauthRes.status})`,
+    status: lastStatus || 502,
+    error: 'Revoke failed (network or Strava error)',
   }
 }
 
@@ -138,22 +157,50 @@ export function buildAuthorizeUrl(env: StravaEnv, state: string): string {
   return `${STRAVA_AUTHORIZE_URL}?${params.toString()}`
 }
 
+function fetchErrorMessage(err: unknown): string {
+  if (!(err instanceof Error)) return 'Strava fetch failed'
+  const cause = (err as Error & { cause?: unknown }).cause
+  if (cause instanceof Error && cause.message) {
+    return `Strava fetch failed: ${err.message} (${cause.message})`
+  }
+  return `Strava fetch failed: ${err.message}`
+}
+
 export async function stravaApiGet(
   accessToken: string,
   pathWithQuery: string,
 ): Promise<{ ok: true; data: unknown } | { ok: false; status: number; error: string }> {
-  const res = await fetch(`${STRAVA_API_BASE}${pathWithQuery}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  })
-  const data = await parseJson(res)
-  if (!res.ok) {
-    const msg =
-      typeof data === 'object' && data && 'message' in data
-        ? String((data as { message: unknown }).message)
-        : `Strava API ${res.status}`
-    return { ok: false, status: res.status, error: msg }
+  const bases = [STRAVA_API_BASE, STRAVA_API_BASE_FALLBACK]
+  let lastError = 'Strava fetch failed'
+
+  for (const base of bases) {
+    try {
+      const res = await fetch(`${base}${pathWithQuery}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Accept: 'application/json',
+        },
+      })
+      const data = await parseJson(res)
+      if (!res.ok) {
+        const msg =
+          typeof data === 'object' && data && 'message' in data
+            ? String((data as { message: unknown }).message)
+            : `Strava API ${res.status}`
+        // Auth errors won't be fixed by host fallback
+        if (res.status === 401 || res.status === 403) {
+          return { ok: false, status: res.status, error: msg }
+        }
+        lastError = msg
+        continue
+      }
+      return { ok: true, data }
+    } catch (err) {
+      lastError = fetchErrorMessage(err)
+    }
   }
-  return { ok: true, data }
+
+  return { ok: false, status: 502, error: lastError }
 }
 
 type RawActivity = {

@@ -73,16 +73,23 @@ async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   const contentType = res.headers.get('content-type') || ''
-  if (!contentType.includes('application/json')) {
+  const rawText = await res.text()
+  let data: T & { error?: string }
+  try {
+    data = (rawText ? JSON.parse(rawText) : {}) as T & { error?: string }
+  } catch {
     if (res.status === 404) {
       throw new Error(
         'Strava API chưa có trên GitHub Pages (404). Đang dùng Cloud Functions — đợi deploy xong hoặc chạy local.',
       )
     }
-    throw new Error(`Server returned non-JSON (${res.status})`)
+    throw new Error(
+      rawText
+        ? `Server error (${res.status}): ${rawText.slice(0, 180)}`
+        : `Server returned non-JSON (${res.status})`,
+    )
   }
 
-  const data = (await res.json()) as T & { error?: string }
   if (!res.ok) {
     throw new Error(data.error || `Request failed (${res.status})`)
   }

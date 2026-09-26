@@ -37,6 +37,12 @@ STRAVA_REDIRECT_URI=http://localhost:5173/strava/callback
 
 > Production static hosting must still expose the same `/api/strava/*` endpoints (keep the Vite plugin for `preview`, or port `server/strava.ts` to Cloud Functions / your Node host).
 
+## GitHub Pages
+
+Live (after Actions deploy): https://ebacson.github.io/qtrchallenge/web/
+
+Static hosting only — **Strava OAuth/sync API** (`/api/strava/*`) needs local `npm run dev` or a separate backend. Auth + Challenges + Activities read from Firebase still work on Pages.
+
 ## Run
 
 ```bash

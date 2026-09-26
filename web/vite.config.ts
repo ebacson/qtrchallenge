@@ -6,13 +6,20 @@ import { stravaApiPlugin } from './server/stravaApiPlugin.ts'
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url))
 
-export default defineConfig(({ mode }) => {
-  // Always load from web/ (config dir), not process.cwd() — avoids missing
-  // .env.local when `vite` is started from the monorepo root.
+/** GitHub Pages project site: https://ebacson.github.io/qtrchallenge/web/ */
+const PAGES_BASE = '/qtrchallenge/web/'
+
+export default defineConfig(({ mode, command }) => {
+  const isProdBuild = command === 'build'
   return {
     root: rootDir,
     envDir: rootDir,
-    plugins: [react(), stravaApiPlugin(() => loadEnv(mode, rootDir, ''))],
+    base: isProdBuild ? PAGES_BASE : '/',
+    plugins: [
+      react(),
+      // Strava proxy only for local `vite` / `vite preview` — not available on static Pages.
+      ...(command === 'serve' ? [stravaApiPlugin(() => loadEnv(mode, rootDir, ''))] : []),
+    ],
     server: {
       port: 5173,
       strictPort: true,

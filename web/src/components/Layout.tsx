@@ -31,6 +31,15 @@ export function Layout() {
   const menuRef = useRef<HTMLDivElement>(null)
   const menuId = useId()
 
+  const navMenuItems = profile?.admin
+    ? [
+        ...menuItems.slice(0, 2),
+        { to: '/admin/challenges/new', label: 'Tạo thử thách' },
+        { to: '/admin/users', label: 'Quản lý thành viên' },
+        ...menuItems.slice(2),
+      ]
+    : menuItems
+
   useEffect(() => {
     setMenuOpen(false)
   }, [location.pathname])
@@ -76,7 +85,7 @@ export function Layout() {
           {menuOpen && (
             <nav id={menuId} className="brand-dropdown" aria-label="Menu chức năng">
               <ul className="brand-menu-list" role="menu">
-                {menuItems.map((item) => (
+                {navMenuItems.map((item) => (
                   <li key={item.to} role="none">
                     <NavLink
                       to={item.to}

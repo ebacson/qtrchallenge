@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { onValue, ref } from 'firebase/database'
 import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
@@ -14,7 +15,7 @@ import { ChallengeCard } from '../components/ChallengeCard'
 type Filter = 'all' | 'joined' | 'ongoing' | 'upcoming' | 'finished'
 
 export function ChallengesPage() {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const [challenges, setChallenges] = useState<Challenge[]>([])
   const [filter, setFilter] = useState<Filter>('all')
   const [loading, setLoading] = useState(true)
@@ -55,6 +56,13 @@ export function ChallengesPage() {
       <header className="page-header">
         <h1>Thử thách</h1>
         <p className="lede">Danh sách challenge từ Firebase RTDB.</p>
+        {profile?.admin && (
+          <p style={{ marginTop: 12 }}>
+            <Link className="btn primary" to="/admin/challenges/new">
+              Tạo thử thách
+            </Link>
+          </p>
+        )}
       </header>
 
       <div className="filter-row">

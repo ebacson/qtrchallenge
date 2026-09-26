@@ -15,6 +15,9 @@ import { NotificationsPage } from './pages/NotificationsPage'
 import { MembersPage } from './pages/MembersPage'
 import { EventsPage, EventDetailPage } from './pages/EventsPage'
 import { StatsPage } from './pages/StatsPage'
+import { CreateChallengePage } from './pages/CreateChallengePage'
+import { AdminUsersPage } from './pages/AdminUsersPage'
+import { RequireAdmin } from './components/RequireAdmin'
 import type { ReactNode } from 'react'
 import { brandLogoSrc, brandTitle } from './lib/brand'
 
@@ -50,6 +53,22 @@ function AppRoutes() {
         <Route path="activities" element={<ActivitiesPage />} />
         <Route path="challenges" element={<ChallengesPage />} />
         <Route path="challenges/:id" element={<ChallengeDetailPage />} />
+        <Route
+          path="admin/challenges/new"
+          element={
+            <RequireAdmin>
+              <CreateChallengePage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="admin/users"
+          element={
+            <RequireAdmin>
+              <AdminUsersPage />
+            </RequireAdmin>
+          }
+        />
         <Route path="events" element={<EventsPage />} />
         <Route path="events/:eventId" element={<EventDetailPage />} />
         <Route path="hall-of-fame" element={<HallOfFamePage />} />

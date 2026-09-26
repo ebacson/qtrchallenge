@@ -225,6 +225,14 @@ export function ProfilePage() {
         <div className="admin-banner" role="status">
           <strong>Quản trị viên (Admin)</strong>
           <span>Tài khoản của bạn có quyền quản trị club.</span>
+          <div className="admin-quick-links">
+            <Link className="btn primary compact" to="/admin/challenges/new">
+              Tạo thử thách
+            </Link>
+            <Link className="btn ghost compact" to="/admin/users">
+              Quản lý thành viên
+            </Link>
+          </div>
         </div>
       )}
 

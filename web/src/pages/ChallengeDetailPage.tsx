@@ -11,6 +11,7 @@ import {
   listDisplayText,
   parseChallenge,
   progressPercent,
+  STATUS_UPCOMING,
   statusClass,
 } from '../lib/challengeRules'
 import type { Challenge } from '../types'
@@ -188,7 +189,11 @@ export function ChallengeDetailPage() {
   }
 
   async function onLeave() {
-    if (!user || !id) return
+    if (!user || !id || !challenge) return
+    if (challenge.status !== STATUS_UPCOMING) {
+      setError('Thử thách đã diễn ra — không thể rời nữa.')
+      return
+    }
     if (!window.confirm('Bạn chắc muốn rời thử thách này?')) return
     setBusy(true)
     setError('')
@@ -271,14 +276,20 @@ export function ChallengeDetailPage() {
                 ? `${challenge.totalactiviti} hoạt động hợp lệ`
                 : 'Progress cập nhật sau khi sync Strava'}
             </p>
-            <button
-              type="button"
-              className="btn danger"
-              disabled={busy}
-              onClick={() => void onLeave()}
-            >
-              Rời thử thách
-            </button>
+            {challenge.status === STATUS_UPCOMING ? (
+              <button
+                type="button"
+                className="btn danger"
+                disabled={busy}
+                onClick={() => void onLeave()}
+              >
+                Rời thử thách
+              </button>
+            ) : (
+              <p className="tiny muted">
+                Thử thách đã diễn ra — không thể rời nữa.
+              </p>
+            )}
           </section>
 
           <section className="section panel">

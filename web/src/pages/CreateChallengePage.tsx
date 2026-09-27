@@ -11,7 +11,6 @@ import {
   uploadChallengeIcon,
 } from '../lib/adminOps'
 import {
-  challengeDayLabels,
   countInclusiveDays,
   formatDayQuotaLabel,
   formatPaceMinutes,
@@ -37,12 +36,24 @@ function toKm(value: string): number {
   return Number(value.replace(',', '.'))
 }
 
-function resizeDailyKm(list: string[], totalDays: number, fill: string): string[] {
-  if (list.length >= totalDays) return list.slice(0, totalDays)
-  return [...list, ...Array<string>(totalDays - list.length).fill(fill)]
+/** Số ô km theo ngày = số ngày phải hoàn thành (giới hạn để tránh nhập nhầm số lớn). */
+function dailySlotCount(o: QuotaDraft): number {
+  const n = Number(o.daysRequired)
+  return Number.isInteger(n) && n > 0 ? Math.min(n, 366) : 0
 }
 
-function draftToOption(o: QuotaDraft, totalDays: number): DayQuotaOption | null {
+function syncDailySlots(o: QuotaDraft): QuotaDraft {
+  if (!o.perDay) return o
+  const size = dailySlotCount(o)
+  if (o.dailyKm.length === size) return o
+  const dailyKm =
+    o.dailyKm.length > size
+      ? o.dailyKm.slice(0, size)
+      : [...o.dailyKm, ...Array<string>(size - o.dailyKm.length).fill(o.kmPerDay)]
+  return { ...o, dailyKm }
+}
+
+function draftToOption(o: QuotaDraft): DayQuotaOption | null {
   const daysRequired = Number(o.daysRequired)
   const kmPerDay = toKm(o.kmPerDay)
   if (!Number.isInteger(daysRequired) || daysRequired < 1 || !(kmPerDay > 0)) {
@@ -50,7 +61,7 @@ function draftToOption(o: QuotaDraft, totalDays: number): DayQuotaOption | null 
   }
   if (!o.perDay) return { daysRequired, kmPerDay }
   const dailyKm = o.dailyKm.map(toKm)
-  if (dailyKm.length !== totalDays || dailyKm.some((km) => !(km > 0))) return null
+  if (dailyKm.length !== daysRequired || dailyKm.some((km) => !(km > 0))) return null
   return { daysRequired, kmPerDay: Math.min(...dailyKm), dailyKm }
 }
 
@@ -99,31 +110,18 @@ export function CreateChallengePage() {
   useEffect(() => {
     if (mode !== 'day_quota' || totalDays <= 0) return
     setQuotaOptions((prev) =>
-      prev.map((o, i) => {
-        let next = o
-        if (i === 0 && !o.daysRequired) {
-          next = { ...next, daysRequired: String(totalDays) }
-        }
-        if (o.perDay && o.dailyKm.length !== totalDays) {
-          next = { ...next, dailyKm: resizeDailyKm(o.dailyKm, totalDays, o.kmPerDay) }
-        }
-        return next
-      }),
+      prev.map((o, i) =>
+        i === 0 && !o.daysRequired
+          ? syncDailySlots({ ...o, daysRequired: String(totalDays) })
+          : o,
+      ),
     )
   }, [mode, totalDays])
-
-  const dayLabels = useMemo(
-    () =>
-      mode === 'day_quota' && totalDays > 0
-        ? challengeDayLabels(inputDateToChallengeDay(startDate), totalDays)
-        : [],
-    [mode, startDate, totalDays],
-  )
 
   const parsedQuotaOptions: DayQuotaOption[] = useMemo(() => {
     if (totalDays <= 0) return []
     return quotaOptions
-      .map((o) => draftToOption(o, totalDays))
+      .map((o) => draftToOption(o))
       .filter((o): o is DayQuotaOption => o != null)
   }, [quotaOptions, totalDays])
 
@@ -183,22 +181,12 @@ export function CreateChallengePage() {
 
   function updateQuota(index: number, patch: Partial<QuotaDraft>) {
     setQuotaOptions((prev) =>
-      prev.map((o, i) => (i === index ? { ...o, ...patch } : o)),
+      prev.map((o, i) => (i === index ? syncDailySlots({ ...o, ...patch }) : o)),
     )
   }
 
   function togglePerDay(index: number, on: boolean) {
-    setQuotaOptions((prev) =>
-      prev.map((o, i) =>
-        i === index
-          ? {
-              ...o,
-              perDay: on,
-              dailyKm: on ? resizeDailyKm(o.dailyKm, totalDays, o.kmPerDay) : o.dailyKm,
-            }
-          : o,
-      ),
-    )
+    updateQuota(index, { perDay: on })
   }
 
   function updateDailyKm(index: number, day: number, value: string) {
@@ -215,7 +203,7 @@ export function CreateChallengePage() {
     setQuotaOptions((prev) =>
       prev.map((o, i) =>
         i === index
-          ? { ...o, dailyKm: Array<string>(totalDays).fill(o.kmPerDay) }
+          ? { ...o, dailyKm: Array<string>(dailySlotCount(o)).fill(o.kmPerDay) }
           : o,
       ),
     )
@@ -277,17 +265,16 @@ export function CreateChallengePage() {
         return
       }
       for (const [i, draft] of quotaOptions.entries()) {
-        const o = draftToOption(draft, totalDays)
-        if (!o) {
-          setError(
-            draft.perDay
-              ? `Tùy chọn ${i + 1}: nhập số ngày và km (> 0) cho tất cả ${totalDays} ngày.`
-              : `Tùy chọn ${i + 1}: nhập số ngày và km mỗi ngày hợp lệ.`,
-          )
+        if (Number(draft.daysRequired) > totalDays) {
+          setError(`Tùy chọn ${i + 1}: số ngày hoàn thành không được vượt ${totalDays}.`)
           return
         }
-        if (o.daysRequired > totalDays) {
-          setError(`Tùy chọn ${i + 1}: số ngày hoàn thành không được vượt ${totalDays}.`)
+        if (!draftToOption(draft)) {
+          setError(
+            draft.perDay
+              ? `Tùy chọn ${i + 1}: nhập km (> 0) cho tất cả ${draft.daysRequired || '…'} ngày hoạt động.`
+              : `Tùy chọn ${i + 1}: nhập số ngày và km mỗi ngày hợp lệ.`,
+          )
           return
         }
       }
@@ -511,7 +498,7 @@ export function CreateChallengePage() {
               <legend>Các tùy chọn hoàn thành</legend>
               <p className="tiny muted" style={{ marginBottom: 10 }}>
                 Ví dụ 15 ngày: tùy chọn 1 = 15/15 ngày × 5 km/ngày; tùy chọn 2 =
-                13/15 ngày × 8 km/ngày.
+                10/15 ngày, mỗi ngày hoạt động một mức km riêng.
               </p>
               {quotaOptions.map((o, index) => (
                 <div key={index} className="quota-option-row">
@@ -561,16 +548,19 @@ export function CreateChallengePage() {
                         disabled={totalDays <= 0}
                         onChange={(e) => togglePerDay(index, e.target.checked)}
                       />
-                      <span>Đặt km riêng cho từng ngày</span>
+                      <span>Đặt km riêng cho từng ngày hoạt động</span>
                     </label>
                     {o.perDay && totalDays > 0 && (
                       <>
+                        <p className="tiny muted">
+                          Nhập km cho {o.dailyKm.length || '…'} ngày hoạt động. Người tham gia
+                          hoàn thành vào ngày nào trong khoảng cũng được (liên tục hoặc ngắt
+                          quãng, không theo thứ tự); mỗi ngày chỉ tính cho một mức km.
+                        </p>
                         <div className="daily-km-grid">
-                          {dayLabels.map((label, day) => (
+                          {o.dailyKm.map((_, day) => (
                             <label key={day} className="daily-km-cell">
-                              <span>
-                                Ngày {day + 1} · {label}
-                              </span>
+                              <span>Ngày hoạt động {day + 1}</span>
                               <input
                                 type="number"
                                 min={0.1}

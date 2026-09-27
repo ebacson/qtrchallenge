@@ -740,6 +740,12 @@ select {
   font-size: 0.8rem;
 }
 
+.daily-km-list li.done {
+  border-color: #2e9d5b;
+  background: rgba(46, 157, 91, 0.1);
+  color: #1f7a45;
+}
+
 .empty {
   color: var(--ink-soft);
   padding: 24px 0;

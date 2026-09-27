@@ -5,7 +5,6 @@ import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
 import {
   canJoin,
-  challengeDayLabels,
   challengeProgressPercent,
   challengeRulesSummary,
   joinBlockedMessage,
@@ -38,15 +37,19 @@ function extractKm(value: string): number {
   return Number.isFinite(n) ? n : 0
 }
 
-function DailyKmList({ startDate, dailyKm }: { startDate: string; dailyKm: number[] }) {
-  const labels = challengeDayLabels(startDate, dailyKm.length)
+/** Mức km đạt được luôn là các mức nhỏ nhất (xem countMatchedDayTargets). */
+function DailyKmList({ dailyKm, completed = 0 }: { dailyKm: number[]; completed?: number }) {
+  const sorted = [...dailyKm].sort((a, b) => a - b)
   return (
     <div className="daily-km-list">
-      <p className="tiny muted">Km yêu cầu từng ngày</p>
+      <p className="tiny muted">
+        Km yêu cầu cho {sorted.length} ngày hoạt động — ngày nào trong khoảng cũng được, mỗi
+        ngày tính cho một mức
+      </p>
       <ul>
-        {dailyKm.map((km, i) => (
-          <li key={i}>
-            <span>{labels[i] ?? `Ngày ${i + 1}`}</span>
+        {sorted.map((km, i) => (
+          <li key={i} className={i < completed ? 'done' : undefined}>
+            <span>{i < completed ? '✓' : `#${i + 1}`}</span>
             <strong>{km} km</strong>
           </li>
         ))}
@@ -324,7 +327,10 @@ export function ChallengeDetailPage() {
                 : 'Progress cập nhật sau khi sync Strava'}
             </p>
             {challenge.userDailyKm && (
-              <DailyKmList startDate={challenge.startDate} dailyKm={challenge.userDailyKm} />
+              <DailyKmList
+                dailyKm={challenge.userDailyKm}
+                completed={Number(challenge.totalactiviti) || 0}
+              />
             )}
             {challenge.status === STATUS_UPCOMING ? (
               <button
@@ -414,7 +420,7 @@ export function ChallengeDetailPage() {
                 </select>
               </label>
               {selectedDailyKm && (
-                <DailyKmList startDate={challenge.startDate} dailyKm={selectedDailyKm} />
+                <DailyKmList dailyKm={selectedDailyKm} />
               )}
               {needsPassword && (
                 <label>

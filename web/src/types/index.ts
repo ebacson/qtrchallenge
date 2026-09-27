@@ -36,7 +36,10 @@ export interface UserProfile {
 export interface DayQuotaOption {
   daysRequired: number
   kmPerDay: number
-  /** Km yêu cầu riêng cho từng ngày (index 0 = ngày bắt đầu); ghi đè kmPerDay */
+  /**
+   * Km yêu cầu cho từng ngày hoạt động (độ dài = daysRequired). Các ngày không cần
+   * liên tục và không gắn với ngày cụ thể; ghi đè kmPerDay.
+   */
   dailyKm?: number[]
 }
 

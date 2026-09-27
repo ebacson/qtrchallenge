@@ -195,18 +195,6 @@ export function formatDayQuotaLabel(
   return `${daysRequired}/${totalDays} ngày · ${formatKm(kmPerDay)} km/ngày`
 }
 
-/** Nhãn dd/MM cho từng ngày của thử thách (startDate dạng dd-MM-yyyy). */
-export function challengeDayLabels(startDate: string, totalDays: number): string[] {
-  const startMs = parseChallengeDayStartMs(startDate)
-  if (startMs == null || totalDays <= 0) return []
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return Array.from({ length: totalDays }, (_, i) => {
-    // +7h: parseChallengeDayStartMs trả về UTC của 00:00 giờ VN
-    const d = new Date(startMs + i * 86_400_000 + 7 * 3_600_000)
-    return `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}`
-  })
-}
-
 function parseDailyKm(raw: unknown): number[] | undefined {
   if (raw == null || typeof raw !== 'object') return undefined
   const values = Array.isArray(raw)
@@ -298,8 +286,23 @@ export type ProgressOptions = {
   minActivityDistanceKm?: number
   /** Đếm ngày đạt đủ kmPerDay trong khoảng */
   kmPerDay?: number
-  /** Km yêu cầu riêng từng ngày (index tính từ startDate); ưu tiên hơn kmPerDay */
+  /** Km yêu cầu cho từng ngày hoạt động, không theo thứ tự ngày; ưu tiên hơn kmPerDay */
   dailyKm?: number[]
+}
+
+/**
+ * Số mục tiêu km được đáp ứng khi mỗi ngày (tổng km trong ngày) chỉ dùng cho
+ * một mục tiêu. Ghép tăng dần cho kết quả tối đa, và các mục tiêu đạt luôn là
+ * những mục tiêu nhỏ nhất.
+ */
+export function countMatchedDayTargets(dayKms: number[], targets: number[]): number {
+  const days = [...dayKms].sort((a, b) => a - b)
+  const reqs = [...targets].sort((a, b) => a - b)
+  let matched = 0
+  for (const km of days) {
+    if (matched < reqs.length && km >= reqs[matched]) matched += 1
+  }
+  return matched
 }
 
 export function convertPaceToMinutesPerKm(pace: string): number {
@@ -364,12 +367,12 @@ export function calculateProgress(
   }
 
   let daysCompleted: number | undefined
-  if (isDayQuota) {
+  if (dailyKm?.length) {
+    daysCompleted = countMatchedDayTargets([...dayTotals.values()], dailyKm)
+  } else if (kmPerDay != null && kmPerDay > 0) {
     daysCompleted = 0
-    for (const [dayMs, km] of dayTotals) {
-      const dayIndex = Math.round((dayMs - startDate.getTime()) / 86_400_000)
-      const required = dailyKm?.[dayIndex] ?? kmPerDay
-      if (required != null && required > 0 && km >= required) daysCompleted += 1
+    for (const km of dayTotals.values()) {
+      if (km >= kmPerDay) daysCompleted += 1
     }
   }
 

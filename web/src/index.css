@@ -653,6 +653,36 @@ select {
   color: var(--teal);
   flex-shrink: 0;
   white-space: nowrap;
+  text-align: right;
+}
+
+.participant-km small {
+  display: block;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.participant-options {
+  list-style: none;
+  margin: 4px 0 6px;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+.participant-options li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.participant-options strong {
+  flex-shrink: 0;
+  color: var(--ink);
 }
 
 .desc-toggle-row {

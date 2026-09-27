@@ -17,6 +17,7 @@ import {
   progressPercent,
   STATUS_UPCOMING,
   statusClass,
+  userDayQuotaProgress,
 } from '../lib/challengeRules'
 import type { Challenge } from '../types'
 
@@ -31,6 +32,9 @@ type Participant = {
   targetKm: number
   /** Thử thách khoảng ngày: progressKm/targetKm là số ngày */
   isDays: boolean
+  /** Tỉ lệ ngày hoàn thành (0–1) dùng để xếp hạng thử thách khoảng ngày */
+  ratio: number
+  options: { key: string; title: string; daysCompleted: number; daysRequired: number }[]
   rank: number
   pct: number
 }
@@ -137,18 +141,40 @@ export function ChallengeDetailPage() {
   }, [])
 
   const participants = useMemo(() => {
+    const isDayQuotaChallenge = challenge?.challengeMode === 'day_quota'
+    const goals = challenge ? challengeGoals(challenge) : []
     const list: Omit<Participant, 'rank'>[] = Object.entries(rawUserChallenges).map(
       ([uid, row]) => {
         const progress = String(row.progress ?? '0.0 km')
         const userTarget = String(row.userTarget ?? '')
+        const quota =
+          challenge && isDayQuotaChallenge
+            ? userDayQuotaProgress(challenge.dayQuotaOptions, challenge.targetDistances, row)
+            : []
+        const options = quota.map((q) => {
+          const goal = goals.find((g) => g.index === q.optionIndex)
+          return {
+            key: `${q.optionIndex}-${q.label}`,
+            title: goal ? `${goal.title}: ${goal.summary}` : q.label,
+            daysCompleted: q.daysCompleted,
+            daysRequired: q.option.daysRequired,
+          }
+        })
         const dayMatch = progress.match(/^\s*(\d+)\s*\/\s*(\d+)\s*ngày/)
-        const isDays = Boolean(dayMatch)
-        const progressKm = dayMatch ? Number(dayMatch[1]) : extractKm(progress)
-        const targetKm = dayMatch ? Number(dayMatch[2]) : extractKm(userTarget)
+        const isDays = options.length > 0 || Boolean(dayMatch)
+        const progressKm = options.length
+          ? options.reduce((sum, o) => sum + o.daysCompleted, 0)
+          : dayMatch
+            ? Number(dayMatch[1])
+            : extractKm(progress)
+        const targetKm = options.length
+          ? options.reduce((sum, o) => sum + o.daysRequired, 0)
+          : dayMatch
+            ? Number(dayMatch[2])
+            : extractKm(userTarget)
+        const ratio = targetKm > 0 ? Math.min(1, progressKm / targetKm) : 0
         const pct =
-          targetKm > 0
-            ? Math.min(100, Math.round((progressKm / targetKm) * 100))
-            : progressPercent(progress, userTarget)
+          targetKm > 0 ? Math.round(ratio * 100) : progressPercent(progress, userTarget)
         const profile = profiles[uid]
         return {
           id: uid,
@@ -163,6 +189,8 @@ export function ChallengeDetailPage() {
           progressKm,
           targetKm,
           isDays,
+          ratio,
+          options,
           pct,
         }
       },
@@ -170,7 +198,7 @@ export function ChallengeDetailPage() {
 
     list.sort((a, b) => {
       if (a.isDays || b.isDays) {
-        if (b.pct !== a.pct) return b.pct - a.pct
+        if (b.ratio !== a.ratio) return b.ratio - a.ratio
       }
       if (b.progressKm !== a.progressKm) return b.progressKm - a.progressKm
       if (b.targetKm !== a.targetKm) return b.targetKm - a.targetKm
@@ -178,7 +206,7 @@ export function ChallengeDetailPage() {
     })
 
     return list.map((p, index) => ({ ...p, rank: index + 1 }))
-  }, [rawUserChallenges, profiles])
+  }, [rawUserChallenges, profiles, challenge])
 
   if (!challenge) {
     return (
@@ -558,7 +586,10 @@ export function ChallengeDetailPage() {
           <section className="section panel">
             <h2>Bảng xếp hạng</h2>
             <p className="lede tiny">
-              {participants.length} thành viên · sắp xếp theo km hoàn thành
+              {participants.length} thành viên ·{' '}
+              {challenge.challengeMode === 'day_quota'
+                ? 'sắp xếp theo tỉ lệ ngày hoàn thành'
+                : 'sắp xếp theo km hoàn thành'}
             </p>
             {participants.length === 0 ? (
               <p className="muted">Chưa có ai tham gia.</p>
@@ -582,12 +613,25 @@ export function ChallengeDetailPage() {
                         {p.fullName}
                         {p.id === user?.uid ? ' (bạn)' : ''}
                       </strong>
-                      <span className="tiny muted">
-                        Hoàn thành: {p.progress} / {p.userTarget || '—'}
-                        {p.totalactiviti
-                          ? ` · ${p.totalactiviti} hoạt động`
-                          : ''}
-                      </span>
+                      {p.options.length > 0 ? (
+                        <ul className="participant-options">
+                          {p.options.map((o) => (
+                            <li key={o.key}>
+                              <span>{o.title}</span>
+                              <strong>
+                                {o.daysCompleted}/{o.daysRequired} ngày
+                              </strong>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <span className="tiny muted">
+                          Hoàn thành: {p.progress} / {p.userTarget || '—'}
+                          {p.totalactiviti
+                            ? ` · ${p.totalactiviti} hoạt động`
+                            : ''}
+                        </span>
+                      )}
                       <div className="progress-track">
                         <div
                           className={`progress-fill ${fillTone(p.pct)}`}
@@ -596,9 +640,16 @@ export function ChallengeDetailPage() {
                       </div>
                     </div>
                     <span className="participant-km">
-                      {p.isDays
-                        ? `${p.progressKm}/${p.targetKm} ngày`
-                        : `${p.progressKm.toFixed(1)} km`}
+                      {p.isDays ? (
+                        <>
+                          {p.pct}%
+                          <small>
+                            {p.progressKm}/{p.targetKm} ngày
+                          </small>
+                        </>
+                      ) : (
+                        `${p.progressKm.toFixed(1)} km`
+                      )}
                     </span>
                   </li>
                 ))}

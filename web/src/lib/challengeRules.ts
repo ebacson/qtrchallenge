@@ -384,7 +384,7 @@ function parseOptionResults(raw: unknown): Map<number, StoredOptionResult> {
   return map
 }
 
-function userDayQuotaProgress(
+export function userDayQuotaProgress(
   options: DayQuotaOption[] | undefined,
   targetDistances: string[],
   userRow: Record<string, unknown> | undefined,

@@ -172,6 +172,97 @@ export function challengeRulesSummary(challenge: Challenge): string {
   return ''
 }
 
+export type ChallengeGoal = {
+  /** Index trong targetDistances / dayQuotaOptions */
+  index: number
+  title: string
+  summary: string
+  details: string[]
+  /** Các mức km từng ngày hoạt động (tùy chọn km riêng) */
+  kmList?: number[]
+}
+
+function formatKmVi(km: number): string {
+  return formatKm(km).replace('.', ',')
+}
+
+/** Mô tả đầy đủ từng mục tiêu / tùy chọn để hiển thị cho người tham gia. */
+export function challengeGoals(challenge: Challenge): ChallengeGoal[] {
+  const period = `${challenge.startDate} → ${challenge.endDate}`
+  const tolerance = formatKmVi(DAY_TARGET_TOLERANCE_KM)
+
+  if (challenge.challengeMode === 'day_quota' && challenge.dayQuotaOptions?.length) {
+    const total = challenge.totalDays ?? countInclusiveDays(challenge.startDate, challenge.endDate)
+    return challenge.dayQuotaOptions.map((o, index) => {
+      const days =
+        o.daysRequired === total
+          ? `Hoạt động đủ cả ${total}/${total} ngày (${period}).`
+          : `Hoạt động đủ ${o.daysRequired} ngày bất kỳ trong ${total} ngày (${period}), liên tục hoặc ngắt quãng.`
+      if (o.dailyKm?.length) {
+        return {
+          index,
+          title: `Tùy chọn ${index + 1}`,
+          summary: `${o.daysRequired}/${total} ngày · mỗi ngày một mức km riêng`,
+          details: [
+            days,
+            `Mỗi ngày cần 1 hoạt động có cự ly bằng một trong ${o.dailyKm.length} mức bên dưới (sai số ±${tolerance} km). Mỗi mức chỉ tính cho 1 ngày, không cần theo thứ tự.`,
+          ],
+          kmList: o.dailyKm,
+        }
+      }
+      return {
+        index,
+        title: `Tùy chọn ${index + 1}`,
+        summary: `${o.daysRequired}/${total} ngày · ${formatKmVi(o.kmPerDay)} km/ngày`,
+        details: [
+          days,
+          `Mỗi ngày cần 1 hoạt động có cự ly ${formatKmVi(o.kmPerDay)} km (chấp nhận ${formatKmVi(o.kmPerDay - DAY_TARGET_TOLERANCE_KM)}–${formatKmVi(o.kmPerDay + DAY_TARGET_TOLERANCE_KM)} km).`,
+        ],
+      }
+    })
+  }
+
+  if (challenge.challengeMode === 'activity_count') {
+    const n = challenge.requiredActivities ?? 0
+    const d = challenge.minActivityDistanceKm ?? MIN_DISTANCE_KM
+    return [
+      {
+        index: 0,
+        title: 'Mục tiêu',
+        summary: `${n} hoạt động ≥ ${formatKmVi(d)} km`,
+        details: [`Hoàn thành ${n} hoạt động, mỗi hoạt động từ ${formatKmVi(d)} km trở lên (${period}).`],
+      },
+    ]
+  }
+
+  return challenge.targetDistances.map((label, index) => ({
+    index,
+    title: `Mục tiêu ${index + 1}`,
+    summary: `${label} tích lũy`,
+    details: [
+      `Tổng cự ly các hoạt động hợp lệ đạt ${label} trong khoảng ${period}.`,
+      `Chỉ tính hoạt động từ ${formatKmVi(MIN_DISTANCE_KM)} km trở lên.`,
+    ],
+  }))
+}
+
+/** Quy định chung áp dụng cho mọi mục tiêu của thử thách. */
+export function challengeGeneralRules(challenge: Challenge): string[] {
+  const paceMin = challenge.paceMinMinutes ?? MIN_PACE
+  const paceMax = challenge.paceMaxMinutes ?? MAX_PACE
+  const rules = [
+    `Tính các hoạt động ${[...ELIGIBLE_ACTIVITY_TYPES].join(', ')} đồng bộ từ Strava.`,
+    `Pace hợp lệ: ${formatPaceMinutes(paceMin)}–${formatPaceMinutes(paceMax)} phút/km.`,
+    'Ngày tính theo giờ Việt Nam (GMT+7).',
+  ]
+  if (challenge.challengeMode === 'day_quota' && (challenge.dayQuotaOptions?.length ?? 0) > 1) {
+    rules.push(
+      'Được chọn một hoặc nhiều tùy chọn; mỗi tùy chọn tính tiến độ riêng.',
+    )
+  }
+  return rules
+}
+
 export function countInclusiveDays(startDate: string, endDate: string): number {
   const a = parseChallengeDayStartMs(startDate)
   const b = parseChallengeDayStartMs(endDate)

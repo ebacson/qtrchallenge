@@ -740,6 +740,89 @@ select {
   font-size: 0.8rem;
 }
 
+.goal-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.goal-item {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.goal-item.mine {
+  border-color: var(--accent);
+  background: rgba(232, 93, 4, 0.06);
+}
+
+.goal-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+}
+
+.goal-summary {
+  font-weight: 600;
+  color: var(--accent-deep);
+}
+
+.goal-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+}
+
+.goal-details {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+  display: grid;
+  gap: 4px;
+}
+
+.goal-km-chips {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 6px;
+}
+
+.goal-km-chips li {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.8rem;
+}
+
+.goal-rules-title {
+  margin: 16px 0 0;
+  font-size: 0.95rem;
+}
+
+.card-goal-list {
+  list-style: none;
+  margin: 6px 0 8px;
+  padding: 0;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  display: grid;
+  gap: 2px;
+}
+
 .option-pick-list {
   display: grid;
   gap: 8px;

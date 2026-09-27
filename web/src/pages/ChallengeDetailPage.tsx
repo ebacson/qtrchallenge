@@ -5,6 +5,8 @@ import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
 import {
   canJoin,
+  challengeGeneralRules,
+  challengeGoals,
   challengeProgressPercent,
   DAY_TARGET_TOLERANCE_KM,
   challengeRulesSummary,
@@ -193,6 +195,17 @@ export function ChallengeDetailPage() {
   const isDayQuota =
     challenge.challengeMode === 'day_quota' && Boolean(challenge.dayQuotaOptions?.length)
   const rules = challengeRulesSummary(challenge)
+  const goals = challengeGoals(challenge)
+  const generalRules = challengeGeneralRules(challenge)
+  const myGoalIndexes = new Set(
+    challenge.userDayQuota
+      ? challenge.userDayQuota.map((q) => q.optionIndex)
+      : [challenge.targetDistances.indexOf(challenge.userTarget ?? '')],
+  )
+  const goalTitle = (index: number, fallback: string) => {
+    const goal = goals.find((g) => g.index === index)
+    return goal ? `${goal.title}: ${goal.summary}` : fallback
+  }
 
   function toggleOption(index: number) {
     setSelectedOptions((prev) =>
@@ -264,7 +277,7 @@ export function ChallengeDetailPage() {
             <div key={label} className={checked ? 'option-pick checked' : 'option-pick'}>
               <label className="custom-distance-row">
                 <input type="checkbox" checked={checked} onChange={() => toggleOption(i)} />
-                <span>{label}</span>
+                <span>{goalTitle(i, label)}</span>
               </label>
               {checked && option.dailyKm && <DailyKmList dailyKm={option.dailyKm} />}
             </div>
@@ -368,6 +381,47 @@ export function ChallengeDetailPage() {
         </div>
       </div>
 
+      {goals.length > 0 && (
+        <section className="section panel">
+          <h2>Mục tiêu thử thách</h2>
+          <ol className="goal-list">
+            {goals.map((g) => {
+              const mine = joined && myGoalIndexes.has(g.index)
+              return (
+                <li key={g.index} className={mine ? 'goal-item mine' : 'goal-item'}>
+                  <div className="goal-head">
+                    <strong>{g.title}</strong>
+                    <span className="goal-summary">{g.summary}</span>
+                    {mine && <span className="goal-badge">Bạn đã chọn</span>}
+                  </div>
+                  <ul className="goal-details">
+                    {g.details.map((d) => (
+                      <li key={d}>{d}</li>
+                    ))}
+                  </ul>
+                  {g.kmList && (
+                    <ul className="goal-km-chips">
+                      {g.kmList.map((km, i) => (
+                        <li key={i}>
+                          <span>Ngày {i + 1}</span>
+                          <strong>{km} km</strong>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              )
+            })}
+          </ol>
+          <h3 className="goal-rules-title">Quy định chung</h3>
+          <ul className="goal-details">
+            {generalRules.map((r) => (
+              <li key={r}>{r}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {challenge.description && (
         <section className="section panel">
           <div className="desc-toggle-row">
@@ -422,7 +476,7 @@ export function ChallengeDetailPage() {
               return (
                 <div key={`${q.optionIndex}-${q.label}`} className="option-progress">
                   <div className="progress-meta">
-                    <span>{q.label}</span>
+                    <span>{goalTitle(q.optionIndex, q.label)}</span>
                     <span>
                       {q.daysCompleted}/{q.option.daysRequired} ngày
                     </span>

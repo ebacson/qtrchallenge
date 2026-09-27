@@ -1,10 +1,16 @@
 import { Link } from 'react-router-dom'
 import type { Challenge } from '../types'
-import { listDisplayText, challengeProgressPercent, statusClass } from '../lib/challengeRules'
+import {
+  challengeGoals,
+  challengeProgressPercent,
+  listDisplayText,
+  statusClass,
+} from '../lib/challengeRules'
 
 export function ChallengeCard({ challenge }: { challenge: Challenge }) {
   const joined = Boolean(challenge.userTarget)
   const pct = challengeProgressPercent(challenge)
+  const goals = challengeGoals(challenge)
 
   return (
     <Link to={`/challenges/${challenge.id}`} className="challenge-card">
@@ -26,6 +32,15 @@ export function ChallengeCard({ challenge }: { challenge: Challenge }) {
           {challenge.startDate} → {challenge.endDate}
         </p>
         <p className="tiny muted">{listDisplayText(challenge)}</p>
+        {challenge.challengeMode === 'day_quota' && goals.length > 0 && (
+          <ul className="card-goal-list">
+            {goals.map((g) => (
+              <li key={g.index}>
+                <strong>{g.title}:</strong> {g.summary}
+              </li>
+            ))}
+          </ul>
+        )}
         {joined ? (
           <div className="progress-block">
             <div className="progress-meta">

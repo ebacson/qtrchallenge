@@ -187,6 +187,7 @@ export type MappedActivity = {
   totalElevationGain: string
   type: string
   startDate: string
+  startDateUtc: string
   averageCadence: string
   averageHeartrate: string
   maxHeartrate: string
@@ -223,11 +224,13 @@ function calculatePace(distanceMeters: number, movingTimeSec: number): string {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
+/** `dd-MM-yyyy HH:mm:ss` theo giờ Việt Nam (GMT+7), giống app iOS. */
 function formatStartDate(iso: string): string {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
+  const ms = new Date(iso).getTime()
+  if (Number.isNaN(ms)) return ''
+  const d = new Date(ms + 7 * 3_600_000)
   const pad = (n: number) => String(n).padStart(2, '0')
-  return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  return `${pad(d.getUTCDate())}-${pad(d.getUTCMonth() + 1)}-${d.getUTCFullYear()} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`
 }
 
 export function mapStravaActivity(activity: RawActivity): MappedActivity {
@@ -241,6 +244,7 @@ export function mapStravaActivity(activity: RawActivity): MappedActivity {
     totalElevationGain: (activity.total_elevation_gain ?? 0).toFixed(1),
     type: activity.sport_type || activity.type || '',
     startDate: formatStartDate(activity.start_date ?? ''),
+    startDateUtc: activity.start_date ?? '',
     averageCadence: cadence === 0 ? 'N/A' : String(cadence),
     averageHeartrate:
       activity.average_heartrate != null ? String(activity.average_heartrate) : 'N/A',

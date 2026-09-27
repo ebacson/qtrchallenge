@@ -32,10 +32,33 @@ export type StravaActivityRecord = {
   totalElevationGain: string
   type: string
   startDate: string
+  /** ISO UTC từ Strava; Cloud Function bản cũ không trả trường này */
+  startDateUtc?: string
   averageCadence: string
   averageHeartrate: string
   maxHeartrate: string
   pace: string
+}
+
+const VN_OFFSET_MS = 7 * 3_600_000
+
+function formatVnDateTime(utcMs: number): string {
+  const d = new Date(utcMs + VN_OFFSET_MS)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(d.getUTCDate())}-${pad(d.getUTCMonth() + 1)}-${d.getUTCFullYear()} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`
+}
+
+/** startDate lưu Firebase: `dd-MM-yyyy HH:mm:ss` theo giờ Việt Nam (như app iOS). */
+export function activityStartDateVn(a: StravaActivityRecord): string {
+  if (a.startDateUtc) {
+    const ms = Date.parse(a.startDateUtc)
+    if (!Number.isNaN(ms)) return formatVnDateTime(ms)
+  }
+  // Cloud Function bản cũ định dạng startDate theo giờ UTC của server
+  const m = a.startDate.match(/^(\d{2})-(\d{2})-(\d{4}) (\d{2}):(\d{2}):(\d{2})$/)
+  if (!m) return a.startDate
+  const [, dd, mm, yyyy, hh, min, ss] = m.map(Number)
+  return formatVnDateTime(Date.UTC(yyyy, mm - 1, dd, hh, min, ss))
 }
 
 /**

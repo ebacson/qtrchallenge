@@ -6,6 +6,7 @@ import { db } from '../lib/firebase'
 import { syncOngoingChallengeProgress } from '../lib/challengeProgress'
 import {
   consumeOAuthState,
+  activityStartDateVn,
   ensureFreshAccessToken,
   exchangeCode,
   fetchAthlete,
@@ -179,7 +180,7 @@ export function StravaPage() {
         updates[`${base}/elapsedTime`] = a.elapsedTime
         updates[`${base}/totalElevationGain`] = a.totalElevationGain
         updates[`${base}/type`] = a.type
-        updates[`${base}/startDate`] = a.startDate
+        updates[`${base}/startDate`] = activityStartDateVn(a)
         updates[`${base}/averageCadence`] = a.averageCadence
         updates[`${base}/averageHeartrate`] = a.averageHeartrate
         updates[`${base}/maxHeartrate`] = a.maxHeartrate

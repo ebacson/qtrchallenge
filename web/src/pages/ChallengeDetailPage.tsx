@@ -85,6 +85,8 @@ export function ChallengeDetailPage() {
   >({})
   const [showDescription, setShowDescription] = useState(false)
   const [selectedTarget, setSelectedTarget] = useState('')
+  const [selectedOptions, setSelectedOptions] = useState<number[]>([0])
+  const [editingOptions, setEditingOptions] = useState(false)
   const [password, setPassword] = useState('')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -188,12 +190,92 @@ export function ChallengeDetailPage() {
   const joined = Boolean(challenge.userTarget)
   const pct = challengeProgressPercent(challenge)
   const needsPassword = Boolean(challenge.password)
-  const selectedDailyKm =
-    challenge.challengeMode === 'day_quota'
-      ? challenge.dayQuotaOptions?.[challenge.targetDistances.indexOf(selectedTarget)]
-          ?.dailyKm
-      : undefined
+  const isDayQuota =
+    challenge.challengeMode === 'day_quota' && Boolean(challenge.dayQuotaOptions?.length)
   const rules = challengeRulesSummary(challenge)
+
+  function toggleOption(index: number) {
+    setSelectedOptions((prev) =>
+      prev.includes(index)
+        ? prev.filter((i) => i !== index)
+        : [...prev, index].sort((a, b) => a - b),
+    )
+  }
+
+  /** Dữ liệu ghi vào user_challenges khi chọn/đổi các tùy chọn khoảng ngày */
+  function dayQuotaJoinFields(c: Challenge, indexes: number[]) {
+    const options = indexes.map((i) => c.dayQuotaOptions![i])
+    const required = options.reduce((sum, o) => sum + o.daysRequired, 0)
+    return {
+      userTarget: indexes.map((i) => c.targetDistances[i]).join(' + '),
+      optionIndexes: indexes,
+      optionIndex: indexes[0],
+      daysRequired: options[0].daysRequired,
+      kmPerDay: options[0].kmPerDay,
+      progress: `0/${required} ngày`,
+      totalactiviti: '0',
+      optionResults: null,
+      completedTargets: null,
+    }
+  }
+
+  function startEditingOptions() {
+    setSelectedOptions(
+      challenge?.userDayQuota?.map((q) => q.optionIndex).filter((i) => i >= 0) ?? [0],
+    )
+    setEditingOptions(true)
+  }
+
+  async function onSaveOptions() {
+    if (!user || !id || !challenge) return
+    if (challenge.status !== STATUS_UPCOMING) {
+      setError('Thử thách đã diễn ra — không thể đổi tùy chọn nữa.')
+      return
+    }
+    if (!selectedOptions.length) {
+      setError('Chọn ít nhất một tùy chọn.')
+      return
+    }
+    setBusy(true)
+    setError('')
+    try {
+      await update(
+        ref(db, `challenges/${id}/user_challenges/${user.uid}`),
+        dayQuotaJoinFields(challenge, selectedOptions),
+      )
+      setEditingOptions(false)
+      setMessage('Đã cập nhật tùy chọn.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không cập nhật được tùy chọn')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const optionPicker = isDayQuota && (
+    <fieldset className="distance-fieldset">
+      <legend>Chọn một hoặc nhiều tùy chọn</legend>
+      <div className="option-pick-list">
+        {challenge.targetDistances.map((label, i) => {
+          const option = challenge.dayQuotaOptions?.[i]
+          if (!option) return null
+          const checked = selectedOptions.includes(i)
+          return (
+            <div key={label} className={checked ? 'option-pick checked' : 'option-pick'}>
+              <label className="custom-distance-row">
+                <input type="checkbox" checked={checked} onChange={() => toggleOption(i)} />
+                <span>{label}</span>
+              </label>
+              {checked && option.dailyKm && <DailyKmList dailyKm={option.dailyKm} />}
+            </div>
+          )
+        })}
+      </div>
+      <p className="tiny muted">
+        Mỗi tùy chọn tính tiến độ riêng; một hoạt động có thể được tính cho nhiều tùy chọn.
+      </p>
+    </fieldset>
+  )
   const myRank = participants.find((p) => p.id === user?.uid)?.rank
 
   async function onJoin(e: FormEvent) {
@@ -210,30 +292,29 @@ export function ChallengeDetailPage() {
       setError('Mật khẩu không đúng.')
       return
     }
-    if (!selectedTarget) {
-      setError('Chọn mục tiêu cự ly.')
+    if (isDayQuota ? !selectedOptions.length : !selectedTarget) {
+      setError(isDayQuota ? 'Chọn ít nhất một tùy chọn.' : 'Chọn mục tiêu cự ly.')
       return
     }
 
     setBusy(true)
     try {
-      const optionIndex = challenge.targetDistances.indexOf(selectedTarget)
       const quota =
-        challenge.challengeMode === 'day_quota'
-          ? (challenge.dayQuotaOptions?.[optionIndex] ??
-            parseDayQuotaLabel(selectedTarget))
+        !isDayQuota && challenge.challengeMode === 'day_quota'
+          ? parseDayQuotaLabel(selectedTarget)
           : null
-      await update(ref(db, `challenges/${id}/user_challenges/${user.uid}`), {
-        userTarget: selectedTarget,
-        progress: quota ? `0/${quota.daysRequired} ngày` : '0.0 km',
-        ...(quota
-          ? {
-              optionIndex,
-              daysRequired: quota.daysRequired,
-              kmPerDay: quota.kmPerDay,
-            }
-          : {}),
-      })
+      await update(
+        ref(db, `challenges/${id}/user_challenges/${user.uid}`),
+        isDayQuota
+          ? dayQuotaJoinFields(challenge, selectedOptions)
+          : {
+              userTarget: selectedTarget,
+              progress: quota ? `0/${quota.daysRequired} ngày` : '0.0 km',
+              ...(quota
+                ? { daysRequired: quota.daysRequired, kmPerDay: quota.kmPerDay }
+                : {}),
+            },
+      )
       setMessage('Đã tham gia thử thách thành công!')
       setPassword('')
     } catch (err) {
@@ -317,7 +398,7 @@ export function ChallengeDetailPage() {
             )}
             <p>
               {challenge.challengeMode === 'day_quota'
-                ? `${challenge.progress ?? `0/${challenge.userDaysRequired ?? '?'} ngày`} · ${challenge.userDailyKm ? 'km theo từng ngày' : `${challenge.userKmPerDay ?? '?'} km/ngày`}`
+                ? `${challenge.userDayQuota?.reduce((s, q) => s + q.daysCompleted, 0) ?? 0}/${challenge.userDaysRequired ?? '?'} ngày${(challenge.userDayQuota?.length ?? 0) > 1 ? ` · ${challenge.userDayQuota!.length} tùy chọn` : ''}`
                 : challenge.challengeMode === 'activity_count'
                   ? `${challenge.totalactiviti ?? '0'} / ${challenge.requiredActivities ?? '?'} hoạt động (≥ ${challenge.minActivityDistanceKm ?? 1} km)`
                   : `${challenge.progress ?? '0 km'} / ${challenge.userTarget}`}
@@ -333,21 +414,78 @@ export function ChallengeDetailPage() {
                 ? `${challenge.totalactiviti} hoạt động hợp lệ`
                 : 'Progress cập nhật sau khi sync Strava'}
             </p>
-            {challenge.userDailyKm && (
-              <DailyKmList
-                dailyKm={challenge.userDailyKm}
-                completedTargets={challenge.userCompletedTargets}
-              />
-            )}
+            {challenge.userDayQuota?.map((q) => {
+              const optionPct = Math.min(
+                100,
+                Math.round((q.daysCompleted / q.option.daysRequired) * 100),
+              )
+              return (
+                <div key={`${q.optionIndex}-${q.label}`} className="option-progress">
+                  <div className="progress-meta">
+                    <span>{q.label}</span>
+                    <span>
+                      {q.daysCompleted}/{q.option.daysRequired} ngày
+                    </span>
+                  </div>
+                  <div className="progress-track">
+                    <div
+                      className={`progress-fill ${fillTone(optionPct)}`}
+                      style={{ width: `${optionPct}%` }}
+                    />
+                  </div>
+                  {q.option.dailyKm && (
+                    <DailyKmList
+                      dailyKm={q.option.dailyKm}
+                      completedTargets={q.completedTargets}
+                    />
+                  )}
+                </div>
+              )
+            })}
             {challenge.status === STATUS_UPCOMING ? (
-              <button
-                type="button"
-                className="btn danger"
-                disabled={busy}
-                onClick={() => void onLeave()}
-              >
-                Rời thử thách
-              </button>
+              <>
+                {isDayQuota &&
+                  (editingOptions ? (
+                    <div className="option-edit">
+                      {optionPicker}
+                      <div className="btn-row">
+                        <button
+                          type="button"
+                          className="btn primary"
+                          disabled={busy}
+                          onClick={() => void onSaveOptions()}
+                        >
+                          Lưu tùy chọn
+                        </button>
+                        <button
+                          type="button"
+                          className="btn ghost"
+                          disabled={busy}
+                          onClick={() => setEditingOptions(false)}
+                        >
+                          Hủy
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      disabled={busy}
+                      onClick={startEditingOptions}
+                    >
+                      Đổi tùy chọn
+                    </button>
+                  ))}
+                <button
+                  type="button"
+                  className="btn danger"
+                  disabled={busy}
+                  onClick={() => void onLeave()}
+                >
+                  Rời thử thách
+                </button>
+              </>
             ) : (
               <p className="tiny muted">
                 Thử thách đã diễn ra — không thể rời nữa.
@@ -413,21 +551,22 @@ export function ChallengeDetailPage() {
             <p className="form-error">{joinBlockedMessage(challenge)}</p>
           ) : (
             <form className="auth-form" onSubmit={onJoin}>
-              <label>
-                Mục tiêu
-                <select
-                  value={selectedTarget}
-                  onChange={(e) => setSelectedTarget(e.target.value)}
-                >
-                  {challenge.targetDistances.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {selectedDailyKm && (
-                <DailyKmList dailyKm={selectedDailyKm} />
+              {isDayQuota ? (
+                optionPicker
+              ) : (
+                <label>
+                  Mục tiêu
+                  <select
+                    value={selectedTarget}
+                    onChange={(e) => setSelectedTarget(e.target.value)}
+                  >
+                    {challenge.targetDistances.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               )}
               {needsPassword && (
                 <label>

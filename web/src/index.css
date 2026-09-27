@@ -740,6 +740,40 @@ select {
   font-size: 0.8rem;
 }
 
+.option-pick-list {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.option-pick {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.option-pick.checked {
+  border-color: var(--accent, #e85d2a);
+  background: rgba(232, 93, 42, 0.06);
+}
+
+.option-progress {
+  margin: 14px 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.option-edit {
+  margin: 12px 0;
+}
+
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
 .daily-km-list li.done {
   border-color: #2e9d5b;
   background: rgba(46, 157, 91, 0.1);

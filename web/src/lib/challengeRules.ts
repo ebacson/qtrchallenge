@@ -1,4 +1,9 @@
-import type { Challenge, ChallengeProgressResult, DayQuotaOption } from '../types'
+import type {
+  Challenge,
+  ChallengeProgressResult,
+  DayQuotaOption,
+  UserDayQuotaProgress,
+} from '../types'
 
 export const STATUS_UPCOMING = 'Sắp diễn ra'
 export const STATUS_ONGOING = 'Đang diễn ra'
@@ -232,6 +237,82 @@ export function resolveDayQuotaOption(
   const kmPerDay = Number(userRow.kmPerDay)
   if (daysRequired > 0 && kmPerDay > 0) return { daysRequired, kmPerDay }
   return parseDayQuotaLabel(target)
+}
+
+export type DayQuotaSelection = {
+  optionIndex: number
+  label: string
+  option: DayQuotaOption
+}
+
+/** Các tùy chọn user đã chọn: `optionIndexes` (nhiều), hoặc một tùy chọn như bản cũ. */
+export function resolveUserDayQuotaOptions(
+  options: DayQuotaOption[] | undefined,
+  targetDistances: string[],
+  userRow: Record<string, unknown> | undefined,
+): DayQuotaSelection[] {
+  if (!userRow) return []
+  const indexes = parseIndexList(userRow.optionIndexes) ?? []
+  const picked = [...new Set(indexes)]
+    .filter((i) => options?.[i])
+    .map((i) => ({
+      optionIndex: i,
+      label: targetDistances[i] ?? '',
+      option: options![i],
+    }))
+  if (picked.length) return picked
+
+  const single = resolveDayQuotaOption(options, targetDistances, userRow)
+  if (!single) return []
+  const optionIndex = options ? options.indexOf(single) : -1
+  return [
+    {
+      optionIndex,
+      label: targetDistances[optionIndex] ?? String(userRow.userTarget ?? ''),
+      option: single,
+    },
+  ]
+}
+
+type StoredOptionResult = { daysCompleted: number; completedTargets?: number[] }
+
+function parseOptionResults(raw: unknown): Map<number, StoredOptionResult> {
+  const map = new Map<number, StoredOptionResult>()
+  if (raw == null || typeof raw !== 'object') return map
+  const rows = Array.isArray(raw) ? raw : Object.values(raw as Record<string, unknown>)
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue
+    const r = row as Record<string, unknown>
+    const optionIndex = Number(r.optionIndex)
+    if (!Number.isInteger(optionIndex)) continue
+    map.set(optionIndex, {
+      daysCompleted: Number(r.daysCompleted) || 0,
+      completedTargets: parseIndexList(r.completedTargets),
+    })
+  }
+  return map
+}
+
+function userDayQuotaProgress(
+  options: DayQuotaOption[] | undefined,
+  targetDistances: string[],
+  userRow: Record<string, unknown> | undefined,
+): UserDayQuotaProgress[] {
+  const selections = resolveUserDayQuotaOptions(options, targetDistances, userRow)
+  if (!userRow || !selections.length) return []
+  const results = parseOptionResults(userRow.optionResults)
+  return selections.map((s) => {
+    const stored = results.get(s.optionIndex)
+    if (stored) return { ...s, ...stored }
+    // Dòng tham gia một tùy chọn trước khi có optionResults
+    const legacyDone = selections.length === 1 ? Number(userRow.totalactiviti) || 0 : 0
+    return {
+      ...s,
+      daysCompleted: legacyDone,
+      completedTargets:
+        selections.length === 1 ? parseIndexList(userRow.completedTargets) : undefined,
+    }
+  })
 }
 
 export function parseDayQuotaLabel(label: string): DayQuotaOption | null {
@@ -477,7 +558,7 @@ export function parseChallenge(
   const targetDistances = Array.isArray(dict.targetDistances)
     ? (dict.targetDistances as string[])
     : []
-  const userQuota = resolveDayQuotaOption(dayQuotaOptions, targetDistances, userData)
+  const userDayQuota = userDayQuotaProgress(dayQuotaOptions, targetDistances, userData)
 
   return {
     id,
@@ -507,10 +588,10 @@ export function parseChallenge(
     totalDays,
     dayQuotaOptions,
     userTarget: userData?.userTarget != null ? String(userData.userTarget) : undefined,
-    userDaysRequired: userQuota?.daysRequired,
-    userKmPerDay: userQuota?.kmPerDay,
-    userDailyKm: userQuota?.dailyKm,
-    userCompletedTargets: parseIndexList(userData?.completedTargets),
+    userDaysRequired: userDayQuota.length
+      ? userDayQuota.reduce((sum, q) => sum + q.option.daysRequired, 0)
+      : undefined,
+    userDayQuota: userDayQuota.length ? userDayQuota : undefined,
     progress: userData?.progress != null ? String(userData.progress) : undefined,
     totalpace: userData?.totalpace != null ? String(userData.totalpace) : undefined,
     totalactiviti:
@@ -546,13 +627,10 @@ export function progressPercent(progress?: string, target?: string): number {
 }
 
 export function challengeProgressPercent(challenge: Challenge): number {
-  if (challenge.challengeMode === 'day_quota' && challenge.userDaysRequired) {
-    const m = String(challenge.progress ?? '').match(/(\d+)\s*\//)
-    const done = m ? Number(m[1]) : Number(challenge.totalactiviti ?? 0) || 0
-    return Math.min(
-      100,
-      Math.round((done / challenge.userDaysRequired) * 100),
-    )
+  if (challenge.challengeMode === 'day_quota' && challenge.userDayQuota?.length) {
+    const done = challenge.userDayQuota.reduce((sum, q) => sum + q.daysCompleted, 0)
+    const required = challenge.userDaysRequired ?? 0
+    return required > 0 ? Math.min(100, Math.round((done / required) * 100)) : 0
   }
   if (
     challenge.challengeMode === 'activity_count' &&

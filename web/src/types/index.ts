@@ -44,6 +44,16 @@ export interface DayQuotaOption {
   dailyKm?: number[]
 }
 
+/** Tiến độ của user cho một tùy chọn khoảng ngày đã chọn */
+export interface UserDayQuotaProgress {
+  /** Index trong dayQuotaOptions / targetDistances; -1 nếu chỉ suy ra từ nhãn cũ */
+  optionIndex: number
+  label: string
+  option: DayQuotaOption
+  daysCompleted: number
+  completedTargets?: number[]
+}
+
 export interface Challenge {
   id: string
   name: string
@@ -65,10 +75,10 @@ export interface Challenge {
   dayQuotaOptions?: DayQuotaOption[]
   /** Fields from current user's join row */
   userTarget?: string
+  /** Tổng số ngày yêu cầu của các tùy chọn đã chọn */
   userDaysRequired?: number
-  userKmPerDay?: number
-  userDailyKm?: number[]
-  userCompletedTargets?: number[]
+  /** Các tùy chọn khoảng ngày user đã chọn (một hoặc nhiều) */
+  userDayQuota?: UserDayQuotaProgress[]
   progress?: string
   totalpace?: string
   totalactiviti?: string

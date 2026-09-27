@@ -202,7 +202,7 @@ export function challengeGoals(challenge: Challenge): ChallengeGoal[] {
         return {
           index,
           title: `Tùy chọn ${index + 1}`,
-          summary: `${o.daysRequired}/${total} ngày · mỗi ngày một mức km riêng`,
+          summary: formatDayQuotaLabel(o.daysRequired, total, o.kmPerDay, o.dailyKm),
           details: [
             days,
             `Mỗi ngày cần 1 hoạt động có cự ly bằng một trong ${o.dailyKm.length} mức bên dưới (sai số ±${tolerance} km). Mỗi mức chỉ tính cho 1 ngày, không cần theo thứ tự.`,
@@ -213,7 +213,7 @@ export function challengeGoals(challenge: Challenge): ChallengeGoal[] {
       return {
         index,
         title: `Tùy chọn ${index + 1}`,
-        summary: `${o.daysRequired}/${total} ngày · ${formatKmVi(o.kmPerDay)} km/ngày`,
+        summary: formatDayQuotaLabel(o.daysRequired, total, o.kmPerDay),
         details: [
           days,
           `Mỗi ngày cần 1 hoạt động có cự ly ${formatKmVi(o.kmPerDay)} km (chấp nhận ${formatKmVi(o.kmPerDay - DAY_TARGET_TOLERANCE_KM)}–${formatKmVi(o.kmPerDay + DAY_TARGET_TOLERANCE_KM)} km).`,

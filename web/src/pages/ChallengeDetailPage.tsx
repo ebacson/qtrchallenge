@@ -281,9 +281,8 @@ export function ChallengeDetailPage() {
             <div key={label} className={checked ? 'option-pick checked' : 'option-pick'}>
               <label className="custom-distance-row">
                 <input type="checkbox" checked={checked} onChange={() => toggleOption(i)} />
-                <span className="option-pick-text">
-                  <strong>Tùy chọn {i + 1}</strong>
-                  <span>{goal?.summary ?? label}</span>
+                <span>
+                  <strong>Tùy chọn {i + 1}:</strong> {goal?.summary ?? label}
                 </span>
               </label>
               {checked && option.dailyKm && <DailyKmList dailyKm={option.dailyKm} />}
@@ -398,8 +397,9 @@ export function ChallengeDetailPage() {
               return (
                 <li key={g.index} className={mine ? 'goal-item mine' : 'goal-item'}>
                   <div className="goal-head">
-                    <strong>{g.title}</strong>
-                    <span className="goal-summary">{g.summary}</span>
+                    <strong>
+                      {g.title}: <span className="goal-summary">{g.summary}</span>
+                    </strong>
                     {mine && <span className="goal-badge">Bạn đã chọn</span>}
                   </div>
                   <ul className="goal-details">

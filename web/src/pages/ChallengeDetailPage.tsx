@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
 import {
   canJoin,
+  challengeDayLabels,
   challengeProgressPercent,
   challengeRulesSummary,
   joinBlockedMessage,
@@ -26,6 +27,8 @@ type Participant = {
   totalactiviti: string
   progressKm: number
   targetKm: number
+  /** Thử thách khoảng ngày: progressKm/targetKm là số ngày */
+  isDays: boolean
   rank: number
   pct: number
 }
@@ -33,6 +36,23 @@ type Participant = {
 function extractKm(value: string): number {
   const n = Number(String(value).replace(/[^0-9.]/g, ''))
   return Number.isFinite(n) ? n : 0
+}
+
+function DailyKmList({ startDate, dailyKm }: { startDate: string; dailyKm: number[] }) {
+  const labels = challengeDayLabels(startDate, dailyKm.length)
+  return (
+    <div className="daily-km-list">
+      <p className="tiny muted">Km yêu cầu từng ngày</p>
+      <ul>
+        {dailyKm.map((km, i) => (
+          <li key={i}>
+            <span>{labels[i] ?? `Ngày ${i + 1}`}</span>
+            <strong>{km} km</strong>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
 }
 
 function fillTone(pct: number): string {
@@ -107,8 +127,10 @@ export function ChallengeDetailPage() {
       ([uid, row]) => {
         const progress = String(row.progress ?? '0.0 km')
         const userTarget = String(row.userTarget ?? '')
-        const progressKm = extractKm(progress)
-        const targetKm = extractKm(userTarget)
+        const dayMatch = progress.match(/^\s*(\d+)\s*\/\s*(\d+)\s*ngày/)
+        const isDays = Boolean(dayMatch)
+        const progressKm = dayMatch ? Number(dayMatch[1]) : extractKm(progress)
+        const targetKm = dayMatch ? Number(dayMatch[2]) : extractKm(userTarget)
         const pct =
           targetKm > 0
             ? Math.min(100, Math.round((progressKm / targetKm) * 100))
@@ -126,12 +148,16 @@ export function ChallengeDetailPage() {
           totalactiviti: String(row.totalactiviti ?? ''),
           progressKm,
           targetKm,
+          isDays,
           pct,
         }
       },
     )
 
     list.sort((a, b) => {
+      if (a.isDays || b.isDays) {
+        if (b.pct !== a.pct) return b.pct - a.pct
+      }
       if (b.progressKm !== a.progressKm) return b.progressKm - a.progressKm
       if (b.targetKm !== a.targetKm) return b.targetKm - a.targetKm
       return a.fullName.localeCompare(b.fullName, 'vi')
@@ -152,6 +178,11 @@ export function ChallengeDetailPage() {
   const joined = Boolean(challenge.userTarget)
   const pct = challengeProgressPercent(challenge)
   const needsPassword = Boolean(challenge.password)
+  const selectedDailyKm =
+    challenge.challengeMode === 'day_quota'
+      ? challenge.dayQuotaOptions?.[challenge.targetDistances.indexOf(selectedTarget)]
+          ?.dailyKm
+      : undefined
   const rules = challengeRulesSummary(challenge)
   const myRank = participants.find((p) => p.id === user?.uid)?.rank
 
@@ -176,15 +207,21 @@ export function ChallengeDetailPage() {
 
     setBusy(true)
     try {
-      const quota = parseDayQuotaLabel(selectedTarget)
+      const optionIndex = challenge.targetDistances.indexOf(selectedTarget)
+      const quota =
+        challenge.challengeMode === 'day_quota'
+          ? (challenge.dayQuotaOptions?.[optionIndex] ??
+            parseDayQuotaLabel(selectedTarget))
+          : null
       await update(ref(db, `challenges/${id}/user_challenges/${user.uid}`), {
         userTarget: selectedTarget,
-        progress:
-          challenge.challengeMode === 'day_quota' && quota
-            ? `0/${quota.daysRequired} ngày`
-            : '0.0 km',
+        progress: quota ? `0/${quota.daysRequired} ngày` : '0.0 km',
         ...(quota
-          ? { daysRequired: quota.daysRequired, kmPerDay: quota.kmPerDay }
+          ? {
+              optionIndex,
+              daysRequired: quota.daysRequired,
+              kmPerDay: quota.kmPerDay,
+            }
           : {}),
       })
       setMessage('Đã tham gia thử thách thành công!')
@@ -270,7 +307,7 @@ export function ChallengeDetailPage() {
             )}
             <p>
               {challenge.challengeMode === 'day_quota'
-                ? `${challenge.progress ?? `0/${challenge.userDaysRequired ?? '?'} ngày`} · ${challenge.userKmPerDay ?? '?'} km/ngày`
+                ? `${challenge.progress ?? `0/${challenge.userDaysRequired ?? '?'} ngày`} · ${challenge.userDailyKm ? 'km theo từng ngày' : `${challenge.userKmPerDay ?? '?'} km/ngày`}`
                 : challenge.challengeMode === 'activity_count'
                   ? `${challenge.totalactiviti ?? '0'} / ${challenge.requiredActivities ?? '?'} hoạt động (≥ ${challenge.minActivityDistanceKm ?? 1} km)`
                   : `${challenge.progress ?? '0 km'} / ${challenge.userTarget}`}
@@ -286,6 +323,9 @@ export function ChallengeDetailPage() {
                 ? `${challenge.totalactiviti} hoạt động hợp lệ`
                 : 'Progress cập nhật sau khi sync Strava'}
             </p>
+            {challenge.userDailyKm && (
+              <DailyKmList startDate={challenge.startDate} dailyKm={challenge.userDailyKm} />
+            )}
             {challenge.status === STATUS_UPCOMING ? (
               <button
                 type="button"
@@ -342,7 +382,11 @@ export function ChallengeDetailPage() {
                         />
                       </div>
                     </div>
-                    <span className="participant-km">{p.progressKm.toFixed(1)} km</span>
+                    <span className="participant-km">
+                      {p.isDays
+                        ? `${p.progressKm}/${p.targetKm} ngày`
+                        : `${p.progressKm.toFixed(1)} km`}
+                    </span>
                   </li>
                 ))}
               </ol>
@@ -369,6 +413,9 @@ export function ChallengeDetailPage() {
                   ))}
                 </select>
               </label>
+              {selectedDailyKm && (
+                <DailyKmList startDate={challenge.startDate} dailyKm={selectedDailyKm} />
+              )}
               {needsPassword && (
                 <label>
                   Mật khẩu thử thách

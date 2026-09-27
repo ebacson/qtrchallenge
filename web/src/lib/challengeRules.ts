@@ -174,13 +174,70 @@ export function countInclusiveDays(startDate: string, endDate: string): number {
   return Math.floor((b - a) / 86_400_000) + 1
 }
 
+function formatKm(km: number): string {
+  return Number.isInteger(km) ? String(km) : km.toFixed(1)
+}
+
 export function formatDayQuotaLabel(
   daysRequired: number,
   totalDays: number,
   kmPerDay: number,
+  dailyKm?: number[],
+  optionNumber?: number,
 ): string {
-  const km = Number.isInteger(kmPerDay) ? String(kmPerDay) : kmPerDay.toFixed(1)
-  return `${daysRequired}/${totalDays} ngày · ${km} km/ngày`
+  if (dailyKm?.length) {
+    const min = Math.min(...dailyKm)
+    const max = Math.max(...dailyKm)
+    const range = min === max ? `${formatKm(min)} km` : `${formatKm(min)}–${formatKm(max)} km`
+    const prefix = optionNumber != null ? `Tùy chọn ${optionNumber}: ` : ''
+    return `${prefix}${daysRequired}/${totalDays} ngày · km theo từng ngày (${range})`
+  }
+  return `${daysRequired}/${totalDays} ngày · ${formatKm(kmPerDay)} km/ngày`
+}
+
+/** Nhãn dd/MM cho từng ngày của thử thách (startDate dạng dd-MM-yyyy). */
+export function challengeDayLabels(startDate: string, totalDays: number): string[] {
+  const startMs = parseChallengeDayStartMs(startDate)
+  if (startMs == null || totalDays <= 0) return []
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return Array.from({ length: totalDays }, (_, i) => {
+    // +7h: parseChallengeDayStartMs trả về UTC của 00:00 giờ VN
+    const d = new Date(startMs + i * 86_400_000 + 7 * 3_600_000)
+    return `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}`
+  })
+}
+
+function parseDailyKm(raw: unknown): number[] | undefined {
+  if (raw == null || typeof raw !== 'object') return undefined
+  const values = Array.isArray(raw)
+    ? raw
+    : Object.entries(raw as Record<string, unknown>)
+        .sort(([a], [b]) => Number(a) - Number(b))
+        .map(([, v]) => v)
+  const list = values.map((v) => Number(v))
+  if (!list.length || list.some((n) => !Number.isFinite(n) || n <= 0)) return undefined
+  return list
+}
+
+/** Tùy chọn user đã chọn khi tham gia (theo optionIndex, vị trí nhãn, hoặc nhãn cũ). */
+export function resolveDayQuotaOption(
+  options: DayQuotaOption[] | undefined,
+  targetDistances: string[],
+  userRow: Record<string, unknown> | undefined,
+): DayQuotaOption | null {
+  if (!userRow) return null
+  const target = String(userRow.userTarget ?? '')
+  const storedIndex = Number(userRow.optionIndex)
+  const index =
+    Number.isInteger(storedIndex) && storedIndex >= 0
+      ? storedIndex
+      : targetDistances.indexOf(target)
+  if (options && index >= 0 && options[index]) return options[index]
+
+  const daysRequired = Number(userRow.daysRequired)
+  const kmPerDay = Number(userRow.kmPerDay)
+  if (daysRequired > 0 && kmPerDay > 0) return { daysRequired, kmPerDay }
+  return parseDayQuotaLabel(target)
 }
 
 export function parseDayQuotaLabel(label: string): DayQuotaOption | null {
@@ -202,13 +259,14 @@ export function parseDayQuotaOptions(
     const o = row as Record<string, unknown>
     const daysRequired = Number(o.daysRequired)
     const kmPerDay = Number(o.kmPerDay)
+    const dailyKm = parseDailyKm(o.dailyKm)
     if (
       Number.isFinite(daysRequired) &&
       daysRequired > 0 &&
       Number.isFinite(kmPerDay) &&
       kmPerDay > 0
     ) {
-      list.push({ daysRequired, kmPerDay })
+      list.push(dailyKm ? { daysRequired, kmPerDay, dailyKm } : { daysRequired, kmPerDay })
     }
   }
   return list.length ? list : undefined
@@ -240,6 +298,8 @@ export type ProgressOptions = {
   minActivityDistanceKm?: number
   /** Đếm ngày đạt đủ kmPerDay trong khoảng */
   kmPerDay?: number
+  /** Km yêu cầu riêng từng ngày (index tính từ startDate); ưu tiên hơn kmPerDay */
+  dailyKm?: number[]
 }
 
 export function convertPaceToMinutesPerKm(pace: string): number {
@@ -269,6 +329,8 @@ export function calculateProgress(
   const paceMax = options?.paceMax ?? MAX_PACE
   const minDist = options?.minActivityDistanceKm ?? MIN_DISTANCE_KM
   const kmPerDay = options?.kmPerDay
+  const dailyKm = options?.dailyKm
+  const isDayQuota = kmPerDay != null || dailyKm != null
 
   let totalDistance = 0
   let totalActivities = 0
@@ -284,8 +346,8 @@ export function calculateProgress(
     const paceStr = String(activity.pace ?? '')
     if (!activityDateStr || Number.isNaN(distance)) continue
 
-    // For day_quota, keep all distances in day bucket; filter day later by kmPerDay
-    if (kmPerDay == null && distance < minDist) continue
+    // Day quota sums every activity per day; the day threshold is applied afterwards
+    if (!isDayQuota && distance < minDist) continue
 
     const dayMs = activityDayMs(activityDateStr)
     if (dayMs == null) continue
@@ -302,10 +364,12 @@ export function calculateProgress(
   }
 
   let daysCompleted: number | undefined
-  if (kmPerDay != null && kmPerDay > 0) {
+  if (isDayQuota) {
     daysCompleted = 0
-    for (const km of dayTotals.values()) {
-      if (km >= kmPerDay) daysCompleted += 1
+    for (const [dayMs, km] of dayTotals) {
+      const dayIndex = Math.round((dayMs - startDate.getTime()) / 86_400_000)
+      const required = dailyKm?.[dayIndex] ?? kmPerDay
+      if (required != null && required > 0 && km >= required) daysCompleted += 1
     }
   }
 
@@ -375,11 +439,10 @@ export function parseChallenge(
       ? totalDaysRaw
       : countInclusiveDays(startDate, endDate) || undefined
 
-  const userDaysRequired = Number(userData?.daysRequired)
-  const userKmPerDay = Number(userData?.kmPerDay)
-  const parsedFromTarget = userData?.userTarget
-    ? parseDayQuotaLabel(String(userData.userTarget))
-    : null
+  const targetDistances = Array.isArray(dict.targetDistances)
+    ? (dict.targetDistances as string[])
+    : []
+  const userQuota = resolveDayQuotaOption(dayQuotaOptions, targetDistances, userData)
 
   return {
     id,
@@ -388,9 +451,7 @@ export function parseChallenge(
     startDate,
     endDate,
     status: computedStatus,
-    targetDistances: Array.isArray(dict.targetDistances)
-      ? (dict.targetDistances as string[])
-      : [],
+    targetDistances,
     icon: dict.icon ? String(dict.icon) : undefined,
     creator: dict.creator != null ? String(dict.creator) : undefined,
     password: dict.password ? String(dict.password) : undefined,
@@ -411,14 +472,9 @@ export function parseChallenge(
     totalDays,
     dayQuotaOptions,
     userTarget: userData?.userTarget != null ? String(userData.userTarget) : undefined,
-    userDaysRequired:
-      Number.isFinite(userDaysRequired) && userDaysRequired > 0
-        ? userDaysRequired
-        : parsedFromTarget?.daysRequired,
-    userKmPerDay:
-      Number.isFinite(userKmPerDay) && userKmPerDay > 0
-        ? userKmPerDay
-        : parsedFromTarget?.kmPerDay,
+    userDaysRequired: userQuota?.daysRequired,
+    userKmPerDay: userQuota?.kmPerDay,
+    userDailyKm: userQuota?.dailyKm,
     progress: userData?.progress != null ? String(userData.progress) : undefined,
     totalpace: userData?.totalpace != null ? String(userData.totalpace) : undefined,
     totalactiviti:

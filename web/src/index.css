@@ -689,6 +689,57 @@ select {
   }
 }
 
+.quota-option-extra {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.daily-km-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.daily-km-cell {
+  display: grid;
+  gap: 4px;
+  font-size: 0.78rem;
+}
+
+.daily-km-cell span {
+  color: var(--ink-soft);
+}
+
+.daily-km-cell input {
+  width: 100%;
+}
+
+.daily-km-list {
+  margin: 10px 0;
+}
+
+.daily-km-list ul {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 6px;
+}
+
+.daily-km-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.8rem;
+}
+
 .empty {
   color: var(--ink-soft);
   padding: 24px 0;

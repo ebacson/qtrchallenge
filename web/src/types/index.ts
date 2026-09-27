@@ -36,6 +36,8 @@ export interface UserProfile {
 export interface DayQuotaOption {
   daysRequired: number
   kmPerDay: number
+  /** Km yêu cầu riêng cho từng ngày (index 0 = ngày bắt đầu); ghi đè kmPerDay */
+  dailyKm?: number[]
 }
 
 export interface Challenge {
@@ -61,6 +63,7 @@ export interface Challenge {
   userTarget?: string
   userDaysRequired?: number
   userKmPerDay?: number
+  userDailyKm?: number[]
   progress?: string
   totalpace?: string
   totalactiviti?: string

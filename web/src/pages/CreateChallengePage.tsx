@@ -11,6 +11,7 @@ import {
   uploadChallengeIcon,
 } from '../lib/adminOps'
 import {
+  challengeDayLabels,
   countInclusiveDays,
   formatDayQuotaLabel,
   formatPaceMinutes,
@@ -25,7 +26,33 @@ const JOIN_DEADLINE_OPTIONS = [3, 7, 14, 21, 30, 45, 60]
 
 type Mode = 'monthly_pace' | 'day_quota'
 
-type QuotaDraft = { daysRequired: string; kmPerDay: string }
+type QuotaDraft = {
+  daysRequired: string
+  kmPerDay: string
+  perDay: boolean
+  dailyKm: string[]
+}
+
+function toKm(value: string): number {
+  return Number(value.replace(',', '.'))
+}
+
+function resizeDailyKm(list: string[], totalDays: number, fill: string): string[] {
+  if (list.length >= totalDays) return list.slice(0, totalDays)
+  return [...list, ...Array<string>(totalDays - list.length).fill(fill)]
+}
+
+function draftToOption(o: QuotaDraft, totalDays: number): DayQuotaOption | null {
+  const daysRequired = Number(o.daysRequired)
+  const kmPerDay = toKm(o.kmPerDay)
+  if (!Number.isInteger(daysRequired) || daysRequired < 1 || !(kmPerDay > 0)) {
+    return null
+  }
+  if (!o.perDay) return { daysRequired, kmPerDay }
+  const dailyKm = o.dailyKm.map(toKm)
+  if (dailyKm.length !== totalDays || dailyKm.some((km) => !(km > 0))) return null
+  return { daysRequired, kmPerDay: Math.min(...dailyKm), dailyKm }
+}
 
 export function CreateChallengePage() {
   const { user } = useAuth()
@@ -40,7 +67,7 @@ export function CreateChallengePage() {
   const [paceMinInput, setPaceMinInput] = useState('04:00')
   const [paceMaxInput, setPaceMaxInput] = useState('08:00')
   const [quotaOptions, setQuotaOptions] = useState<QuotaDraft[]>([
-    { daysRequired: '', kmPerDay: '5' },
+    { daysRequired: '', kmPerDay: '5', perDay: false, dailyKm: [] },
   ])
   const [selected, setSelected] = useState<string[]>([])
   const [customKm, setCustomKm] = useState('')
@@ -72,27 +99,39 @@ export function CreateChallengePage() {
   useEffect(() => {
     if (mode !== 'day_quota' || totalDays <= 0) return
     setQuotaOptions((prev) =>
-      prev.map((o, i) =>
-        i === 0 && !o.daysRequired
-          ? { ...o, daysRequired: String(totalDays) }
-          : o,
-      ),
+      prev.map((o, i) => {
+        let next = o
+        if (i === 0 && !o.daysRequired) {
+          next = { ...next, daysRequired: String(totalDays) }
+        }
+        if (o.perDay && o.dailyKm.length !== totalDays) {
+          next = { ...next, dailyKm: resizeDailyKm(o.dailyKm, totalDays, o.kmPerDay) }
+        }
+        return next
+      }),
     )
   }, [mode, totalDays])
 
+  const dayLabels = useMemo(
+    () =>
+      mode === 'day_quota' && totalDays > 0
+        ? challengeDayLabels(inputDateToChallengeDay(startDate), totalDays)
+        : [],
+    [mode, startDate, totalDays],
+  )
+
+  const parsedQuotaOptions: DayQuotaOption[] = useMemo(() => {
+    if (totalDays <= 0) return []
+    return quotaOptions
+      .map((o) => draftToOption(o, totalDays))
+      .filter((o): o is DayQuotaOption => o != null)
+  }, [quotaOptions, totalDays])
+
   const distances = useMemo(() => {
     if (mode === 'day_quota') {
-      if (totalDays <= 0) return []
-      return quotaOptions
-        .map((o) => {
-          const days = Number(o.daysRequired)
-          const km = Number(o.kmPerDay.replace(',', '.'))
-          if (!Number.isFinite(days) || days < 1 || !Number.isFinite(km) || km <= 0) {
-            return null
-          }
-          return formatDayQuotaLabel(days, totalDays, km)
-        })
-        .filter((x): x is string => Boolean(x))
+      return parsedQuotaOptions.map((o, i) =>
+        formatDayQuotaLabel(o.daysRequired, totalDays, o.kmPerDay, o.dailyKm, i + 1),
+      )
     }
     const list = [...selected]
     if (customOn && customKm.trim()) {
@@ -100,22 +139,7 @@ export function CreateChallengePage() {
       if (n > 0) list.push(`${n} km`)
     }
     return list
-  }, [mode, selected, customOn, customKm, quotaOptions, totalDays])
-
-  const parsedQuotaOptions: DayQuotaOption[] = useMemo(() => {
-    return quotaOptions
-      .map((o) => ({
-        daysRequired: Number(o.daysRequired),
-        kmPerDay: Number(o.kmPerDay.replace(',', '.')),
-      }))
-      .filter(
-        (o) =>
-          Number.isFinite(o.daysRequired) &&
-          o.daysRequired > 0 &&
-          Number.isFinite(o.kmPerDay) &&
-          o.kmPerDay > 0,
-      )
-  }, [quotaOptions])
+  }, [mode, selected, customOn, customKm, parsedQuotaOptions, totalDays])
 
   const preview = useMemo(() => {
     const startLabel = inputDateToChallengeDay(startDate)
@@ -163,12 +187,48 @@ export function CreateChallengePage() {
     )
   }
 
+  function togglePerDay(index: number, on: boolean) {
+    setQuotaOptions((prev) =>
+      prev.map((o, i) =>
+        i === index
+          ? {
+              ...o,
+              perDay: on,
+              dailyKm: on ? resizeDailyKm(o.dailyKm, totalDays, o.kmPerDay) : o.dailyKm,
+            }
+          : o,
+      ),
+    )
+  }
+
+  function updateDailyKm(index: number, day: number, value: string) {
+    setQuotaOptions((prev) =>
+      prev.map((o, i) =>
+        i === index
+          ? { ...o, dailyKm: o.dailyKm.map((v, d) => (d === day ? value : v)) }
+          : o,
+      ),
+    )
+  }
+
+  function fillDailyKm(index: number) {
+    setQuotaOptions((prev) =>
+      prev.map((o, i) =>
+        i === index
+          ? { ...o, dailyKm: Array<string>(totalDays).fill(o.kmPerDay) }
+          : o,
+      ),
+    )
+  }
+
   function addQuotaOption() {
     setQuotaOptions((prev) => [
       ...prev,
       {
         daysRequired: totalDays > 0 ? String(Math.max(1, totalDays - prev.length)) : '',
         kmPerDay: '5',
+        perDay: false,
+        dailyKm: [],
       },
     ])
   }
@@ -216,15 +276,24 @@ export function CreateChallengePage() {
         setError('Khoảng ngày không hợp lệ.')
         return
       }
-      if (parsedQuotaOptions.length === 0) {
-        setError('Thêm ít nhất một tùy chọn (số ngày / km mỗi ngày).')
-        return
-      }
-      for (const [i, o] of parsedQuotaOptions.entries()) {
+      for (const [i, draft] of quotaOptions.entries()) {
+        const o = draftToOption(draft, totalDays)
+        if (!o) {
+          setError(
+            draft.perDay
+              ? `Tùy chọn ${i + 1}: nhập số ngày và km (> 0) cho tất cả ${totalDays} ngày.`
+              : `Tùy chọn ${i + 1}: nhập số ngày và km mỗi ngày hợp lệ.`,
+          )
+          return
+        }
         if (o.daysRequired > totalDays) {
           setError(`Tùy chọn ${i + 1}: số ngày hoàn thành không được vượt ${totalDays}.`)
           return
         }
+      }
+      if (new Set(distances).size !== distances.length) {
+        setError('Có hai tùy chọn trùng nhau.')
+        return
       }
     }
 
@@ -463,7 +532,7 @@ export function CreateChallengePage() {
                     />
                   </label>
                   <label>
-                    Km mỗi ngày
+                    {o.perDay ? 'Km mặc định' : 'Km mỗi ngày'}
                     <input
                       type="number"
                       min={0.1}
@@ -484,6 +553,47 @@ export function CreateChallengePage() {
                   >
                     Xóa
                   </button>
+                  <div className="quota-option-extra">
+                    <label className="custom-distance-row">
+                      <input
+                        type="checkbox"
+                        checked={o.perDay}
+                        disabled={totalDays <= 0}
+                        onChange={(e) => togglePerDay(index, e.target.checked)}
+                      />
+                      <span>Đặt km riêng cho từng ngày</span>
+                    </label>
+                    {o.perDay && totalDays > 0 && (
+                      <>
+                        <div className="daily-km-grid">
+                          {dayLabels.map((label, day) => (
+                            <label key={day} className="daily-km-cell">
+                              <span>
+                                Ngày {day + 1} · {label}
+                              </span>
+                              <input
+                                type="number"
+                                min={0.1}
+                                step={0.1}
+                                value={o.dailyKm[day] ?? ''}
+                                onChange={(e) =>
+                                  updateDailyKm(index, day, e.target.value)
+                                }
+                                required
+                              />
+                            </label>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          className="btn ghost compact"
+                          onClick={() => fillDailyKm(index)}
+                        >
+                          Điền tất cả = {o.kmPerDay || '…'} km
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               ))}
               <button

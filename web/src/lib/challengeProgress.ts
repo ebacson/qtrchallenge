@@ -4,8 +4,9 @@ import {
   calculateProgress,
   calculateStatus,
   parseChallengeDay,
-  parseDayQuotaLabel,
+  parseDayQuotaOptions,
   progressOptionsFromDict,
+  resolveDayQuotaOption,
   STATUS_FINISHED,
 } from './challengeRules'
 import { calculateLevelFromChallenges } from './levelCalculator'
@@ -75,24 +76,20 @@ export async function syncOngoingChallengeProgress(
         const baseOpts = progressOptionsFromDict(challenge) ?? {}
 
         if (mode === 'day_quota') {
-          const fromFields = {
-            daysRequired: Number(userRow.daysRequired),
-            kmPerDay: Number(userRow.kmPerDay),
-          }
-          const fromLabel = parseDayQuotaLabel(String(userRow.userTarget ?? ''))
-          const daysRequired =
-            Number.isFinite(fromFields.daysRequired) && fromFields.daysRequired > 0
-              ? fromFields.daysRequired
-              : fromLabel?.daysRequired
-          const kmPerDay =
-            Number.isFinite(fromFields.kmPerDay) && fromFields.kmPerDay > 0
-              ? fromFields.kmPerDay
-              : fromLabel?.kmPerDay
-          if (!daysRequired || !kmPerDay) return
+          const option = resolveDayQuotaOption(
+            parseDayQuotaOptions(challenge.dayQuotaOptions),
+            Array.isArray(challenge.targetDistances)
+              ? (challenge.targetDistances as string[])
+              : [],
+            userRow,
+          )
+          if (!option) return
+          const { daysRequired, kmPerDay, dailyKm } = option
 
           const result = calculateProgress(activities, startDate, endDate, {
             ...baseOpts,
             kmPerDay,
+            dailyKm,
           })
           const daysCompleted = result.daysCompleted ?? 0
           await update(

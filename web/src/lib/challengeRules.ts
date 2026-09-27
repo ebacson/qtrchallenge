@@ -281,14 +281,14 @@ export function formatDayQuotaLabel(
   dailyKm?: number[],
   optionNumber?: number,
 ): string {
+  const prefix = optionNumber != null ? `Tùy chọn ${optionNumber}: ` : ''
   if (dailyKm?.length) {
     const min = Math.min(...dailyKm)
     const max = Math.max(...dailyKm)
     const range = min === max ? `${formatKm(min)} km` : `${formatKm(min)}–${formatKm(max)} km`
-    const prefix = optionNumber != null ? `Tùy chọn ${optionNumber}: ` : ''
     return `${prefix}${daysRequired}/${totalDays} ngày · km theo từng ngày (${range})`
   }
-  return `${daysRequired}/${totalDays} ngày · ${formatKm(kmPerDay)} km/ngày`
+  return `${prefix}${daysRequired}/${totalDays} ngày · ${formatKm(kmPerDay)} km/ngày`
 }
 
 function parseDailyKm(raw: unknown): number[] | undefined {

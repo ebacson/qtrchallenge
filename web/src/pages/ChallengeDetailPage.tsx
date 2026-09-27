@@ -265,19 +265,26 @@ export function ChallengeDetailPage() {
     }
   }
 
+  const optionCount = challenge.dayQuotaOptions?.length ?? 0
   const optionPicker = isDayQuota && (
     <fieldset className="distance-fieldset">
-      <legend>Chọn một hoặc nhiều tùy chọn</legend>
+      <legend>
+        Thử thách có {optionCount} tùy chọn — chọn một hoặc nhiều
+      </legend>
       <div className="option-pick-list">
         {challenge.targetDistances.map((label, i) => {
           const option = challenge.dayQuotaOptions?.[i]
           if (!option) return null
+          const goal = goals.find((g) => g.index === i)
           const checked = selectedOptions.includes(i)
           return (
             <div key={label} className={checked ? 'option-pick checked' : 'option-pick'}>
               <label className="custom-distance-row">
                 <input type="checkbox" checked={checked} onChange={() => toggleOption(i)} />
-                <span>{goalTitle(i, label)}</span>
+                <span className="option-pick-text">
+                  <strong>Tùy chọn {i + 1}</strong>
+                  <span>{goal?.summary ?? label}</span>
+                </span>
               </label>
               {checked && option.dailyKm && <DailyKmList dailyKm={option.dailyKm} />}
             </div>
@@ -285,7 +292,8 @@ export function ChallengeDetailPage() {
         })}
       </div>
       <p className="tiny muted">
-        Mỗi tùy chọn tính tiến độ riêng; một hoạt động có thể được tính cho nhiều tùy chọn.
+        Đang chọn {selectedOptions.length}/{optionCount} tùy chọn. Mỗi tùy chọn tính tiến độ
+        riêng; một hoạt động có thể được tính cho nhiều tùy chọn.
       </p>
     </fieldset>
   )

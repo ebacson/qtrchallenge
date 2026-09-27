@@ -89,7 +89,7 @@ export function HallOfFamePage() {
         <p className="eyebrow gold-eyebrow">Hall of Fame</p>
         <h1>Bảng vàng thành tích</h1>
         <p className="lede">
-          Top 10 mang vòng nguyệt quế — xếp theo PR đã xác minh (hh:mm:ss).
+          Bảng vàng vinh danh các thành viên có thành tích cao trong thi đấu.
         </p>
       </header>
 

@@ -41,6 +41,18 @@ function activityTimeMs(startDate: string): number {
   ).getTime()
 }
 
+/** Hiển thị `dd-MM-yyyy HH:mm:ss` (coi là giờ GMT) theo giờ Việt Nam GMT+7. */
+function displayVnTime(startDate: string): string {
+  const m = startDate
+    .trim()
+    .match(/^(\d{2})-(\d{2})-(\d{4})\s+(\d{2}):(\d{2}):(\d{2})/)
+  if (!m) return startDate
+  const [, dd, mm, yyyy, hh, min, ss] = m.map(Number)
+  const d = new Date(Date.UTC(yyyy, mm - 1, dd, hh, min, ss) + 7 * 3_600_000)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(d.getUTCDate())}-${pad(d.getUTCMonth() + 1)}-${d.getUTCFullYear()} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`
+}
+
 export function ActivitiesPage() {
   const { user } = useAuth()
   const [activities, setActivities] = useState<Activity[]>([])
@@ -101,7 +113,7 @@ export function ActivitiesPage() {
               <div>
                 <strong>{a.name}</strong>
                 <p className="tiny muted">
-                  {a.type} · {a.startDate}
+                  {a.type} · {displayVnTime(a.startDate)}
                 </p>
               </div>
               <div className="activity-metrics">

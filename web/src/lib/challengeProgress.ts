@@ -91,7 +91,7 @@ export async function syncOngoingChallengeProgress(
             kmPerDay,
             dailyKm,
           })
-          const daysCompleted = result.daysCompleted ?? 0
+          const daysCompleted = Math.min(result.daysCompleted ?? 0, daysRequired)
           await update(
             ref(db, `challenges/${challengeId}/user_challenges/${uid}`),
             {
@@ -102,6 +102,7 @@ export async function syncOngoingChallengeProgress(
                 : '0',
               daysRequired,
               kmPerDay,
+              completedTargets: result.completedTargets ?? null,
             },
           )
           updatedChallengeIds.push(challengeId)

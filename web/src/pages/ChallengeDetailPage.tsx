@@ -6,6 +6,7 @@ import { db } from '../lib/firebase'
 import {
   canJoin,
   challengeProgressPercent,
+  DAY_TARGET_TOLERANCE_KM,
   challengeRulesSummary,
   joinBlockedMessage,
   listDisplayText,
@@ -37,19 +38,25 @@ function extractKm(value: string): number {
   return Number.isFinite(n) ? n : 0
 }
 
-/** Mức km đạt được luôn là các mức nhỏ nhất (xem countMatchedDayTargets). */
-function DailyKmList({ dailyKm, completed = 0 }: { dailyKm: number[]; completed?: number }) {
-  const sorted = [...dailyKm].sort((a, b) => a - b)
+function DailyKmList({
+  dailyKm,
+  completedTargets = [],
+}: {
+  dailyKm: number[]
+  completedTargets?: number[]
+}) {
+  const done = new Set(completedTargets)
   return (
     <div className="daily-km-list">
       <p className="tiny muted">
-        Km yêu cầu cho {sorted.length} ngày hoạt động — ngày nào trong khoảng cũng được, mỗi
-        ngày tính cho một mức
+        {dailyKm.length} ngày hoạt động, ngày nào trong khoảng cũng được: mỗi mức cần một hoạt
+        động có cự ly bằng mức đó (±{String(DAY_TARGET_TOLERANCE_KM).replace('.', ',')} km),
+        mỗi ngày tính cho một mức
       </p>
       <ul>
-        {sorted.map((km, i) => (
-          <li key={i} className={i < completed ? 'done' : undefined}>
-            <span>{i < completed ? '✓' : `#${i + 1}`}</span>
+        {dailyKm.map((km, i) => (
+          <li key={i} className={done.has(i) ? 'done' : undefined}>
+            <span>{done.has(i) ? '✓' : `#${i + 1}`}</span>
             <strong>{km} km</strong>
           </li>
         ))}
@@ -329,7 +336,7 @@ export function ChallengeDetailPage() {
             {challenge.userDailyKm && (
               <DailyKmList
                 dailyKm={challenge.userDailyKm}
-                completed={Number(challenge.totalactiviti) || 0}
+                completedTargets={challenge.userCompletedTargets}
               />
             )}
             {challenge.status === STATUS_UPCOMING ? (

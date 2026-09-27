@@ -498,7 +498,8 @@ export function CreateChallengePage() {
               <legend>Các tùy chọn hoàn thành</legend>
               <p className="tiny muted" style={{ marginBottom: 10 }}>
                 Ví dụ 15 ngày: tùy chọn 1 = 15/15 ngày × 5 km/ngày; tùy chọn 2 =
-                10/15 ngày, mỗi ngày hoạt động một mức km riêng.
+                10/15 ngày, mỗi ngày hoạt động một mức km riêng. Mỗi ngày cần một hoạt
+                động có cự ly bằng mức km đã đặt (sai số ±0,1 km).
               </p>
               {quotaOptions.map((o, index) => (
                 <div key={index} className="quota-option-row">
@@ -553,9 +554,10 @@ export function CreateChallengePage() {
                     {o.perDay && totalDays > 0 && (
                       <>
                         <p className="tiny muted">
-                          Nhập km cho {o.dailyKm.length || '…'} ngày hoạt động. Người tham gia
-                          hoàn thành vào ngày nào trong khoảng cũng được (liên tục hoặc ngắt
-                          quãng, không theo thứ tự); mỗi ngày chỉ tính cho một mức km.
+                          Nhập km cho {o.dailyKm.length || '…'} ngày hoạt động. Mỗi mức cần một
+                          hoạt động có cự ly bằng mức đó (sai số ±0,1 km), vào ngày nào trong
+                          khoảng cũng được (liên tục hoặc ngắt quãng, không theo thứ tự); mỗi
+                          ngày chỉ tính cho một mức.
                         </p>
                         <div className="daily-km-grid">
                           {o.dailyKm.map((_, day) => (

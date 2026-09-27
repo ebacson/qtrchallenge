@@ -207,6 +207,12 @@ function parseDailyKm(raw: unknown): number[] | undefined {
   return list
 }
 
+function parseIndexList(raw: unknown): number[] | undefined {
+  if (raw == null || typeof raw !== 'object') return undefined
+  const values = Array.isArray(raw) ? raw : Object.values(raw as Record<string, unknown>)
+  return values.map(Number).filter((n) => Number.isInteger(n) && n >= 0)
+}
+
 /** Tùy chọn user đã chọn khi tham gia (theo optionIndex, vị trí nhãn, hoặc nhãn cũ). */
 export function resolveDayQuotaOption(
   options: DayQuotaOption[] | undefined,
@@ -290,19 +296,40 @@ export type ProgressOptions = {
   dailyKm?: number[]
 }
 
+/** Sai số cho phép giữa cự ly một hoạt động và mức km đặt cho ngày. */
+export const DAY_TARGET_TOLERANCE_KM = 0.1
+
+function matchesDayTarget(km: number, target: number): boolean {
+  return Math.abs(km - target) <= DAY_TARGET_TOLERANCE_KM + 1e-9
+}
+
 /**
- * Số mục tiêu km được đáp ứng khi mỗi ngày (tổng km trong ngày) chỉ dùng cho
- * một mục tiêu. Ghép tăng dần cho kết quả tối đa, và các mục tiêu đạt luôn là
- * những mục tiêu nhỏ nhất.
+ * Ghép ngày ↔ mức km: một ngày đạt một mức nếu có một hoạt động trong ngày có
+ * cự ly bằng mức đó (± sai số); mỗi ngày chỉ dùng cho một mức. Trả về index các
+ * mức đạt được (ghép cực đại).
  */
-export function countMatchedDayTargets(dayKms: number[], targets: number[]): number {
-  const days = [...dayKms].sort((a, b) => a - b)
-  const reqs = [...targets].sort((a, b) => a - b)
-  let matched = 0
-  for (const km of days) {
-    if (matched < reqs.length && km >= reqs[matched]) matched += 1
+export function matchDayTargets(dayActivityKms: number[][], targets: number[]): number[] {
+  const candidates = dayActivityKms.map((kms) =>
+    targets.flatMap((t, i) => (kms.some((km) => matchesDayTarget(km, t)) ? [i] : [])),
+  )
+  const owner = new Array<number>(targets.length).fill(-1)
+
+  const tryAssign = (day: number, seen: boolean[]): boolean => {
+    for (const t of candidates[day]) {
+      if (seen[t]) continue
+      seen[t] = true
+      if (owner[t] < 0 || tryAssign(owner[t], seen)) {
+        owner[t] = day
+        return true
+      }
+    }
+    return false
   }
-  return matched
+
+  candidates.forEach((_, day) => {
+    tryAssign(day, new Array<boolean>(targets.length).fill(false))
+  })
+  return owner.flatMap((day, i) => (day >= 0 ? [i] : []))
 }
 
 export function convertPaceToMinutesPerKm(pace: string): number {
@@ -338,7 +365,7 @@ export function calculateProgress(
   let totalDistance = 0
   let totalActivities = 0
   let totalPace = 0
-  const dayTotals = new Map<number, number>()
+  const dayActivityKms = new Map<number, number[]>()
 
   for (const activity of activities) {
     const type = String(activity.type ?? '')
@@ -349,7 +376,7 @@ export function calculateProgress(
     const paceStr = String(activity.pace ?? '')
     if (!activityDateStr || Number.isNaN(distance)) continue
 
-    // Day quota sums every activity per day; the day threshold is applied afterwards
+    // Day quota matches single activities against the day targets instead
     if (!isDayQuota && distance < minDist) continue
 
     const dayMs = activityDayMs(activityDateStr)
@@ -362,17 +389,21 @@ export function calculateProgress(
       totalDistance += distance
       totalPace += pace
       totalActivities += 1
-      dayTotals.set(dayMs, (dayTotals.get(dayMs) ?? 0) + distance)
+      const kms = dayActivityKms.get(dayMs)
+      if (kms) kms.push(distance)
+      else dayActivityKms.set(dayMs, [distance])
     }
   }
 
   let daysCompleted: number | undefined
+  let completedTargets: number[] | undefined
   if (dailyKm?.length) {
-    daysCompleted = countMatchedDayTargets([...dayTotals.values()], dailyKm)
+    completedTargets = matchDayTargets([...dayActivityKms.values()], dailyKm)
+    daysCompleted = completedTargets.length
   } else if (kmPerDay != null && kmPerDay > 0) {
     daysCompleted = 0
-    for (const km of dayTotals.values()) {
-      if (km >= kmPerDay) daysCompleted += 1
+    for (const kms of dayActivityKms.values()) {
+      if (kms.some((km) => matchesDayTarget(km, kmPerDay))) daysCompleted += 1
     }
   }
 
@@ -382,6 +413,7 @@ export function calculateProgress(
     totalPaceMinutes: totalPace,
     hasEligibleActivities: totalActivities > 0,
     daysCompleted,
+    completedTargets,
   }
 }
 
@@ -478,6 +510,7 @@ export function parseChallenge(
     userDaysRequired: userQuota?.daysRequired,
     userKmPerDay: userQuota?.kmPerDay,
     userDailyKm: userQuota?.dailyKm,
+    userCompletedTargets: parseIndexList(userData?.completedTargets),
     progress: userData?.progress != null ? String(userData.progress) : undefined,
     totalpace: userData?.totalpace != null ? String(userData.totalpace) : undefined,
     totalactiviti:

@@ -37,8 +37,9 @@ export interface DayQuotaOption {
   daysRequired: number
   kmPerDay: number
   /**
-   * Km yêu cầu cho từng ngày hoạt động (độ dài = daysRequired). Các ngày không cần
-   * liên tục và không gắn với ngày cụ thể; ghi đè kmPerDay.
+   * Km yêu cầu cho từng ngày hoạt động (độ dài = daysRequired). Mỗi mức cần một
+   * hoạt động có cự ly bằng mức đó (± 0,1 km) vào một ngày riêng, ngày nào cũng
+   * được; ghi đè kmPerDay.
    */
   dailyKm?: number[]
 }
@@ -67,6 +68,7 @@ export interface Challenge {
   userDaysRequired?: number
   userKmPerDay?: number
   userDailyKm?: number[]
+  userCompletedTargets?: number[]
   progress?: string
   totalpace?: string
   totalactiviti?: string
@@ -78,4 +80,6 @@ export interface ChallengeProgressResult {
   totalPaceMinutes: number
   hasEligibleActivities: boolean
   daysCompleted?: number
+  /** Index các mức trong dailyKm đã đạt */
+  completedTargets?: number[]
 }

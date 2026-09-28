@@ -18,7 +18,9 @@
           var redirect = sessionStorage.getItem('qtr-spa-redirect')
           if (!redirect) return
           sessionStorage.removeItem('qtr-spa-redirect')
-          if (redirect.indexOf('/qtrchallenge/web') === 0) {
+          // Old links under /qtrchallenge/web/… now live at /qtrchallenge/…
+          redirect = redirect.replace(/^\/qtrchallenge\/web(?=\/|\?|#|$)/, '/qtrchallenge')
+          if (redirect.indexOf('/qtrchallenge') === 0) {
             history.replaceState(null, '', redirect)
           }
         } catch (_) {}

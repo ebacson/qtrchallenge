@@ -5,11 +5,11 @@
     <title>Redirecting…</title>
     <script>
       // GitHub Pages only serves the site-root 404.html for missing paths.
-      // Preserve deep link (e.g. /qtrchallenge/web/strava/callback?code=…) then enter the SPA.
+      // Preserve deep link (e.g. /qtrchallenge/strava/callback?code=…) then enter the SPA.
       ;(function () {
         var path = location.pathname + location.search + location.hash
         sessionStorage.setItem('qtr-spa-redirect', path)
-        location.replace('/qtrchallenge/web/')
+        location.replace('/qtrchallenge/')
       })()
     </script>
   </head>

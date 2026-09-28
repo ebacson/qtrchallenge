@@ -3,6 +3,30 @@ import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { brandLogoSrc, brandTitle } from '../lib/brand'
 
+const INVALID_LOGIN_CODES = new Set([
+  'auth/invalid-credential',
+  'auth/invalid-login-credentials',
+  'auth/user-not-found',
+  'auth/wrong-password',
+  'auth/invalid-email',
+])
+
+function loginErrorMessage(err: unknown): string {
+  const code = (err as { code?: unknown } | null)?.code
+  if (typeof code === 'string') {
+    if (INVALID_LOGIN_CODES.has(code)) {
+      return 'Tài khoản email không tồn tại hoặc mật khẩu không đúng.'
+    }
+    if (code === 'auth/too-many-requests') {
+      return 'Đăng nhập sai quá nhiều lần. Vui lòng thử lại sau.'
+    }
+    if (code === 'auth/network-request-failed') {
+      return 'Không có kết nối mạng. Vui lòng thử lại.'
+    }
+  }
+  return 'Đăng nhập thất bại'
+}
+
 export function LoginPage() {
   const { user, loading, login, resetPassword } = useAuth()
   const [email, setEmail] = useState('')
@@ -22,7 +46,7 @@ export function LoginPage() {
     try {
       await login(email, password)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Đăng nhập thất bại')
+      setError(loginErrorMessage(err))
     } finally {
       setBusy(false)
     }
@@ -48,8 +72,6 @@ export function LoginPage() {
       <div className="auth-panel">
         <img src={brandLogoSrc} alt="" className="brand-logo auth-logo" />
         <p className="brand-name hero-brand">{brandTitle}</p>
-        <p className="auth-tagline">Club challenge · Strava</p>
-
         <form className="auth-form" onSubmit={onSubmit}>
           <label>
             Email
@@ -94,8 +116,7 @@ export function LoginPage() {
         </form>
 
         <p className="auth-footer">
-          Chưa có tài khoản? Dùng app iOS/Android để đăng ký, hoặc{' '}
-          <Link to="/register">đăng ký web</Link>.
+          Chưa có tài khoản? <Link to="/register">Đăng ký</Link>.
         </p>
       </div>
     </div>

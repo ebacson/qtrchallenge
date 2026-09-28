@@ -13,9 +13,11 @@ import {
 import {
   completionPercent,
   formatVnd,
+  isRewardEligible,
   participantCompletion,
   PENALTY_PARTIAL,
   PENALTY_UNDER_HALF,
+  REWARD_START_YEAR,
   type CompletionTier,
   type ParticipantCompletion,
 } from '../lib/rewardPenalty'
@@ -194,7 +196,8 @@ function SummaryView({ reports }: { reports: ChallengeReport[] }) {
   return (
     <>
       <p className="tiny muted">
-        Tổng hợp {finished.length} thử thách đã kết thúc (không tính thử thách đang diễn ra).
+        Tổng hợp {finished.length} thử thách đã kết thúc từ năm {REWARD_START_YEAR} (không tính
+        thử thách đang diễn ra).
       </p>
       <div className="stat-row">
         <div className="stat">
@@ -264,7 +267,7 @@ export function RewardsPage() {
     const list: ChallengeReport[] = []
     for (const [id, val] of Object.entries(rawChallenges)) {
       const challenge = parseChallenge(id, val)
-      if (challenge.status === STATUS_UPCOMING) continue
+      if (challenge.status === STATUS_UPCOMING || !isRewardEligible(challenge)) continue
       const userChallenges = (val.user_challenges ?? {}) as Record<
         string,
         Record<string, unknown>
@@ -310,20 +313,25 @@ export function RewardsPage() {
         <p className="lede">
           Thống kê thành viên hoàn thành và không hoàn thành thử thách. Không hoàn thành dưới 50%
           mục tiêu phạt {formatVnd(PENALTY_UNDER_HALF)}, từ 50% đến dưới 100% phạt{' '}
-          {formatVnd(PENALTY_PARTIAL)}.
+          {formatVnd(PENALTY_PARTIAL)}. Chỉ tính các thử thách bắt đầu từ năm {REWARD_START_YEAR}{' '}
+          trở đi.
         </p>
       </header>
 
       {loading ? (
         <p className="empty">Đang tải…</p>
       ) : reports.length === 0 ? (
-        <p className="empty">Chưa có thử thách nào có người tham gia.</p>
+        <p className="empty">
+          Chưa có thử thách nào từ năm {REWARD_START_YEAR} có người tham gia.
+        </p>
       ) : (
         <>
           <label className="search-field">
             Thử thách
             <select value={selected} onChange={(e) => setSelected(e.target.value)}>
-              <option value={ALL}>Tổng hợp tất cả thử thách đã kết thúc</option>
+              <option value={ALL}>
+                Tổng hợp thử thách đã kết thúc (từ {REWARD_START_YEAR})
+              </option>
               {reports.map((r) => (
                 <option key={r.challenge.id} value={r.challenge.id}>
                   {r.challenge.name || 'Thử thách'}

@@ -1,8 +1,16 @@
-import { userDayQuotaProgress } from './challengeRules'
+import { parseChallengeDay, userDayQuotaProgress } from './challengeRules'
 import type { Challenge } from '../types'
 
 export const PENALTY_UNDER_HALF = 150_000
 export const PENALTY_PARTIAL = 100_000
+
+/** Thưởng/phạt chỉ áp dụng cho thử thách bắt đầu từ năm này trở đi */
+export const REWARD_START_YEAR = 2026
+
+export function isRewardEligible(challenge: Challenge): boolean {
+  const start = parseChallengeDay(challenge.startDate)
+  return start !== null && start.getFullYear() >= REWARD_START_YEAR
+}
 
 export type CompletionTier = 'completed' | 'partial' | 'underHalf'
 

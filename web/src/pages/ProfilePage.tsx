@@ -360,7 +360,7 @@ export function ProfilePage() {
       <section className="section panel">
         <h2>Lịch sử thành tích</h2>
         <p className="lede tiny">
-          Ghi chú giải chạy, thành tích hoặc câu chuyện của bạn (giống app).
+          Ghi chú giải chạy, thành tích hoặc câu chuyện của bạn.
         </p>
 
         <form className="history-form" onSubmit={onSaveHistory}>

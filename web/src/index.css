@@ -1034,10 +1034,24 @@ select {
 
 .boot-screen {
   min-height: 100vh;
-  display: grid;
-  place-content: center;
+  min-height: 100dvh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   gap: 8px;
+}
+
+.boot-screen > * {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.boot-screen .brand-logo.boot-logo {
+  display: block;
+  margin: 0 0 4px;
 }
 
 .detail-hero {

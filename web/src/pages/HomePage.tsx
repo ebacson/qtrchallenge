@@ -56,7 +56,7 @@ export function HomePage() {
         <p className="eyebrow">Xin chào</p>
         <h1>{profile?.fullName || 'Runner'}</h1>
         <p className="lede">
-          Club QTR — thử thách, bảng vàng, events và Strava sync.
+          QTR — One Team - One Dream.
         </p>
         <div className="stat-row">
           <div className="stat">

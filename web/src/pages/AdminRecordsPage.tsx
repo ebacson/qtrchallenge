@@ -2,20 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { onValue, ref, update } from 'firebase/database'
 import { db } from '../lib/firebase'
-import { formatRankTime, parsePersonalRecord, timeToSeconds } from '../lib/prRanking'
+import { formatRankTime } from '../lib/prRanking'
+import {
+  RECORD_FIELDS as FIELDS,
+  recordStatus,
+  type RecordDistance as Distance,
+  type RecordStatus,
+} from '../lib/userRecords'
 
-type Distance = 'FM' | 'HM'
 type Filter = 'pending' | 'verified' | 'all'
-
-type RecordStatus = {
-  /** PR user khai (users/{uid}/…Time), hoặc PR trong personalRecord nếu chưa khai */
-  submitted: string
-  /** PR đang dùng cho Bảng vàng (personalRecord, đã xác thực) */
-  approved: string
-  verified: boolean
-  pending: boolean
-  validFormat: boolean
-}
 
 type RecordRow = {
   id: string
@@ -25,35 +20,6 @@ type RecordRow = {
   avatar: string
   FM: RecordStatus
   HM: RecordStatus
-}
-
-const FIELDS = {
-  FM: { time: 'fullMarathonTime', flag: 'isFullMarathonVerified', label: 'Full Marathon (42 km)' },
-  HM: { time: 'halfMarathonTime', flag: 'isHalfMarathonVerified', label: 'Half Marathon (21 km)' },
-} as const
-
-function recordStatus(
-  row: Record<string, unknown>,
-  distance: Distance,
-): RecordStatus {
-  const { time } = FIELDS[distance]
-  const pr = parsePersonalRecord(row.personalRecord as Record<string, unknown> | undefined)
-  const prTime = distance === 'FM' ? pr?.fullMarathonTime ?? '' : pr?.halfMarathonTime ?? ''
-  const prVerified =
-    distance === 'FM' ? Boolean(pr?.isFullMarathonVerified) : Boolean(pr?.isHalfMarathonVerified)
-  const submitted = String(row[time] ?? '').trim() || prTime
-  const submittedSec = timeToSeconds(submitted)
-  const validFormat = Number.isFinite(submittedSec)
-  const approved = prVerified ? prTime : ''
-  const verified =
-    Boolean(submitted) && prVerified && timeToSeconds(prTime) === submittedSec
-  return {
-    submitted,
-    approved,
-    verified,
-    pending: Boolean(submitted) && !verified,
-    validFormat,
-  }
 }
 
 export function AdminRecordsPage() {

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { get, onValue, ref, remove, set } from 'firebase/database'
+import { AdminUserAchievements } from '../components/AdminUserAchievements'
 import { useAuth } from '../context/AuthContext'
 import { deleteUserAvatar } from '../lib/adminOps'
 import { db } from '../lib/firebase'
@@ -13,6 +14,7 @@ type AdminUser = {
   level: number
   member: boolean
   admin: boolean
+  raw: Record<string, unknown>
 }
 
 export function AdminUsersPage() {
@@ -37,6 +39,7 @@ export function AdminUsersPage() {
           level: Number(row.level ?? 0) || 0,
           member: Boolean(row.member),
           admin: Boolean(row.admin),
+          raw: row ?? {},
         }))
         .sort((a, b) => {
           if (a.admin !== b.admin) return a.admin ? -1 : 1
@@ -145,7 +148,7 @@ export function AdminUsersPage() {
         <p className="eyebrow">Admin</p>
         <h1>Quản lý thành viên</h1>
         <p className="lede">
-          Cấp/hủy Admin, phê duyệt member chính thức, hoặc xóa hồ sơ.
+          Cấp/hủy Admin, phê duyệt member chính thức, xem & chỉnh sửa thành tích, hoặc xóa hồ sơ.
         </p>
       </header>
 
@@ -231,6 +234,12 @@ export function AdminUsersPage() {
                     Xóa hoàn toàn
                   </button>
                 </div>
+
+                <AdminUserAchievements
+                  uid={u.id}
+                  displayName={u.fullName || u.email}
+                  row={u.raw}
+                />
               </li>
             )
           })}

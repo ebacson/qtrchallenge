@@ -12,25 +12,7 @@ import { useAuth } from '../context/AuthContext'
 import { uploadUserAvatar } from '../lib/avatarUpload'
 import { db } from '../lib/firebase'
 import { levelTone } from '../lib/levelCalculator'
-
-type HistoryEntry = {
-  id: string
-  content: string
-  timestamp: string
-  createdAt: number
-}
-
-function formatHistoryTime(entry: HistoryEntry): string {
-  const ms =
-    entry.createdAt > 0
-      ? entry.createdAt * (entry.createdAt < 1e12 ? 1000 : 1)
-      : Number(entry.timestamp) || 0
-  if (!ms) return entry.timestamp || ''
-  const d = new Date(ms)
-  if (Number.isNaN(d.getTime())) return entry.timestamp || ''
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
+import { formatHistoryTime, parseHistory, type HistoryEntry } from '../lib/userRecords'
 
 export function ProfilePage() {
   const { user, profile } = useAuth()
@@ -69,20 +51,7 @@ export function ProfilePage() {
     if (!user) return
     const histRef = ref(db, `users/${user.uid}/history`)
     const unsub = onValue(histRef, (snap) => {
-      const val = (snap.val() ?? {}) as Record<string, Record<string, unknown>>
-      const entries = Object.entries(val)
-        .map(([id, row]) => ({
-          id,
-          content: String(row.content ?? ''),
-          timestamp: String(row.timestamp ?? ''),
-          createdAt: Number(row.createdAt ?? 0) || 0,
-        }))
-        .sort((a, b) => {
-          const ta = a.createdAt || Number(a.id) || 0
-          const tb = b.createdAt || Number(b.id) || 0
-          return tb - ta
-        })
-      setHistory(entries)
+      setHistory(parseHistory(snap.val()))
     })
     return unsub
   }, [user])

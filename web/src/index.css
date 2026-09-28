@@ -1794,6 +1794,67 @@ code {
   margin-top: 12px;
 }
 
+.admin-achievements {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-achievements-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.admin-pr-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.admin-pr-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.admin-history-preview {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-pr-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.auth-form label.admin-pr-verify {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.auth-form .admin-pr-verify input {
+  padding: 0;
+}
+
+.admin-history {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .challenge-preview {
   margin: 4px 0 0;
   padding: 12px 14px;

@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -16,6 +17,7 @@ import {
   type User,
 } from 'firebase/auth'
 import { onValue, ref } from 'firebase/database'
+import { refreshUserLevel } from '../lib/challengeProgress'
 import { auth, db } from '../lib/firebase'
 import type { UserProfile } from '../types'
 
@@ -78,6 +80,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
     return unsub
   }, [user])
+
+  // Thử thách kết thúc không tự kích hoạt tính lại level → làm một lần mỗi phiên khi đã có hồ sơ
+  const hasProfile = profile !== null
+  const levelRefreshedFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (!user || !hasProfile || levelRefreshedFor.current === user.uid) return
+    levelRefreshedFor.current = user.uid
+    void refreshUserLevel(user.uid).catch((err) => {
+      console.warn('refreshUserLevel failed', err)
+    })
+  }, [user, hasProfile])
 
   const login = useCallback(async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email.trim(), password)

@@ -25,6 +25,39 @@ function shouldRecalculate(status: string): boolean {
   return status !== STATUS_FINISHED
 }
 
+/**
+ * Tính lại level từ các thử thách đã kết thúc và chỉ ghi khi giá trị thay đổi.
+ * `currentLevel` bỏ qua thì đọc từ RTDB; không tạo node user nếu user chưa tồn tại.
+ */
+export async function refreshUserLevel(
+  uid: string,
+  challenges?: Record<string, Record<string, unknown>>,
+  currentLevel?: number,
+): Promise<number> {
+  const data =
+    challenges ??
+    (((await get(ref(db, 'challenges'))).val() ?? {}) as Record<
+      string,
+      Record<string, unknown>
+    >)
+  const level = calculateLevelFromChallenges(uid, data)
+
+  let current = currentLevel
+  if (current === undefined) {
+    const userSnap = await get(ref(db, `users/${uid}/level`))
+    if (!userSnap.exists()) {
+      const existsSnap = await get(ref(db, `users/${uid}/email`))
+      if (!existsSnap.exists()) return level
+    }
+    current = Number(userSnap.val() ?? 0) || 0
+  }
+
+  if (level !== current) {
+    await update(ref(db, `users/${uid}`), { level })
+  }
+  return level
+}
+
 export async function syncOngoingChallengeProgress(
   uid: string,
   force = false,
@@ -145,10 +178,11 @@ export async function syncOngoingChallengeProgress(
       }),
     )
 
-    if (updatedChallengeIds.length) {
-      const level = calculateLevelFromChallenges(uid, challenges)
-      await update(ref(db, `users/${uid}`), { level })
-    }
+    // Progress vừa ghi có thể là lần cuối của thử thách vừa kết thúc → đọc lại trước khi tính level
+    const latestChallenges = updatedChallengeIds.length
+      ? ((await get(ref(db, 'challenges'))).val() ?? {})
+      : challenges
+    await refreshUserLevel(uid, latestChallenges)
 
     lastSyncAt = Date.now()
     return {

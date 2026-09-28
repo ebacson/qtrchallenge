@@ -8,6 +8,8 @@ const ALLOWED_ORIGINS = new Set([
   'http://localhost:5173',
   'http://127.0.0.1:5173',
   'https://ebacson.github.io',
+  'https://quangtrirunners.online',
+  'https://www.quangtrirunners.online',
   'https://quangtrirunners.io.vn',
   'https://www.quangtrirunners.io.vn',
 ])
@@ -27,9 +29,9 @@ export const stravaApi = onRequest(
   async (req, res) => {
     try {
       const origin = corsOrigin(req.get('origin') || undefined)
+      res.set('Vary', 'Origin')
       if (origin) {
         res.set('Access-Control-Allow-Origin', origin)
-        res.set('Vary', 'Origin')
         res.set('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
         res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
       }

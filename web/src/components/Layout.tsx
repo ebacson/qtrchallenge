@@ -20,7 +20,6 @@ const menuItems = [
   { to: '/notifications', label: 'Thông báo' },
   { to: '/members', label: 'Thành viên' },
   { to: '/stats', label: 'Thống kê' },
-  { to: '/strava', label: 'Strava' },
   { to: '/profile', label: 'Profile' },
 ]
 

@@ -7,6 +7,7 @@ import {
   set,
   update,
 } from 'firebase/database'
+import { StravaConnectPanel } from '../components/StravaConnectPanel'
 import { useAuth } from '../context/AuthContext'
 import { uploadUserAvatar } from '../lib/avatarUpload'
 import { db } from '../lib/firebase'
@@ -281,16 +282,7 @@ export function ProfilePage() {
 
       <section className="section panel">
         <h2>Strava</h2>
-        <p className="body-text">
-          {profile.user_strava
-            ? `Đã kết nối: ${profile.user_strava}`
-            : 'Chưa kết nối Strava.'}
-        </p>
-        <p style={{ marginTop: 12 }}>
-          <Link className="btn ghost" to="/strava">
-            Mở Strava Sync
-          </Link>
-        </p>
+        <StravaConnectPanel />
       </section>
 
       <section className="section panel">

@@ -13,7 +13,7 @@ const shortcuts = [
   { to: '/members', title: 'Thành viên', desc: 'Danh sách runners' },
   { to: '/stats', title: 'Thống kê', desc: 'Km & pace' },
   { to: '/events', title: 'Events', desc: 'Giải & kết quả' },
-  { to: '/strava', title: 'Strava', desc: 'Kết nối & sync' },
+  { to: '/profile', title: 'Strava', desc: 'Kết nối & sync trong Profile' },
 ]
 
 export function HomePage() {

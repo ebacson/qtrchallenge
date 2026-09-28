@@ -1648,11 +1648,59 @@ code {
   margin-bottom: 16px;
 }
 
-.search-field input {
+.search-field input,
+.search-field select {
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 12px 14px;
   background: #fff;
+  font: inherit;
+}
+
+.stat strong.stat-money {
+  font-size: 1.2rem;
+  line-height: 1.9rem;
+  overflow-wrap: anywhere;
+}
+
+.reward-challenge-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.reward-challenge-head a {
+  color: inherit;
+  font-size: 1.1rem;
+}
+
+.reward-challenge-head .tiny {
+  flex-basis: 100%;
+}
+
+.reward-section h2 {
+  margin-bottom: 2px;
+}
+
+.reward-amount {
+  font-family: var(--display);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.reward-amount.completed {
+  color: var(--ok);
+}
+
+.reward-amount.partial {
+  color: var(--warn);
+}
+
+.reward-amount.underHalf {
+  color: var(--danger);
 }
 
 .event-list {

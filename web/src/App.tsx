@@ -15,6 +15,7 @@ import { NotificationsPage } from './pages/NotificationsPage'
 import { MembersPage } from './pages/MembersPage'
 import { EventsPage, EventDetailPage } from './pages/EventsPage'
 import { StatsPage } from './pages/StatsPage'
+import { RewardsPage } from './pages/RewardsPage'
 import { CreateChallengePage } from './pages/CreateChallengePage'
 import { AdminUsersPage } from './pages/AdminUsersPage'
 import { AdminRecordsPage } from './pages/AdminRecordsPage'
@@ -85,6 +86,7 @@ function AppRoutes() {
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="members" element={<MembersPage />} />
         <Route path="stats" element={<StatsPage />} />
+        <Route path="rewards" element={<RewardsPage />} />
         <Route path="strava" element={<StravaPage />} />
         <Route path="strava/callback" element={<StravaCallbackPage />} />
         <Route path="profile" element={<ProfilePage />} />

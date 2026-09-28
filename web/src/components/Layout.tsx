@@ -15,6 +15,7 @@ const menuItems = [
   { to: '/', label: 'Home', end: true },
   { to: '/challenges', label: 'Thử thách' },
   { to: '/activities', label: 'Hoạt động' },
+  { to: '/rewards', label: 'Thưởng - Phạt' },
   { to: '/events', label: 'Sự kiện' },
   { to: '/hall-of-fame', label: 'Bảng vàng' },
   { to: '/notifications', label: 'Thông báo' },

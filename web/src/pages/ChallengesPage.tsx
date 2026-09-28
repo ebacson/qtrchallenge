@@ -100,7 +100,7 @@ export function ChallengesPage() {
     <div className="page">
       <header className="page-header">
         <h1>Thử thách</h1>
-        <p className="lede">Danh sách challenge từ Firebase RTDB.</p>
+        <p className="lede">Hãy chọn tham gia một thử thách phù hợp.</p>
         {profile?.admin && (
           <p style={{ marginTop: 12 }}>
             <Link className="btn primary" to="/admin/challenges/new">

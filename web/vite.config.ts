@@ -7,8 +7,8 @@ import { stravaApiPlugin } from './server/stravaApiPlugin.ts'
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url))
 
-/** GitHub Pages project site: https://ebacson.github.io/qtrchallenge/ */
-const PAGES_BASE = '/qtrchallenge/'
+/** GitHub Pages with custom domain (CNAME): https://quangtrirunners.io.vn/ */
+const PAGES_BASE = '/'
 
 /** Emit real HTML files for OAuth deep links (GH Pages has no SPA rewrite). */
 function spaDeepLinkPages(): Plugin {

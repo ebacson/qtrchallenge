@@ -39,7 +39,7 @@ STRAVA_REDIRECT_URI=http://localhost:5173/strava/callback
 
 ## GitHub Pages
 
-Live (after Actions deploy): https://ebacson.github.io/qtrchallenge/
+Live (after Actions deploy): https://quangtrirunners.io.vn/
 
 Static hosting only — **Strava OAuth/sync API** (`/api/strava/*`) needs local `npm run dev` or a separate backend. Auth + Challenges + Activities read from Firebase still work on Pages.
 

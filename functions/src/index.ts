@@ -8,6 +8,8 @@ const ALLOWED_ORIGINS = new Set([
   'http://localhost:5173',
   'http://127.0.0.1:5173',
   'https://ebacson.github.io',
+  'https://quangtrirunners.io.vn',
+  'https://www.quangtrirunners.io.vn',
 ])
 
 function corsOrigin(origin: string | undefined): string | null {

@@ -37,7 +37,7 @@ jobs:
           mkdir -p _site
           cp -R web/dist/. _site/
           # Keep ads / image files that external apps link to at site root
-          for f in app-ads.txt App_ads.txt defaull_avatar.png qtr_banner.jpeg; do
+          for f in CNAME app-ads.txt App_ads.txt defaull_avatar.png qtr_banner.jpeg; do
             if [ -f "$f" ]; then cp "$f" _site/; fi
           done
           # GitHub Pages serves ONLY site-root 404.html for missing paths (SPA deep links)

@@ -18,11 +18,12 @@
           var redirect = sessionStorage.getItem('qtr-spa-redirect')
           if (!redirect) return
           sessionStorage.removeItem('qtr-spa-redirect')
-          // Old links under /qtrchallenge/web/… now live at /qtrchallenge/…
-          redirect = redirect.replace(/^\/qtrchallenge\/web(?=\/|\?|#|$)/, '/qtrchallenge')
-          if (redirect.indexOf('/qtrchallenge') === 0) {
-            history.replaceState(null, '', redirect)
-          }
+          // Old links under /qtrchallenge/… and /web/… now live at the site root
+          redirect = redirect
+            .replace(/^\/qtrchallenge(?=\/|\?|#|$)/, '')
+            .replace(/^\/web(?=\/|\?|#|$)/, '')
+          if (redirect.charAt(0) !== '/') redirect = '/' + redirect
+          history.replaceState(null, '', redirect)
         } catch (_) {}
       })()
     </script>

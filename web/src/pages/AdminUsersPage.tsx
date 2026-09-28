@@ -153,6 +153,9 @@ export function AdminUsersPage() {
         <Link className="btn primary" to="/admin/challenges/new">
           Tạo thử thách
         </Link>
+        <Link className="btn ghost" to="/admin/records">
+          Xác thực thành tích
+        </Link>
       </div>
 
       <label className="search-field">

@@ -770,6 +770,40 @@ select {
   font-size: 0.8rem;
 }
 
+.record-rows {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.record-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.record-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.record-info > .tiny.muted:first-child {
+  flex-basis: 100%;
+}
+
+.record-time {
+  font-family: var(--display);
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .goal-list {
   list-style: none;
   margin: 0;

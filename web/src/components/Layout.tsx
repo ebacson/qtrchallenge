@@ -35,6 +35,7 @@ export function Layout() {
         ...menuItems.slice(0, 2),
         { to: '/admin/challenges/new', label: 'Tạo thử thách' },
         { to: '/admin/users', label: 'Quản lý thành viên' },
+        { to: '/admin/records', label: 'Xác thực thành tích' },
         ...menuItems.slice(2),
       ]
     : menuItems

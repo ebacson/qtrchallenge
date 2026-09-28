@@ -17,6 +17,7 @@ import { EventsPage, EventDetailPage } from './pages/EventsPage'
 import { StatsPage } from './pages/StatsPage'
 import { CreateChallengePage } from './pages/CreateChallengePage'
 import { AdminUsersPage } from './pages/AdminUsersPage'
+import { AdminRecordsPage } from './pages/AdminRecordsPage'
 import { RequireAdmin } from './components/RequireAdmin'
 import type { ReactNode } from 'react'
 import { brandLogoSrc, brandTitle } from './lib/brand'
@@ -66,6 +67,14 @@ function AppRoutes() {
           element={
             <RequireAdmin>
               <AdminUsersPage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="admin/records"
+          element={
+            <RequireAdmin>
+              <AdminRecordsPage />
             </RequireAdmin>
           }
         />

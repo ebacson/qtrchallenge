@@ -236,6 +236,9 @@ export function ProfilePage() {
             <Link className="btn ghost compact" to="/admin/users">
               Quản lý thành viên
             </Link>
+            <Link className="btn ghost compact" to="/admin/records">
+              Xác thực thành tích
+            </Link>
           </div>
         </div>
       )}

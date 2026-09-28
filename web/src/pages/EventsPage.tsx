@@ -45,7 +45,7 @@ export function EventsPage() {
     <div className="page">
       <header className="page-header">
         <h1>Events</h1>
-        <p className="lede">Giải chạy / sự kiện từ Firebase EVENT.</p>
+        <p className="lede">Giải chạy / sự kiện do QTR tổ chức.</p>
       </header>
 
       {loading ? (

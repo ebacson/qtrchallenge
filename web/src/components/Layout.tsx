@@ -5,22 +5,22 @@ import { brandLogoSrc, brandTitle } from '../lib/brand'
 
 const tabs = [
   { to: '/', label: 'Home', end: true },
-  { to: '/challenges', label: 'Challenge' },
-  { to: '/events', label: 'Events' },
+  { to: '/challenges', label: 'Thử thách' },
+  { to: '/events', label: 'Sự kiện' },
   { to: '/hall-of-fame', label: 'Bảng vàng' },
-  { to: '/profile', label: 'Profile' },
+  { to: '/profile', label: 'Hồ sơ' },
 ]
 
 const menuItems = [
   { to: '/', label: 'Home', end: true },
-  { to: '/challenges', label: 'Challenge' },
+  { to: '/challenges', label: 'Thử thách' },
   { to: '/activities', label: 'Hoạt động' },
-  { to: '/events', label: 'Events' },
+  { to: '/events', label: 'Sự kiện' },
   { to: '/hall-of-fame', label: 'Bảng vàng' },
   { to: '/notifications', label: 'Thông báo' },
   { to: '/members', label: 'Thành viên' },
   { to: '/stats', label: 'Thống kê' },
-  { to: '/profile', label: 'Profile' },
+  { to: '/profile', label: 'Hồ sơ' },
 ]
 
 export function Layout() {

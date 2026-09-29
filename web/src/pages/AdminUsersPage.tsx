@@ -70,11 +70,22 @@ export function AdminUsersPage() {
     })
   }, [users, q, memberType])
 
-  async function setFlag(uid: string, field: 'admin' | 'member', value: boolean) {
+  async function setFlag(target: AdminUser, field: 'admin' | 'member', value: boolean) {
+    const uid = target.id
     if (!user || uid === user.uid) {
       setError('Không thể đổi quyền trên chính tài khoản đang đăng nhập.')
       return
     }
+    const who = target.fullName || target.email
+    const question =
+      field === 'admin'
+        ? value
+          ? `Cấp quyền Admin cho "${who}"?\n\nAdmin có toàn quyền quản trị: tạo thử thách, quản lý thành viên, xác thực thành tích.`
+          : `Hủy quyền Admin của "${who}"?`
+        : value
+          ? `Phê duyệt "${who}" thành thành viên Chính thức?`
+          : `Chuyển "${who}" sang thành viên Tự do?`
+    if (!window.confirm(question)) return
     setBusyId(uid)
     setError('')
     setMessage('')
@@ -223,7 +234,7 @@ export function AdminUsersPage() {
                     type="button"
                     className="btn ghost compact"
                     disabled={busy || isSelf}
-                    onClick={() => void setFlag(u.id, 'admin', !u.admin)}
+                    onClick={() => void setFlag(u, 'admin', !u.admin)}
                   >
                     {u.admin ? 'Hủy Admin' : 'Cấp Admin'}
                   </button>
@@ -231,7 +242,7 @@ export function AdminUsersPage() {
                     type="button"
                     className="btn ghost compact"
                     disabled={busy || isSelf}
-                    onClick={() => void setFlag(u.id, 'member', !u.member)}
+                    onClick={() => void setFlag(u, 'member', !u.member)}
                   >
                     {u.member ? 'Chuyển sang Tự do' : 'Phê duyệt Chính thức'}
                   </button>

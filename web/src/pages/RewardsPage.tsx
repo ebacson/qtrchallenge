@@ -23,7 +23,7 @@ import {
 } from '../lib/rewardPenalty'
 import type { Challenge } from '../types'
 
-type Profile = { fullName: string; avatar: string }
+type Profile = { fullName: string; avatar: string; member: boolean; email: string }
 
 type ReportRow = {
   uid: string
@@ -32,11 +32,17 @@ type ReportRow = {
   completion: ParticipantCompletion
 }
 
+type AbsentRow = { uid: string; name: string; avatar: string }
+
 type ChallengeReport = {
   challenge: Challenge
   rows: ReportRow[]
+  /** Thành viên chính thức không đăng ký tham gia (chỉ liệt kê, không phạt) */
+  absent: AbsentRow[]
   endMs: number
 }
+
+const SYSTEM_EMAILS = new Set(['echiptime@gmail.com'])
 
 const ALL = 'all'
 
@@ -67,7 +73,7 @@ function Avatar({ name, avatar }: { name: string; avatar: string }) {
 }
 
 function ChallengeReportView({ report }: { report: ChallengeReport }) {
-  const { challenge, rows } = report
+  const { challenge, rows, absent } = report
   const completed = rows.filter((r) => r.completion.tier === 'completed').length
   const failed = rows.length - completed
   const totalPenalty = rows.reduce((sum, r) => sum + r.completion.penalty, 0)
@@ -143,6 +149,32 @@ function ChallengeReportView({ report }: { report: ChallengeReport }) {
           </section>
         )
       })}
+
+      <section className="section panel reward-section">
+        <h2>
+          Thành viên chính thức chưa đăng ký{' '}
+          <span className="tiny muted">· {absent.length} người</span>
+        </h2>
+        <p className="tiny muted">
+          Chỉ liệt kê, không tính phạt
+          {ongoing && ' · vẫn có thể đăng ký nếu còn hạn tham gia'}
+        </p>
+        {absent.length === 0 ? (
+          <p className="empty">Tất cả thành viên chính thức đã đăng ký.</p>
+        ) : (
+          <ul className="participant-list reward-scroll">
+            {absent.map((r) => (
+              <li key={r.uid} className="participant-row">
+                <Avatar name={r.name} avatar={r.avatar} />
+                <div className="participant-meta">
+                  <strong>{r.name}</strong>
+                  <span className="tiny muted">Chưa đăng ký tham gia</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </>
   )
 }
@@ -259,12 +291,26 @@ export function RewardsPage() {
       const val = (snap.val() ?? {}) as Record<string, Record<string, unknown>>
       const map: Record<string, Profile> = {}
       for (const [uid, row] of Object.entries(val)) {
-        map[uid] = { fullName: String(row.fullName ?? ''), avatar: String(row.avatar ?? '') }
+        map[uid] = {
+          fullName: String(row.fullName ?? ''),
+          avatar: String(row.avatar ?? ''),
+          member: row.member === true,
+          email: String(row.email ?? '').toLowerCase(),
+        }
       }
       setProfiles(map)
     })
     return unsub
   }, [])
+
+  const officialMembers = useMemo(
+    () =>
+      Object.entries(profiles)
+        .filter(([, p]) => p.member && p.email && !SYSTEM_EMAILS.has(p.email))
+        .map(([uid, p]) => ({ uid, name: p.fullName || 'Người dùng ẩn danh', avatar: p.avatar }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'vi')),
+    [profiles],
+  )
 
   const reports = useMemo(() => {
     const list: ChallengeReport[] = []
@@ -294,11 +340,12 @@ export function RewardsPage() {
       list.push({
         challenge,
         rows,
+        absent: officialMembers.filter((m) => !(m.uid in userChallenges)),
         endMs: parseChallengeDay(challenge.endDate)?.getTime() ?? 0,
       })
     }
     return list.sort((a, b) => b.endMs - a.endMs)
-  }, [rawChallenges, profiles])
+  }, [rawChallenges, profiles, officialMembers])
 
   useEffect(() => {
     if (selected || !reports.length) return

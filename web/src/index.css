@@ -1691,6 +1691,23 @@ code {
   flex-shrink: 0;
 }
 
+.reward-amount strong,
+.reward-amount small {
+  display: block;
+  text-align: right;
+}
+
+.reward-amount strong {
+  font-size: 1.2rem;
+  line-height: 1.1;
+}
+
+.reward-amount small {
+  font-family: var(--font);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
 .reward-amount.completed {
   color: var(--ok);
 }

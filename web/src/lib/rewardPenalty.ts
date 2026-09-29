@@ -18,7 +18,7 @@ export type ParticipantCompletion = {
   done: number
   required: number
   unit: 'km' | 'ngày' | 'hoạt động'
-  /** 0–1, không làm tròn — dùng để xét thưởng/phạt */
+  /** done/required, không giới hạn 1 (vượt mục tiêu > 1), không làm tròn */
   ratio: number
   tier: CompletionTier
   penalty: number
@@ -84,7 +84,7 @@ export function participantCompletion(
   }
 
   if (!(required > 0)) return null
-  const ratio = Math.min(1, done / required)
+  const ratio = done / required
   const tier = tierFromRatio(ratio)
   return { done, required, unit, ratio, tier, penalty: penaltyForTier(tier) }
 }
@@ -95,5 +95,5 @@ export function formatVnd(amount: number): string {
 
 /** Phần trăm làm tròn xuống để 99,6% không hiển thị thành 100% */
 export function completionPercent(ratio: number): number {
-  return Math.floor(ratio * 100)
+  return Math.floor(ratio * 100 + 1e-9)
 }

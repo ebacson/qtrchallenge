@@ -126,11 +126,14 @@ function ChallengeReportView({ report }: { report: ChallengeReport }) {
                         <strong>{r.name}</strong>
                         <span className="tiny muted">
                           {formatAmount(c.done, c.unit)} / {formatAmount(c.required, c.unit)}{' '}
-                          {c.unit} · {completionPercent(c.ratio)}%
+                          {c.unit}
                         </span>
                       </div>
                       <span className={`reward-amount ${tier}`}>
-                        {tier === 'completed' ? '✓' : `−${formatVnd(c.penalty)}`}
+                        <strong>{completionPercent(c.ratio)}%</strong>
+                        <small>
+                          {tier === 'completed' ? '✓ Hoàn thành' : `−${formatVnd(c.penalty)}`}
+                        </small>
                       </span>
                     </li>
                   )

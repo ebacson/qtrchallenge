@@ -1885,20 +1885,6 @@ code {
   color: var(--danger);
 }
 
-.reward-amount.notJoined {
-  color: var(--warn);
-}
-
-.stat-row.cols-4 {
-  grid-template-columns: repeat(4, 1fr);
-}
-
-@media (max-width: 520px) {
-  .stat-row.cols-4 {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
 .event-list {
   display: flex;
   flex-direction: column;

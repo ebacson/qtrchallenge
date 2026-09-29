@@ -3,8 +3,6 @@ import type { Challenge } from '../types'
 
 export const PENALTY_UNDER_HALF = 150_000
 export const PENALTY_PARTIAL = 100_000
-/** Thành viên chính thức không đăng ký tham gia thử thách */
-export const PENALTY_NOT_JOINED = 50_000
 
 /** Thưởng/phạt chỉ áp dụng cho thử thách bắt đầu từ năm này trở đi */
 export const REWARD_START_YEAR = 2026

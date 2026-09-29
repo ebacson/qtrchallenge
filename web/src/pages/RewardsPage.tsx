@@ -15,7 +15,6 @@ import {
   formatVnd,
   isRewardEligible,
   participantCompletion,
-  PENALTY_NOT_JOINED,
   PENALTY_PARTIAL,
   PENALTY_UNDER_HALF,
   REWARD_START_YEAR,
@@ -24,7 +23,7 @@ import {
 } from '../lib/rewardPenalty'
 import type { Challenge } from '../types'
 
-type Profile = { fullName: string; avatar: string; member: boolean; email: string }
+type Profile = { fullName: string; avatar: string }
 
 type ReportRow = {
   uid: string
@@ -33,17 +32,11 @@ type ReportRow = {
   completion: ParticipantCompletion
 }
 
-type AbsentRow = { uid: string; name: string; avatar: string }
-
 type ChallengeReport = {
   challenge: Challenge
   rows: ReportRow[]
-  /** Thành viên chính thức không đăng ký tham gia */
-  absent: AbsentRow[]
   endMs: number
 }
-
-const SYSTEM_EMAILS = new Set(['echiptime@gmail.com'])
 
 const ALL = 'all'
 
@@ -74,11 +67,10 @@ function Avatar({ name, avatar }: { name: string; avatar: string }) {
 }
 
 function ChallengeReportView({ report }: { report: ChallengeReport }) {
-  const { challenge, rows, absent } = report
+  const { challenge, rows } = report
   const completed = rows.filter((r) => r.completion.tier === 'completed').length
   const failed = rows.length - completed
-  const totalPenalty =
-    rows.reduce((sum, r) => sum + r.completion.penalty, 0) + absent.length * PENALTY_NOT_JOINED
+  const totalPenalty = rows.reduce((sum, r) => sum + r.completion.penalty, 0)
   const ongoing = challenge.status === STATUS_ONGOING
 
   return (
@@ -98,7 +90,7 @@ function ChallengeReportView({ report }: { report: ChallengeReport }) {
         )}
       </div>
 
-      <div className="stat-row cols-4">
+      <div className="stat-row">
         <div className="stat">
           <strong>{completed}</strong>
           <span>Hoàn thành</span>
@@ -106,10 +98,6 @@ function ChallengeReportView({ report }: { report: ChallengeReport }) {
         <div className="stat">
           <strong>{failed}</strong>
           <span>Không hoàn thành</span>
-        </div>
-        <div className="stat">
-          <strong>{absent.length}</strong>
-          <span>Không tham gia</span>
         </div>
         <div className="stat">
           <strong className="stat-money">{formatVnd(totalPenalty)}</strong>
@@ -155,36 +143,6 @@ function ChallengeReportView({ report }: { report: ChallengeReport }) {
           </section>
         )
       })}
-
-      <section className="section panel reward-section reward-notJoined">
-        <h2>
-          Thành viên chính thức không tham gia{' '}
-          <span className="tiny muted">· {absent.length} người</span>
-        </h2>
-        <p className="tiny muted">
-          Phạt {formatVnd(PENALTY_NOT_JOINED)}
-          {ongoing && ' · vẫn có thể đăng ký nếu còn hạn tham gia'}
-        </p>
-        {absent.length === 0 ? (
-          <p className="empty">Không có thành viên.</p>
-        ) : (
-          <ul className="participant-list reward-scroll">
-            {absent.map((r) => (
-              <li key={r.uid} className="participant-row">
-                <Avatar name={r.name} avatar={r.avatar} />
-                <div className="participant-meta">
-                  <strong>{r.name}</strong>
-                  <span className="tiny muted">Chưa đăng ký tham gia</span>
-                </div>
-                <span className="reward-amount notJoined">
-                  <strong>—</strong>
-                  <small>−{formatVnd(PENALTY_NOT_JOINED)}</small>
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
     </>
   )
 }
@@ -202,34 +160,24 @@ function SummaryView({ reports }: { reports: ChallengeReport[] }) {
         joined: number
         completed: number
         failed: number
-        notJoined: number
         penalty: number
       }
     >()
-    const entry = (r: AbsentRow) =>
-      map.get(r.uid) ?? {
-        uid: r.uid,
-        name: r.name,
-        avatar: r.avatar,
-        joined: 0,
-        completed: 0,
-        failed: 0,
-        notJoined: 0,
-        penalty: 0,
-      }
     for (const report of finished) {
       for (const r of report.rows) {
-        const m = entry(r)
+        const m = map.get(r.uid) ?? {
+          uid: r.uid,
+          name: r.name,
+          avatar: r.avatar,
+          joined: 0,
+          completed: 0,
+          failed: 0,
+          penalty: 0,
+        }
         m.joined += 1
         if (r.completion.tier === 'completed') m.completed += 1
         else m.failed += 1
         m.penalty += r.completion.penalty
-        map.set(r.uid, m)
-      }
-      for (const r of report.absent) {
-        const m = entry(r)
-        m.notJoined += 1
-        m.penalty += PENALTY_NOT_JOINED
         map.set(r.uid, m)
       }
     }
@@ -242,7 +190,6 @@ function SummaryView({ reports }: { reports: ChallengeReport[] }) {
 
   const totalCompleted = members.reduce((sum, m) => sum + m.completed, 0)
   const totalFailed = members.reduce((sum, m) => sum + m.failed, 0)
-  const totalNotJoined = members.reduce((sum, m) => sum + m.notJoined, 0)
   const totalPenalty = members.reduce((sum, m) => sum + m.penalty, 0)
 
   if (finished.length === 0) {
@@ -255,7 +202,7 @@ function SummaryView({ reports }: { reports: ChallengeReport[] }) {
         Tổng hợp {finished.length} thử thách đã kết thúc từ năm {REWARD_START_YEAR} (không tính
         thử thách đang diễn ra).
       </p>
-      <div className="stat-row cols-4">
+      <div className="stat-row">
         <div className="stat">
           <strong>{totalCompleted}</strong>
           <span>Lượt hoàn thành</span>
@@ -263,10 +210,6 @@ function SummaryView({ reports }: { reports: ChallengeReport[] }) {
         <div className="stat">
           <strong>{totalFailed}</strong>
           <span>Lượt không hoàn thành</span>
-        </div>
-        <div className="stat">
-          <strong>{totalNotJoined}</strong>
-          <span>Lượt không tham gia</span>
         </div>
         <div className="stat">
           <strong className="stat-money">{formatVnd(totalPenalty)}</strong>
@@ -284,7 +227,6 @@ function SummaryView({ reports }: { reports: ChallengeReport[] }) {
                 <strong>{m.name}</strong>
                 <span className="tiny muted">
                   Tham gia {m.joined} · Hoàn thành {m.completed} · Không hoàn thành {m.failed}
-                  {m.notJoined > 0 && ` · Không tham gia ${m.notJoined}`}
                 </span>
               </div>
               <span className={`reward-amount ${m.penalty > 0 ? 'underHalf' : 'completed'}`}>
@@ -317,26 +259,12 @@ export function RewardsPage() {
       const val = (snap.val() ?? {}) as Record<string, Record<string, unknown>>
       const map: Record<string, Profile> = {}
       for (const [uid, row] of Object.entries(val)) {
-        map[uid] = {
-          fullName: String(row.fullName ?? ''),
-          avatar: String(row.avatar ?? ''),
-          member: row.member === true,
-          email: String(row.email ?? '').toLowerCase(),
-        }
+        map[uid] = { fullName: String(row.fullName ?? ''), avatar: String(row.avatar ?? '') }
       }
       setProfiles(map)
     })
     return unsub
   }, [])
-
-  const officialMembers = useMemo(
-    () =>
-      Object.entries(profiles)
-        .filter(([, p]) => p.member && p.email && !SYSTEM_EMAILS.has(p.email))
-        .map(([uid, p]) => ({ uid, name: p.fullName || 'Người dùng ẩn danh', avatar: p.avatar }))
-        .sort((a, b) => a.name.localeCompare(b.name, 'vi')),
-    [profiles],
-  )
 
   const reports = useMemo(() => {
     const list: ChallengeReport[] = []
@@ -363,18 +291,14 @@ export function RewardsPage() {
         if (b.completion.ratio !== a.completion.ratio) return b.completion.ratio - a.completion.ratio
         return a.name.localeCompare(b.name, 'vi')
       })
-      const absent: AbsentRow[] = officialMembers
-        .filter((m) => !(m.uid in userChallenges))
-        .map((m) => ({ uid: m.uid, name: m.name, avatar: m.avatar }))
       list.push({
         challenge,
         rows,
-        absent,
         endMs: parseChallengeDay(challenge.endDate)?.getTime() ?? 0,
       })
     }
     return list.sort((a, b) => b.endMs - a.endMs)
-  }, [rawChallenges, profiles, officialMembers])
+  }, [rawChallenges, profiles])
 
   useEffect(() => {
     if (selected || !reports.length) return
@@ -392,9 +316,8 @@ export function RewardsPage() {
         <p className="lede">
           Thống kê thành viên hoàn thành và không hoàn thành thử thách. Không hoàn thành dưới 50%
           mục tiêu phạt {formatVnd(PENALTY_UNDER_HALF)}, từ 50% đến dưới 100% phạt{' '}
-          {formatVnd(PENALTY_PARTIAL)}. Thành viên chính thức không tham gia phạt{' '}
-          {formatVnd(PENALTY_NOT_JOINED)}. Chỉ tính các thử thách bắt đầu từ năm{' '}
-          {REWARD_START_YEAR} trở đi.
+          {formatVnd(PENALTY_PARTIAL)}. Chỉ tính các thử thách bắt đầu từ năm {REWARD_START_YEAR}{' '}
+          trở đi.
         </p>
       </header>
 

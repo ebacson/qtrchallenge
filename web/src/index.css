@@ -1471,36 +1471,90 @@ code {
   font-size: 1.25rem;
 }
 
-.hof-top-section h2 {
-  text-align: center;
-}
-
-.hof-laureate-column {
+.hof-laureate-list {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 28px;
-  max-width: 320px;
-  margin: 0 auto;
+  gap: 12px;
 }
 
-.hof-laureate {
+.hof-laureate-card {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  text-align: center;
+  gap: 14px;
+  padding: 12px 14px 12px 8px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
   text-decoration: none;
   color: inherit;
-  width: 100%;
-  padding: 12px 8px 16px;
-  border-radius: 14px;
-  transition: transform 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
-.hof-laureate:hover {
+.hof-laureate-card:hover {
   transform: translateY(-2px);
+  box-shadow: var(--shadow);
   text-decoration: none;
+}
+
+.hof-laureate-card.podium {
+  border-color: rgba(184, 134, 11, 0.45);
+  background: linear-gradient(100deg, rgba(255, 236, 179, 0.55), var(--card) 55%);
+}
+
+.hof-laureate-card.podium-1 {
+  border-width: 2px;
+}
+
+.hof-laureate-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hof-laureate-result {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.hof-laureate-history {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+}
+
+.hof-laureate-history p {
+  margin: 2px 0 0;
+}
+
+.hof-laureate-history ul {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+
+.hof-laureate-history li {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hof-laureate-history li::before {
+  content: '• ';
+  color: #b8860b;
+}
+
+.hof-laureate-history li.muted::before {
+  content: '';
 }
 
 /* Match iOS: ring 180, avatar 90 on top, slight upward offset */
@@ -1511,6 +1565,11 @@ code {
   display: grid;
   place-items: center;
   flex-shrink: 0;
+}
+
+.hof-wreath.md {
+  width: 108px;
+  height: 108px;
 }
 
 .hof-wreath-img {
@@ -1529,12 +1588,12 @@ code {
   display: block;
 }
 
-.hof-face.lg {
+.hof-face.md {
   position: relative;
   z-index: 1;
-  width: 90px;
-  height: 90px;
-  margin-top: -5px;
+  width: 54px;
+  height: 54px;
+  margin-top: -3px;
 }
 
 .hof-face.sm {
@@ -1550,31 +1609,35 @@ code {
   font-weight: 700;
 }
 
-.hof-face.placeholder.lg {
-  font-size: 2rem;
+.hof-face.placeholder.md {
+  font-size: 1.4rem;
   font-family: var(--display);
 }
 
 .hof-laureate-rank {
-  margin: 4px 0 0;
   font-family: var(--display);
-  font-size: 1.35rem;
+  font-size: 1.05rem;
   font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: #b8860b;
 }
 
 .hof-laureate-name {
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   font-weight: 700;
   line-height: 1.25;
-  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .hof-laureate-time {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   font-family: var(--display);
-  font-size: 1.5rem;
+  font-size: 1.45rem;
+  line-height: 1.1;
   color: var(--teal);
 }
 

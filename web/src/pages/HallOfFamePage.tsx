@@ -10,15 +10,22 @@ import {
   type DistanceKey,
   type GenderKey,
 } from '../lib/prRanking'
+import { parseHistory, type HistoryEntry } from '../lib/userRecords'
 
 const goldRingSrc = `${import.meta.env.BASE_URL}gold_ring.png`
+const HISTORY_PREVIEW = 2
+
+const DISTANCE_LABEL: Record<DistanceKey, string> = {
+  FM: 'Full Marathon',
+  HM: 'Half Marathon',
+}
 
 function AvatarFace({
   athlete,
   size,
 }: {
   athlete: AthletePrRow
-  size: 'lg' | 'sm'
+  size: 'md' | 'sm'
 }) {
   if (athlete.avatar) {
     return <img src={athlete.avatar} alt="" className={`hof-face ${size}`} />
@@ -34,30 +41,52 @@ function TopLaureateCard({
   athlete,
   rank,
   distance,
+  history,
 }: {
   athlete: AthletePrRow
   rank: number
   distance: DistanceKey
+  history: HistoryEntry[]
 }) {
+  const preview = history.slice(0, HISTORY_PREVIEW)
+  const more = history.length - preview.length
   return (
-    <Link to={`/hall-of-fame/${athlete.id}`} className="hof-laureate">
-      <div className="hof-wreath">
+    <Link
+      to={`/hall-of-fame/${athlete.id}`}
+      className={`hof-laureate-card${rank <= 3 ? ` podium podium-${rank}` : ''}`}
+    >
+      <div className="hof-wreath md">
         <img src={goldRingSrc} alt="" className="hof-wreath-img" />
-        <AvatarFace athlete={athlete} size="lg" />
+        <AvatarFace athlete={athlete} size="md" />
       </div>
-      <p className="hof-laureate-rank">#{rank}</p>
-      <strong className="hof-laureate-name">{athlete.fullName || 'Runner'}</strong>
-      <span className="hof-laureate-time">{displayTime(athlete, distance)}</span>
-      <span className="tiny muted">
-        Lv {athlete.level}
-        {athlete.member ? ' · Member' : ''}
-      </span>
+      <div className="hof-laureate-info">
+        <span className="hof-laureate-rank">Top {rank}</span>
+        <strong className="hof-laureate-name">{athlete.fullName || 'Runner'}</strong>
+        <span className="hof-laureate-result">
+          <span className="hof-laureate-time">{displayTime(athlete, distance)}</span>
+          <span className="tiny muted">{DISTANCE_LABEL[distance]}</span>
+        </span>
+        <div className="hof-laureate-history">
+          <span className="tiny muted">Lịch sử</span>
+          {preview.length === 0 ? (
+            <p className="tiny muted">Chưa có lịch sử thành tích.</p>
+          ) : (
+            <ul>
+              {preview.map((h) => (
+                <li key={h.id}>{h.content.split('\n')[0]}</li>
+              ))}
+              {more > 0 && <li className="muted">+{more} mục khác</li>}
+            </ul>
+          )}
+        </div>
+      </div>
     </Link>
   )
 }
 
 export function HallOfFamePage() {
   const [athletes, setAthletes] = useState<AthletePrRow[]>([])
+  const [histories, setHistories] = useState<Record<string, HistoryEntry[]>>({})
   const [loading, setLoading] = useState(true)
   const [distance, setDistance] = useState<DistanceKey>('FM')
   const [gender, setGender] = useState<GenderKey>('Nam')
@@ -69,7 +98,10 @@ export function HallOfFamePage() {
       const list = Object.entries(val)
         .map(([id, data]) => mapAthleteFromUser(id, data))
         .filter((a): a is AthletePrRow => a != null)
+      const historyMap: Record<string, HistoryEntry[]> = {}
+      for (const a of list) historyMap[a.id] = parseHistory(val[a.id]?.history)
       setAthletes(list)
+      setHistories(historyMap)
       setLoading(false)
     })
     return unsub
@@ -136,13 +168,14 @@ export function HallOfFamePage() {
         <>
           <section className="section hof-top-section">
             <h2>Top 10</h2>
-            <div className="hof-laureate-column">
+            <div className="hof-laureate-list">
               {top10.map((a, index) => (
                 <TopLaureateCard
                   key={a.id}
                   athlete={a}
                   rank={index + 1}
                   distance={distance}
+                  history={histories[a.id] ?? []}
                 />
               ))}
             </div>

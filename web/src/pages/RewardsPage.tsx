@@ -152,7 +152,7 @@ function ChallengeReportView({ report }: { report: ChallengeReport }) {
 
       <section className="section panel reward-section">
         <h2>
-          Thành viên chính thức chưa đăng ký{' '}
+          Thành viên chính thức không tham gia{' '}
           <span className="tiny muted">· {absent.length} người</span>
         </h2>
         <p className="tiny muted">

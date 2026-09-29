@@ -116,7 +116,7 @@ function ChallengeReportView({ report }: { report: ChallengeReport }) {
             {list.length === 0 ? (
               <p className="empty">Không có thành viên.</p>
             ) : (
-              <ul className="participant-list">
+              <ul className="participant-list reward-scroll">
                 {list.map((r) => {
                   const c = r.completion
                   return (
@@ -219,7 +219,7 @@ function SummaryView({ reports }: { reports: ChallengeReport[] }) {
 
       <section className="section panel">
         <h2>Theo thành viên</h2>
-        <ul className="participant-list">
+        <ul className="participant-list reward-scroll">
           {members.map((m) => (
             <li key={m.uid} className="participant-row">
               <Avatar name={m.name} avatar={m.avatar} />

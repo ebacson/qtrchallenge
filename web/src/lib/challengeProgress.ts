@@ -1,15 +1,8 @@
 import { get, ref, update } from 'firebase/database'
 import { db } from './firebase'
-import {
-  calculateProgress,
-  calculateStatus,
-  parseChallengeDay,
-  parseDayQuotaOptions,
-  progressOptionsFromDict,
-  resolveUserDayQuotaOptions,
-  STATUS_FINISHED,
-} from './challengeRules'
+import { calculateStatus, STATUS_FINISHED } from './challengeRules'
 import { calculateLevelFromChallenges } from './levelCalculator'
+import { computeUserChallengeUpdate } from './progressCompute'
 
 const THROTTLE_MS = 300_000
 
@@ -101,78 +94,12 @@ export async function syncOngoingChallengeProgress(
         const userRow = userChallenges?.[uid]
         if (!userRow) return
 
-        const startDate = parseChallengeDay(startStr)
-        const endDate = parseChallengeDay(endStr)
-        if (!startDate || !endDate) return
+        const updates = computeUserChallengeUpdate(challenge, userRow, activities)
+        if (!updates) return
 
-        const mode = String(challenge.challengeMode ?? '')
-        const baseOpts = progressOptionsFromDict(challenge) ?? {}
-
-        if (mode === 'day_quota') {
-          const selections = resolveUserDayQuotaOptions(
-            parseDayQuotaOptions(challenge.dayQuotaOptions),
-            Array.isArray(challenge.targetDistances)
-              ? (challenge.targetDistances as string[])
-              : [],
-            userRow,
-          )
-          if (!selections.length) return
-
-          // Mỗi tùy chọn tính độc lập: một hoạt động có thể được tính cho nhiều tùy chọn
-          let hasEligible = false
-          let totalPace = 0
-          const optionResults = selections.map(({ optionIndex, option }) => {
-            const result = calculateProgress(activities, startDate, endDate, {
-              ...baseOpts,
-              kmPerDay: option.kmPerDay,
-              dailyKm: option.dailyKm,
-            })
-            hasEligible ||= result.hasEligibleActivities
-            totalPace = result.totalPaceMinutes
-            return {
-              optionIndex,
-              daysCompleted: Math.min(result.daysCompleted ?? 0, option.daysRequired),
-              daysRequired: option.daysRequired,
-              completedTargets: result.completedTargets ?? null,
-            }
-          })
-          const done = optionResults.reduce((sum, r) => sum + r.daysCompleted, 0)
-          const required = optionResults.reduce((sum, r) => sum + r.daysRequired, 0)
-          const first = selections[0].option
-
-          await update(
-            ref(db, `challenges/${challengeId}/user_challenges/${uid}`),
-            {
-              progress: `${done}/${required} ngày`,
-              totalactiviti: String(done),
-              totalpace: hasEligible ? String(totalPace) : '0',
-              daysRequired: first.daysRequired,
-              kmPerDay: first.kmPerDay,
-              optionResults,
-              completedTargets: null,
-            },
-          )
-          updatedChallengeIds.push(challengeId)
-          return
-        }
-
-        const result = calculateProgress(
-          activities,
-          startDate,
-          endDate,
-          baseOpts,
-        )
         await update(
           ref(db, `challenges/${challengeId}/user_challenges/${uid}`),
-          {
-            progress: result.hasEligibleActivities
-              ? `${result.totalDistanceKm.toFixed(2)} km`
-              : '0.00 km',
-            totalactiviti: String(result.totalActivities),
-            totalpace: result.hasEligibleActivities
-              ? String(result.totalPaceMinutes)
-              : '0',
-          },
+          updates,
         )
         updatedChallengeIds.push(challengeId)
       }),

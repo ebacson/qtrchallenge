@@ -187,8 +187,8 @@ export async function stravaApiGet(
           typeof data === 'object' && data && 'message' in data
             ? String((data as { message: unknown }).message)
             : `Strava API ${res.status}`
-        // Auth errors won't be fixed by host fallback
-        if (res.status === 401 || res.status === 403) {
+        // Auth and rate-limit errors won't be fixed by host fallback
+        if (res.status === 401 || res.status === 403 || res.status === 429) {
           return { ok: false, status: res.status, error: msg }
         }
         lastError = msg
@@ -248,11 +248,13 @@ function calculatePace(distanceMeters: number, movingTimeSec: number): string {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
+/** `start_date` của Strava là UTC; lưu theo giờ Việt Nam (GMT+7) bất kể múi giờ của server. */
 function formatStartDate(iso: string): string {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
+  const utc = new Date(iso)
+  if (Number.isNaN(utc.getTime())) return ''
+  const d = new Date(utc.getTime() + 7 * 60 * 60 * 1000)
   const pad = (n: number) => String(n).padStart(2, '0')
-  return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  return `${pad(d.getUTCDate())}-${pad(d.getUTCMonth() + 1)}-${d.getUTCFullYear()} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`
 }
 
 export function mapStravaActivity(activity: RawActivity): MappedActivity {

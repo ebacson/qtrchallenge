@@ -9,6 +9,7 @@ import {
 } from '../components/MemberTypeFilter'
 import { useAuth } from '../context/AuthContext'
 import { deleteUserAvatar } from '../lib/adminOps'
+import { runAdminFullSync, type FullSyncSummary } from '../lib/adminSync'
 import { db } from '../lib/firebase'
 
 type AdminUser = {
@@ -60,6 +61,8 @@ export function AdminUsersPage() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [joinedCounts, setJoinedCounts] = useState<Record<string, number>>({})
+  const [syncing, setSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState<FullSyncSummary | null>(null)
 
   useEffect(() => {
     const usersRef = ref(db, 'users')
@@ -107,6 +110,29 @@ export function AdminUsersPage() {
     })
     return unsub
   }, [])
+
+  async function syncEveryone() {
+    if (!user) return
+    const ok = window.confirm(
+      'Đồng bộ toàn bộ?\n\n' +
+        'Lấy hoạt động Strava mới của mọi thành viên đã kết nối, tính lại tiến độ các thử thách ' +
+        'đang diễn ra (và vừa kết thúc trong 2 ngày) và cập nhật level. Có thể mất vài phút.',
+    )
+    if (!ok) return
+    setSyncing(true)
+    setError('')
+    setMessage('')
+    setSyncResult(null)
+    try {
+      const summary = await runAdminFullSync(await user.getIdToken())
+      setSyncResult(summary)
+      setMessage('Đồng bộ toàn bộ hoàn tất.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Đồng bộ thất bại')
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   async function copyUid(uid: string) {
     try {
@@ -236,7 +262,43 @@ export function AdminUsersPage() {
         <Link className="btn ghost" to="/admin/records">
           Xác thực thành tích
         </Link>
+        <button
+          type="button"
+          className="btn primary"
+          disabled={syncing}
+          onClick={() => void syncEveryone()}
+        >
+          {syncing ? 'Đang đồng bộ… (vài phút)' : 'Đồng bộ toàn bộ'}
+        </button>
       </div>
+
+      {syncResult && (
+        <div className="admin-sync-result">
+          <p>
+            <strong>Strava:</strong> {syncResult.stravaSynced}/{syncResult.usersWithStrava} thành
+            viên, {syncResult.activitiesFetched} hoạt động
+            {syncResult.stravaSkipped > 0 && ` · bỏ qua ${syncResult.stravaSkipped}`}
+            {syncResult.rateLimited && ' (Strava giới hạn lượt gọi, thử lại sau 15 phút)'}
+          </p>
+          <p>
+            <strong>Thử thách:</strong> {syncResult.challengesProcessed} thử thách, cập nhật{' '}
+            {syncResult.progressRowsUpdated} tiến độ · <strong>Level:</strong> cập nhật{' '}
+            {syncResult.levelsUpdated} thành viên · {Math.round(syncResult.durationMs / 1000)} giây
+          </p>
+          {syncResult.stravaFailed.length > 0 && (
+            <details>
+              <summary>{syncResult.stravaFailed.length} thành viên lỗi Strava</summary>
+              <ul>
+                {syncResult.stravaFailed.map((f) => (
+                  <li key={f.uid}>
+                    {f.name || `…${shortUid(f.uid)}`}: {f.error}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
 
       <MemberTypeFilter value={memberType} onChange={setMemberType} items={users} />
 

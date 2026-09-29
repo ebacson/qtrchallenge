@@ -1849,6 +1849,30 @@ code {
   margin: 12px 0 16px;
 }
 
+.admin-sync-result {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  background: rgba(13, 115, 119, 0.06);
+  border: 1px solid rgba(13, 115, 119, 0.25);
+  border-radius: 10px;
+}
+
+.admin-sync-result p {
+  margin: 0 0 4px;
+}
+
+.admin-sync-result details {
+  margin-top: 6px;
+}
+
+.admin-sync-result ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
 .admin-banner .admin-quick-links {
   margin: 10px 0 0;
 }

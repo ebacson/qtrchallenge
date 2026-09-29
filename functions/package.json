@@ -6,7 +6,8 @@
     "node": "22"
   },
   "scripts": {
-    "build": "tsc",
+    "sync-shared": "node scripts/sync-shared.mjs",
+    "build": "npm run sync-shared && tsc",
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions"
   },

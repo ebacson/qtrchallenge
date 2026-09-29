@@ -72,10 +72,10 @@ export const stravaApi = onRequest(
   },
 )
 
-/** Đồng bộ Strava + tính lại thử thách + level cho toàn bộ user mỗi đêm (sau các job Python cũ lúc 23:50 và 00:00). */
+/** Đồng bộ Strava + tính lại thử thách + level cho toàn bộ user lúc 0:00 mỗi ngày (giờ VN). */
 export const syncAllUsers = onSchedule(
   {
-    schedule: '20 0 * * *',
+    schedule: '0 0 * * *',
     timeZone: 'Asia/Ho_Chi_Minh',
     timeoutSeconds: 540,
     memory: '1GiB',

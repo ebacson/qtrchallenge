@@ -1,39 +1,61 @@
+import { lazy, Suspense, type ComponentType, type ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { Layout } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
-import { RegisterPage } from './pages/RegisterPage'
 import { HomePage } from './pages/HomePage'
-import { ChallengesPage } from './pages/ChallengesPage'
-import { ChallengeDetailPage } from './pages/ChallengeDetailPage'
-import { ActivitiesPage } from './pages/ActivitiesPage'
-import { ProfilePage } from './pages/ProfilePage'
-import { StravaCallbackPage, StravaPage } from './pages/StravaPage'
-import { HallOfFamePage } from './pages/HallOfFamePage'
-import { AthletePrPage } from './pages/AthletePrPage'
-import { NotificationsPage } from './pages/NotificationsPage'
-import { MembersPage } from './pages/MembersPage'
-import { EventsPage, EventDetailPage } from './pages/EventsPage'
-import { StatsPage } from './pages/StatsPage'
-import { RewardsPage } from './pages/RewardsPage'
-import { CreateChallengePage } from './pages/CreateChallengePage'
-import { AdminUsersPage } from './pages/AdminUsersPage'
-import { AdminRecordsPage } from './pages/AdminRecordsPage'
 import { RequireAdmin } from './components/RequireAdmin'
-import type { ReactNode } from 'react'
 import { brandLogoSrc, brandTitle } from './lib/brand'
+
+/** Mỗi trang một chunk riêng; trang nằm trong named export. */
+function lazyPage<M extends Record<string, unknown>>(
+  load: () => Promise<M>,
+  name: keyof M,
+) {
+  return lazy(async () => ({ default: (await load())[name] as ComponentType }))
+}
+
+const RegisterPage = lazyPage(() => import('./pages/RegisterPage'), 'RegisterPage')
+const ChallengesPage = lazyPage(() => import('./pages/ChallengesPage'), 'ChallengesPage')
+const ChallengeDetailPage = lazyPage(
+  () => import('./pages/ChallengeDetailPage'),
+  'ChallengeDetailPage',
+)
+const ActivitiesPage = lazyPage(() => import('./pages/ActivitiesPage'), 'ActivitiesPage')
+const ProfilePage = lazyPage(() => import('./pages/ProfilePage'), 'ProfilePage')
+const StravaPage = lazyPage(() => import('./pages/StravaPage'), 'StravaPage')
+const StravaCallbackPage = lazyPage(() => import('./pages/StravaPage'), 'StravaCallbackPage')
+const HallOfFamePage = lazyPage(() => import('./pages/HallOfFamePage'), 'HallOfFamePage')
+const AthletePrPage = lazyPage(() => import('./pages/AthletePrPage'), 'AthletePrPage')
+const NotificationsPage = lazyPage(
+  () => import('./pages/NotificationsPage'),
+  'NotificationsPage',
+)
+const MembersPage = lazyPage(() => import('./pages/MembersPage'), 'MembersPage')
+const EventsPage = lazyPage(() => import('./pages/EventsPage'), 'EventsPage')
+const EventDetailPage = lazyPage(() => import('./pages/EventsPage'), 'EventDetailPage')
+const StatsPage = lazyPage(() => import('./pages/StatsPage'), 'StatsPage')
+const RewardsPage = lazyPage(() => import('./pages/RewardsPage'), 'RewardsPage')
+const CreateChallengePage = lazyPage(
+  () => import('./pages/CreateChallengePage'),
+  'CreateChallengePage',
+)
+const AdminUsersPage = lazyPage(() => import('./pages/AdminUsersPage'), 'AdminUsersPage')
+const AdminRecordsPage = lazyPage(() => import('./pages/AdminRecordsPage'), 'AdminRecordsPage')
+
+function BootScreen() {
+  return (
+    <div className="boot-screen">
+      <img src={brandLogoSrc} alt="" className="brand-logo boot-logo" />
+      <p className="brand-name">{brandTitle}</p>
+      <p className="muted">Đang tải…</p>
+    </div>
+  )
+}
 
 function Protected({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()
-  if (loading) {
-    return (
-      <div className="boot-screen">
-        <img src={brandLogoSrc} alt="" className="brand-logo boot-logo" />
-        <p className="brand-name">{brandTitle}</p>
-        <p className="muted">Đang tải…</p>
-      </div>
-    )
-  }
+  if (loading) return <BootScreen />
   if (!user) return <Navigate to="/login" replace />
   return children
 }
@@ -99,7 +121,9 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppRoutes />
+      <Suspense fallback={<BootScreen />}>
+        <AppRoutes />
+      </Suspense>
     </AuthProvider>
   )
 }

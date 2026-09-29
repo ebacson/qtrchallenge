@@ -1,5 +1,5 @@
 import { getDownloadURL, ref as storageRef, uploadBytes, deleteObject } from 'firebase/storage'
-import { storage } from './firebase'
+import { storage } from './firebaseStorage'
 
 const DEFAULT_CHALLENGE_ICON =
   'https://firebasestorage.googleapis.com/v0/b/echiptime.firebasestorage.app/o/full_logo.png'

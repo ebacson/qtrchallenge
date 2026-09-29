@@ -1,10 +1,9 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
 import { getDatabase } from 'firebase/database'
-import { getStorage } from 'firebase/storage'
 
 /** Bucket thực tế trên project (URL full_logo dùng firebasestorage.app). */
-const STORAGE_BUCKET =
+export const STORAGE_BUCKET =
   (import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string | undefined)?.trim() ||
   'echiptime.firebasestorage.app'
 
@@ -21,5 +20,3 @@ const firebaseConfig = {
 export const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
 export const db = getDatabase(app)
-/** Explicit gs:// avoids wrong legacy appspot.com endpoint. */
-export const storage = getStorage(app, `gs://${STORAGE_BUCKET.replace(/^gs:\/\//, '')}`)

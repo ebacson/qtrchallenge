@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { Suspense, useEffect, useId, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { brandLogoSrc, brandTitle } from '../lib/brand'
@@ -131,7 +131,15 @@ export function Layout() {
       </header>
 
       <main className="main-content">
-        <Outlet />
+        <Suspense
+          fallback={
+            <div className="page">
+              <p className="empty">Đang tải…</p>
+            </div>
+          }
+        >
+          <Outlet />
+        </Suspense>
       </main>
 
       <nav className="tabbar tabbar-5" aria-label="Điều hướng chính">

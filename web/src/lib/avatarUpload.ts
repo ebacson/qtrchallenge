@@ -3,7 +3,7 @@ import {
   ref as storageRef,
   uploadBytes,
 } from 'firebase/storage'
-import { storage } from './firebase'
+import { storage } from './firebaseStorage'
 
 const AVATAR_SIZE = 400
 const UPLOAD_TIMEOUT_MS = 25_000

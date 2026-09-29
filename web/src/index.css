@@ -61,6 +61,15 @@ select {
   font: inherit;
 }
 
+/* Safari iOS tự phóng to khi focus ô nhập có chữ < 16px */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
 .app-shell {
   max-width: 920px;
   margin: 0 auto;

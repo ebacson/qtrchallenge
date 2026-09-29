@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { onValue, ref } from 'firebase/database'
+import {
+  matchesMemberType,
+  MemberTypeFilter,
+  type MemberType,
+} from '../components/MemberTypeFilter'
 import { db } from '../lib/firebase'
 
 type Member = {
@@ -15,6 +20,7 @@ export function MembersPage() {
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
+  const [memberType, setMemberType] = useState<MemberType>('all')
 
   useEffect(() => {
     const usersRef = ref(db, 'users')
@@ -42,13 +48,15 @@ export function MembersPage() {
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
-    if (!needle) return members
-    return members.filter(
-      (m) =>
+    return members.filter((m) => {
+      if (!matchesMemberType(m.member, memberType)) return false
+      if (!needle) return true
+      return (
         m.fullName.toLowerCase().includes(needle) ||
-        m.email.toLowerCase().includes(needle),
-    )
-  }, [members, q])
+        m.email.toLowerCase().includes(needle)
+      )
+    })
+  }, [members, q, memberType])
 
   return (
     <div className="page">
@@ -56,6 +64,8 @@ export function MembersPage() {
         <h1>Thành viên</h1>
         <p className="lede">Danh sách runners trong club (theo level).</p>
       </header>
+
+      <MemberTypeFilter value={memberType} onChange={setMemberType} items={members} />
 
       <label className="search-field">
         Tìm kiếm
@@ -87,7 +97,9 @@ export function MembersPage() {
               </div>
               <div className="member-right">
                 <span className="level-badge level-bronze">Lv {m.level}</span>
-                {m.member && <span className="member-badge yes">Official</span>}
+                <span className={`member-badge ${m.member ? 'yes' : 'no'}`}>
+                  {m.member ? 'Chính thức' : 'Tự do'}
+                </span>
               </div>
             </li>
           ))}

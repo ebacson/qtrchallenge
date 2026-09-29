@@ -2,6 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { get, onValue, ref, remove, set } from 'firebase/database'
 import { AdminUserAchievements } from '../components/AdminUserAchievements'
+import {
+  matchesMemberType,
+  MemberTypeFilter,
+  type MemberType,
+} from '../components/MemberTypeFilter'
 import { useAuth } from '../context/AuthContext'
 import { deleteUserAvatar } from '../lib/adminOps'
 import { db } from '../lib/firebase'
@@ -22,6 +27,7 @@ export function AdminUsersPage() {
   const [users, setUsers] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
+  const [memberType, setMemberType] = useState<MemberType>('all')
   const [busyId, setBusyId] = useState<string | null>(null)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -54,13 +60,15 @@ export function AdminUsersPage() {
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
-    if (!needle) return users
-    return users.filter(
-      (u) =>
+    return users.filter((u) => {
+      if (!matchesMemberType(u.member, memberType)) return false
+      if (!needle) return true
+      return (
         u.fullName.toLowerCase().includes(needle) ||
-        u.email.toLowerCase().includes(needle),
-    )
-  }, [users, q])
+        u.email.toLowerCase().includes(needle)
+      )
+    })
+  }, [users, q, memberType])
 
   async function setFlag(uid: string, field: 'admin' | 'member', value: boolean) {
     if (!user || uid === user.uid) {
@@ -79,7 +87,7 @@ export function AdminUsersPage() {
             : 'Đã hủy quyền Admin.'
           : value
             ? 'Đã phê duyệt thành viên chính thức.'
-            : 'Đã hủy thành viên chính thức.',
+            : 'Đã chuyển sang thành viên Tự do.',
       )
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không cập nhật được')
@@ -158,6 +166,8 @@ export function AdminUsersPage() {
         </Link>
       </div>
 
+      <MemberTypeFilter value={memberType} onChange={setMemberType} items={users} />
+
       <label className="search-field">
         Tìm kiếm
         <input
@@ -199,7 +209,7 @@ export function AdminUsersPage() {
                       <span
                         className={`member-badge ${u.member ? 'yes' : 'no'}`}
                       >
-                        {u.member ? 'Official' : 'Khách'}
+                        {u.member ? 'Chính thức' : 'Tự do'}
                       </span>
                       <span className="level-badge level-bronze">
                         Lv {u.level}
@@ -223,7 +233,7 @@ export function AdminUsersPage() {
                     disabled={busy || isSelf}
                     onClick={() => void setFlag(u.id, 'member', !u.member)}
                   >
-                    {u.member ? 'Hủy Official' : 'Phê duyệt Official'}
+                    {u.member ? 'Chuyển sang Tự do' : 'Phê duyệt Chính thức'}
                   </button>
                   <button
                     type="button"

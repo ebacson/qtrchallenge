@@ -1932,6 +1932,50 @@ code {
   align-items: flex-start;
 }
 
+.admin-user-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px 14px;
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  background: rgba(15, 28, 36, 0.03);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.admin-user-info > div {
+  min-width: 0;
+}
+
+.admin-user-info dt {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+
+.admin-user-info dd {
+  margin: 2px 0 0;
+  font-size: 0.92rem;
+  overflow-wrap: anywhere;
+}
+
+.admin-uid {
+  padding: 1px 6px;
+  font: inherit;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.88rem;
+  color: var(--ink);
+  background: rgba(15, 28, 36, 0.06);
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.admin-uid:hover {
+  border-color: var(--accent);
+}
+
 .admin-user-actions {
   display: flex;
   flex-wrap: wrap;

@@ -19,7 +19,35 @@ type AdminUser = {
   level: number
   member: boolean
   admin: boolean
+  phone: string
+  gender: string
+  dob: string
+  idStrava: string
+  userStrava: string
   raw: Record<string, unknown>
+}
+
+function shortUid(uid: string): string {
+  return uid.length > 6 ? uid.slice(-6) : uid
+}
+
+/** Tuổi từ chuỗi ngày sinh dd/MM/yyyy, dd-MM-yyyy hoặc yyyy-MM-dd */
+function ageFromDob(dob: string): number | null {
+  const s = dob.trim()
+  let y: number, m: number, d: number
+  let match = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/)
+  if (match) {
+    ;[y, m, d] = [Number(match[1]), Number(match[2]), Number(match[3])]
+  } else {
+    match = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/)
+    if (!match) return null
+    ;[d, m, y] = [Number(match[1]), Number(match[2]), Number(match[3])]
+  }
+  if (!y || m < 1 || m > 12 || d < 1 || d > 31) return null
+  const now = new Date()
+  let age = now.getFullYear() - y
+  if (now.getMonth() + 1 < m || (now.getMonth() + 1 === m && now.getDate() < d)) age--
+  return age >= 0 && age < 120 ? age : null
 }
 
 export function AdminUsersPage() {
@@ -31,6 +59,7 @@ export function AdminUsersPage() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [joinedCounts, setJoinedCounts] = useState<Record<string, number>>({})
 
   useEffect(() => {
     const usersRef = ref(db, 'users')
@@ -45,6 +74,11 @@ export function AdminUsersPage() {
           level: Number(row.level ?? 0) || 0,
           member: Boolean(row.member),
           admin: Boolean(row.admin),
+          phone: String(row.phone ?? ''),
+          gender: String(row.gender ?? ''),
+          dob: String(row.dob ?? ''),
+          idStrava: String(row.id_strava ?? ''),
+          userStrava: String(row.user_strava ?? ''),
           raw: row ?? {},
         }))
         .sort((a, b) => {
@@ -58,6 +92,31 @@ export function AdminUsersPage() {
     return unsub
   }, [])
 
+  useEffect(() => {
+    const unsub = onValue(ref(db, 'challenges'), (snap) => {
+      const val = (snap.val() ?? {}) as Record<string, Record<string, unknown>>
+      const counts: Record<string, number> = {}
+      for (const challenge of Object.values(val)) {
+        const participants = challenge?.user_challenges
+        if (!participants || typeof participants !== 'object') continue
+        for (const uid of Object.keys(participants)) {
+          counts[uid] = (counts[uid] ?? 0) + 1
+        }
+      }
+      setJoinedCounts(counts)
+    })
+    return unsub
+  }, [])
+
+  async function copyUid(uid: string) {
+    try {
+      await navigator.clipboard.writeText(uid)
+      setMessage(`Đã sao chép UID ${uid}`)
+    } catch {
+      window.prompt('UID đầy đủ:', uid)
+    }
+  }
+
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
     return users.filter((u) => {
@@ -65,7 +124,9 @@ export function AdminUsersPage() {
       if (!needle) return true
       return (
         u.fullName.toLowerCase().includes(needle) ||
-        u.email.toLowerCase().includes(needle)
+        u.email.toLowerCase().includes(needle) ||
+        u.id.toLowerCase().includes(needle) ||
+        u.phone.replace(/\s/g, '').includes(needle.replace(/\s/g, ''))
       )
     })
   }, [users, q, memberType])
@@ -184,7 +245,7 @@ export function AdminUsersPage() {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Tên hoặc email"
+          placeholder="Tên, email, UID hoặc số điện thoại"
         />
       </label>
 
@@ -228,6 +289,73 @@ export function AdminUsersPage() {
                     </div>
                   </div>
                 </div>
+
+                <dl className="admin-user-info">
+                  <div>
+                    <dt>UID</dt>
+                    <dd>
+                      <button
+                        type="button"
+                        className="admin-uid"
+                        title={`${u.id} — nhấn để sao chép`}
+                        onClick={() => void copyUid(u.id)}
+                      >
+                        …{shortUid(u.id)}
+                      </button>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Điện thoại</dt>
+                    <dd>
+                      {u.phone ? (
+                        <a href={`tel:${u.phone.replace(/\s/g, '')}`}>{u.phone}</a>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Giới tính</dt>
+                    <dd>{u.gender || <span className="muted">—</span>}</dd>
+                  </div>
+                  <div>
+                    <dt>Ngày sinh</dt>
+                    <dd>
+                      {u.dob ? (
+                        <>
+                          {u.dob}
+                          {ageFromDob(u.dob) !== null && (
+                            <span className="muted"> ({ageFromDob(u.dob)} tuổi)</span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Strava</dt>
+                    <dd>
+                      {u.idStrava ? (
+                        <a
+                          href={`https://www.strava.com/athletes/${u.idStrava}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {u.userStrava || u.idStrava}
+                        </a>
+                      ) : u.userStrava ? (
+                        u.userStrava
+                      ) : (
+                        <span className="muted">Chưa kết nối</span>
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Thử thách đã tham gia</dt>
+                    <dd>{joinedCounts[u.id] ?? 0}</dd>
+                  </div>
+                </dl>
 
                 <div className="admin-user-actions">
                   <button

@@ -246,7 +246,7 @@ export function ProfilePage() {
             )}
             <span className={`level-badge level-${tone}`}>Level {profile.level}</span>
             <span className={`member-badge ${profile.member ? 'yes' : 'no'}`}>
-              {profile.member ? 'Thành viên chính thức' : 'Khách'}
+              {profile.member ? 'Thành viên chính thức' : 'Thành viên tự do'}
             </span>
           </div>
         </div>

@@ -68,7 +68,7 @@ export function HomePage() {
             <span>Hoạt động</span>
           </div>
           <div className="stat">
-            <strong>{profile?.member ? 'Official' : 'Guest'}</strong>
+            <strong>{profile?.member ? 'Chính thức' : 'Tự do'}</strong>
             <span>Member</span>
           </div>
         </div>

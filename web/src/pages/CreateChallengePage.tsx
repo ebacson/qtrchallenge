@@ -12,8 +12,10 @@ import {
 } from '../lib/adminOps'
 import {
   countInclusiveDays,
+  formatDay,
   formatDayQuotaLabel,
   formatPaceMinutes,
+  joinDeadlineDate,
   parsePaceInput,
   STATUS_UPCOMING,
 } from '../lib/challengeRules'
@@ -21,8 +23,6 @@ import { db } from '../lib/firebase'
 import type { DayQuotaOption } from '../types'
 
 const PRESET_DISTANCES = ['50 km', '100 km', '150 km', '200 km', '250 km', '300 km']
-const JOIN_DEADLINE_OPTIONS = [3, 7, 14, 21, 30, 45, 60]
-
 type Mode = 'monthly_pace' | 'day_quota'
 
 type QuotaDraft = {
@@ -84,7 +84,7 @@ export function CreateChallengePage() {
   const [customKm, setCustomKm] = useState('')
   const [customOn, setCustomOn] = useState(false)
   const [password, setPassword] = useState('')
-  const [joinDeadlineDays, setJoinDeadlineDays] = useState(7)
+  const [joinDeadlineInput, setJoinDeadlineInput] = useState('7')
   const [iconFile, setIconFile] = useState<File | null>(null)
   const [iconPreview, setIconPreview] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -98,14 +98,24 @@ export function CreateChallengePage() {
     setEndDate(bounds.end)
   }, [mode, monthValue])
 
-  const totalDays = useMemo(() => {
-    if (mode !== 'day_quota') return 0
+  const challengeDays = useMemo(() => {
     if (!startDate || !endDate || endDate < startDate) return 0
     return countInclusiveDays(
       inputDateToChallengeDay(startDate),
       inputDateToChallengeDay(endDate),
     )
-  }, [mode, startDate, endDate])
+  }, [startDate, endDate])
+  const totalDays = mode === 'day_quota' ? challengeDays : 0
+
+  /** Ngày đăng ký cuối = ngày bắt đầu + N, không được sau ngày kết thúc */
+  const maxJoinDeadlineDays = Math.max(1, challengeDays - 1)
+  const joinDeadlineDays = /^\d+$/.test(joinDeadlineInput.trim())
+    ? Number(joinDeadlineInput.trim())
+    : NaN
+  const joinDeadlineLastDay =
+    Number.isInteger(joinDeadlineDays) && joinDeadlineDays >= 1 && startDate
+      ? joinDeadlineDate(inputDateToChallengeDay(startDate), joinDeadlineDays)
+      : null
 
   useEffect(() => {
     if (mode !== 'day_quota' || totalDays <= 0) return
@@ -238,6 +248,16 @@ export function CreateChallengePage() {
     }
     if (endDate < startDate) {
       setError('Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.')
+      return
+    }
+    if (!Number.isInteger(joinDeadlineDays) || joinDeadlineDays < 1) {
+      setError('Hạn tham gia phải là số ngày nguyên từ 1 trở lên.')
+      return
+    }
+    if (challengeDays > 0 && joinDeadlineDays > maxJoinDeadlineDays) {
+      setError(
+        `Hạn tham gia tối đa ${maxJoinDeadlineDays} ngày (không được sau ngày kết thúc thử thách).`,
+      )
       return
     }
 
@@ -600,17 +620,22 @@ export function CreateChallengePage() {
         )}
 
         <label>
-          Hạn tham gia (sau ngày bắt đầu)
-          <select
-            value={joinDeadlineDays}
-            onChange={(e) => setJoinDeadlineDays(Number(e.target.value))}
-          >
-            {JOIN_DEADLINE_OPTIONS.map((d) => (
-              <option key={d} value={d}>
-                {d} ngày
-              </option>
-            ))}
-          </select>
+          Hạn tham gia (số ngày sau ngày bắt đầu)
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={challengeDays > 0 ? maxJoinDeadlineDays : undefined}
+            step={1}
+            value={joinDeadlineInput}
+            onChange={(e) => setJoinDeadlineInput(e.target.value)}
+            placeholder="VD: 7"
+          />
+          <span className="tiny muted">
+            {joinDeadlineLastDay
+              ? `Thành viên đăng ký được đến hết ngày ${formatDay(joinDeadlineLastDay)}.`
+              : 'Nhập số ngày nguyên từ 1 trở lên.'}
+          </span>
         </label>
 
         <label>

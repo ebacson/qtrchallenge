@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { onValue, ref } from 'firebase/database'
 import {
   matchesMemberType,
@@ -62,7 +63,7 @@ export function MembersPage() {
     <div className="page">
       <header className="page-header">
         <h1>Thành viên</h1>
-        <p className="lede">Danh sách runners trong club (theo level).</p>
+        <p className="lede">Danh sách runners trong club (theo level). Chạm vào một thành viên để xem hoạt động.</p>
       </header>
 
       <MemberTypeFilter value={memberType} onChange={setMemberType} items={members} />
@@ -83,24 +84,26 @@ export function MembersPage() {
       ) : (
         <ul className="member-list">
           {filtered.map((m) => (
-            <li key={m.id} className="member-row">
-              <div className="hof-avatar">
-                {m.avatar ? (
-                  <img src={m.avatar} alt="" />
-                ) : (
-                  <span>{(m.fullName || '?').charAt(0).toUpperCase()}</span>
-                )}
-              </div>
-              <div className="hof-meta">
-                <strong>{m.fullName || 'Runner'}</strong>
-                <span className="tiny muted">{m.email}</span>
-              </div>
-              <div className="member-right">
-                <span className="level-badge level-bronze">Lv {m.level}</span>
-                <span className={`member-badge ${m.member ? 'yes' : 'no'}`}>
-                  {m.member ? 'Chính thức' : 'Tự do'}
-                </span>
-              </div>
+            <li key={m.id}>
+              <Link to={`/activities/${m.id}`} className="member-row" title="Xem hoạt động">
+                <div className="hof-avatar">
+                  {m.avatar ? (
+                    <img src={m.avatar} alt="" />
+                  ) : (
+                    <span>{(m.fullName || '?').charAt(0).toUpperCase()}</span>
+                  )}
+                </div>
+                <div className="hof-meta">
+                  <strong>{m.fullName || 'Runner'}</strong>
+                  <span className="tiny muted">{m.email}</span>
+                </div>
+                <div className="member-right">
+                  <span className="level-badge level-bronze">Lv {m.level}</span>
+                  <span className={`member-badge ${m.member ? 'yes' : 'no'}`}>
+                    {m.member ? 'Chính thức' : 'Tự do'}
+                  </span>
+                </div>
+              </Link>
             </li>
           ))}
         </ul>

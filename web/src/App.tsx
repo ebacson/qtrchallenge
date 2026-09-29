@@ -75,6 +75,7 @@ function AppRoutes() {
       >
         <Route index element={<HomePage />} />
         <Route path="activities" element={<ActivitiesPage />} />
+        <Route path="activities/:uid" element={<ActivitiesPage />} />
         <Route path="challenges" element={<ChallengesPage />} />
         <Route path="challenges/:id" element={<ChallengeDetailPage />} />
         <Route

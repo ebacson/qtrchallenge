@@ -315,6 +315,40 @@ select {
   }
 }
 
+.pwa-update {
+  position: fixed;
+  left: 50%;
+  bottom: 92px;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  padding: 8px 8px 8px 16px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.9rem;
+  box-shadow: var(--shadow);
+}
+
+.pwa-update .btn {
+  margin: 0;
+}
+
+.pwa-update-close {
+  display: inline-flex;
+  padding: 4px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+}
+
 .user-chip {
   display: none;
   align-items: center;

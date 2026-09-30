@@ -3,6 +3,7 @@ import { copyFileSync, mkdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv, type Plugin } from 'vite'
+import { VitePWA } from 'vite-plugin-pwa'
 import { stravaApiPlugin } from './server/stravaApiPlugin.ts'
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url))
@@ -37,6 +38,35 @@ export default defineConfig(({ mode, command }) => {
     plugins: [
       react(),
       ...(isProdBuild ? [spaDeepLinkPages()] : []),
+      VitePWA({
+        registerType: 'prompt',
+        injectRegister: false,
+        // Giữ public/manifest.webmanifest (display: browser) để OAuth Strava vẫn chạy trong Safari
+        manifest: false,
+        workbox: {
+          globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,webp,ico,webmanifest}'],
+          globIgnores: ['404.html', 'strava/**'],
+          navigateFallback: 'index.html',
+          cleanupOutdatedCaches: true,
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+          runtimeCaching: [
+            {
+              urlPattern: ({ url }) => url.origin === 'https://fonts.googleapis.com',
+              handler: 'StaleWhileRevalidate',
+              options: { cacheName: 'google-fonts-css' },
+            },
+            {
+              urlPattern: ({ url }) => url.origin === 'https://fonts.gstatic.com',
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'google-fonts',
+                expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
+          ],
+        },
+      }),
       // Strava proxy only for local `vite` / `vite preview` — not available on static Pages.
       ...(command === 'serve' ? [stravaApiPlugin(() => loadEnv(mode, rootDir, ''))] : []),
     ],

@@ -5,6 +5,7 @@ import { Layout } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
 import { HomePage } from './pages/HomePage'
 import { RequireAdmin } from './components/RequireAdmin'
+import { PwaUpdatePrompt } from './components/PwaUpdatePrompt'
 import { brandLogoSrc, brandTitle } from './lib/brand'
 
 /** Mỗi trang một chunk riêng; trang nằm trong named export. */
@@ -125,6 +126,7 @@ export default function App() {
       <Suspense fallback={<BootScreen />}>
         <AppRoutes />
       </Suspense>
+      <PwaUpdatePrompt />
     </AuthProvider>
   )
 }

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { brandLogoSrc, brandTitle } from '../lib/brand'
+import { reloadApp } from '../lib/pwa'
 
 type MenuItem = { to: string; label: string; icon: LucideIcon; end?: boolean }
 type MenuGroup = { key: string; title?: string; items: MenuItem[] }
@@ -183,7 +184,7 @@ export function Layout() {
             disabled={reloading}
             onClick={() => {
               setReloading(true)
-              window.location.reload()
+              void reloadApp()
             }}
           >
             <RotateCw size={20} strokeWidth={2.2} aria-hidden />

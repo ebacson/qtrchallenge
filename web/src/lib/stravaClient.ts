@@ -108,7 +108,8 @@ export async function fetchStravaConfig(): Promise<StravaConfig> {
 
 export async function startStravaConnect(): Promise<void> {
   const state = crypto.randomUUID()
-  sessionStorage.setItem(STATE_KEY, state)
+  // localStorage: callback có thể mở ở tab khác (app Strava / trình duyệt ngoài trên mobile)
+  localStorage.setItem(STATE_KEY, state)
   const { url } = await apiJson<{ url: string }>('/api/strava/authorize-url', {
     method: 'POST',
     body: JSON.stringify({ state }),
@@ -117,7 +118,8 @@ export async function startStravaConnect(): Promise<void> {
 }
 
 export function consumeOAuthState(returnedState: string | null): boolean {
-  const expected = sessionStorage.getItem(STATE_KEY)
+  const expected = localStorage.getItem(STATE_KEY) ?? sessionStorage.getItem(STATE_KEY)
+  localStorage.removeItem(STATE_KEY)
   sessionStorage.removeItem(STATE_KEY)
   if (!expected || !returnedState) return false
   return expected === returnedState

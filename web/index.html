@@ -24,14 +24,23 @@
     <script>
       // Restore deep link after GitHub Pages root 404.html bounce
       ;(function () {
-        try {
-          var redirect = sessionStorage.getItem('qtr-spa-redirect')
-          if (!redirect) return
-          sessionStorage.removeItem('qtr-spa-redirect')
-          // Old links under /qtrchallenge/… and /web/… now live at the site root
-          redirect = redirect
+        // Old links under /qtrchallenge/… and /web/… now live at the site root
+        function stripLegacyBase(path) {
+          return path
             .replace(/^\/qtrchallenge(?=\/|\?|#|$)/, '')
             .replace(/^\/web(?=\/|\?|#|$)/, '')
+        }
+        try {
+          var redirect = sessionStorage.getItem('qtr-spa-redirect')
+          if (redirect) {
+            sessionStorage.removeItem('qtr-spa-redirect')
+          } else {
+            // Service worker serves index.html directly for legacy paths (e.g. Strava OAuth callback)
+            var current = location.pathname + location.search + location.hash
+            redirect = stripLegacyBase(current)
+            if (redirect === current) return
+          }
+          redirect = stripLegacyBase(redirect)
           if (redirect.charAt(0) !== '/') redirect = '/' + redirect
           history.replaceState(null, '', redirect)
         } catch (_) {}

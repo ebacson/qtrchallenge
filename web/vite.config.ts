@@ -47,6 +47,8 @@ export default defineConfig(({ mode, command }) => {
           globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,webp,ico,webmanifest}'],
           globIgnores: ['404.html', 'strava/**'],
           navigateFallback: 'index.html',
+          // Để server xử lý: link cũ /web, /qtrchallenge (qua 404.html) và callback OAuth Strava
+          navigateFallbackDenylist: [/^\/web(\/|$)/, /^\/qtrchallenge(\/|$)/, /^\/strava\/callback/],
           cleanupOutdatedCaches: true,
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
           runtimeCaching: [

@@ -1,7 +1,7 @@
 :root {
   --ink: #1f1414;
   --ink-soft: #5c4a4a;
-  --paper: #ffffff;
+  --paper: #f7e3e6;
   --paper-2: #f6e9ea;
   --card: #ffffff;
   --line: rgba(200, 16, 46, 0.14);
@@ -40,9 +40,9 @@ body,
 body {
   min-height: 100vh;
   background:
-    radial-gradient(ellipse 80% 50% at 10% -10%, rgba(208, 16, 43, 0.1), transparent 55%),
-    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(208, 16, 43, 0.06), transparent 50%),
-    linear-gradient(180deg, #ffffff 0%, #fbf3f3 100%);
+    radial-gradient(ellipse 80% 50% at 10% -10%, rgba(208, 16, 43, 0.16), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(208, 16, 43, 0.1), transparent 50%),
+    linear-gradient(180deg, #fbecee 0%, #f3dade 100%);
   color: var(--ink);
 }
 
@@ -89,7 +89,7 @@ select {
   top: 0;
   z-index: 30;
   backdrop-filter: blur(10px);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.75));
+  background: linear-gradient(180deg, rgba(250, 232, 235, 0.95), rgba(250, 232, 235, 0.75));
 }
 
 .brand-menu {

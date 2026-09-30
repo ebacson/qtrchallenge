@@ -21,7 +21,6 @@ const menuGroups: MenuGroup[] = [
     title: 'Cá nhân',
     items: [
       { to: '/activities', label: 'Hoạt động' },
-      { to: '/stats', label: 'Thống kê' },
       { to: '/profile', label: 'Hồ sơ' },
     ],
   },
@@ -104,7 +103,9 @@ export function Layout() {
             <nav id={menuId} className="brand-dropdown" aria-label="Menu chức năng">
               {navGroups.map((group) => (
                 <div key={group.key} className="brand-menu-group" role="group" aria-label={group.title}>
-                  {group.title && <p className="brand-menu-group-title">{group.title}</p>}
+                  {group.title && (
+                    <p className={`brand-menu-group-title ${group.key}`}>{group.title}</p>
+                  )}
                   <ul className="brand-menu-list" role="menu">
                     {group.items.map((item) => (
                       <li key={item.to} role="none">

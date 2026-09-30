@@ -151,6 +151,18 @@ select {
   color: var(--ink-soft);
 }
 
+.brand-menu-group-title.personal {
+  color: #0d7377;
+}
+
+.brand-menu-group-title.club {
+  color: var(--accent);
+}
+
+.brand-menu-group-title.admin {
+  color: #7c3aed;
+}
+
 .brand-menu-list {
   list-style: none;
   margin: 0;

@@ -1920,8 +1920,74 @@ code {
 .noti-card .dot {
   width: 8px;
   height: 8px;
+  flex-shrink: 0;
   border-radius: 50%;
   background: var(--accent);
+}
+
+.noti-title {
+  font-size: 1.02rem;
+  line-height: 1.35;
+}
+
+.noti-meta {
+  margin: 4px 0 10px;
+}
+
+.noti-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.noti-preview {
+  padding: 12px 14px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  background: rgba(31, 20, 20, 0.03);
+}
+
+.noti-preview-label {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.rich-text {
+  margin-top: 6px;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.rich-text .rt-gap {
+  height: 0.6em;
+}
+
+.rich-text hr {
+  margin: 8px 0;
+  border: 0;
+  border-top: 1px dashed var(--line);
+}
+
+.rich-text .rt-bullet {
+  position: relative;
+  padding-left: 16px;
+}
+
+.rich-text .rt-bullet::before {
+  content: '•';
+  position: absolute;
+  left: 3px;
+  color: var(--accent);
+}
+
+.rich-text a {
+  color: var(--accent);
+  text-decoration: underline;
+  word-break: break-all;
 }
 
 .member-right {

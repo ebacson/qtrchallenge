@@ -170,15 +170,8 @@ async function syncStravaUser(
   summary.activitiesFetched += fetched.activities.length
 }
 
-/**
- * Đồng bộ Strava cho mọi user có token, tính lại tiến độ các thử thách đang diễn ra
- * (và vừa kết thúc) theo đúng logic của web, rồi cập nhật level.
- */
-export async function runFullSync(trigger: string): Promise<FullSyncSummary> {
-  if (running) throw new SyncAlreadyRunningError()
-  running = true
-  const started = Date.now()
-  const summary: FullSyncSummary = {
+function emptySummary(trigger: string, started: number): FullSyncSummary {
+  return {
     trigger,
     startedAt: new Date(started).toISOString(),
     durationMs: 0,
@@ -192,6 +185,118 @@ export async function runFullSync(trigger: string): Promise<FullSyncSummary> {
     progressRowsUpdated: 0,
     levelsUpdated: 0,
   }
+}
+
+/**
+ * Tính lại tiến độ các thử thách cần tính (của mọi user, hoặc chỉ `onlyUid`).
+ * Ghi đè giá trị mới vào `challenges` để tính level ngay sau đó.
+ */
+function collectProgressUpdates(
+  challenges: Record<string, Dict>,
+  activitiesByUid: Map<string, Dict>,
+  now: number,
+  onlyUid?: string,
+): { updates: Dict; challengesProcessed: number; rowsUpdated: number } {
+  const updates: Dict = {}
+  let challengesProcessed = 0
+  let rowsUpdated = 0
+  for (const [challengeId, challenge] of Object.entries(challenges)) {
+    if (!asDict(challenge) || !shouldRecalculate(challenge, now)) continue
+    const rows = asDict(challenge.user_challenges) ?? {}
+    const entries = onlyUid
+      ? Object.entries(rows).filter(([uid]) => uid === onlyUid)
+      : Object.entries(rows)
+    if (onlyUid && !entries.length) continue
+    challengesProcessed += 1
+    for (const [uid, rawRow] of entries) {
+      const row = asDict(rawRow)
+      if (!row) continue
+      const activities = Object.values(activitiesByUid.get(uid) ?? {}).filter(
+        (a): a is Dict => asDict(a) != null,
+      )
+      const next = computeUserChallengeUpdate(challenge, row, activities)
+      if (!next) continue
+      let changed = false
+      for (const [field, value] of Object.entries(next)) {
+        if (sameValue(row[field], value)) continue
+        updates[`challenges/${challengeId}/user_challenges/${uid}/${field}`] = value
+        if (value == null) delete row[field]
+        else row[field] = value
+        changed = true
+      }
+      if (changed) rowsUpdated += 1
+    }
+  }
+  return { updates, challengesProcessed, rowsUpdated }
+}
+
+export type UserSyncResult = {
+  uid: string
+  stravaError: string | null
+  activitiesFetched: number
+  challengesProcessed: number
+  progressRowsUpdated: number
+  levelChanged: boolean
+}
+
+/** Đồng bộ Strava (nếu `fetchStrava`) rồi tính lại tiến độ thử thách + level cho một user. */
+export async function syncSingleUser(uid: string, fetchStrava: boolean): Promise<UserSyncResult> {
+  const db = getDatabase()
+  const row = asDict((await db.ref(`users/${uid}`).get()).val())
+  if (!row) throw new Error(`Không tìm thấy user ${uid}`)
+
+  const activitiesByUid = new Map<string, Dict>([
+    [uid, { ...(asDict(row.strava_activities) ?? {}) }],
+  ])
+  const summary = emptySummary(`user:${uid}`, Date.now())
+  let stravaError: string | null = null
+  if (fetchStrava) {
+    const env = readStravaEnv(process.env)
+    if ('error' in env) {
+      stravaError = env.error
+    } else {
+      const state: StravaState = { rateLimited: false }
+      await syncStravaUser(uid, row, env, state, activitiesByUid, summary)
+      if (state.rateLimited) stravaError = 'Strava rate limit (429)'
+      else if (summary.stravaFailed.length) stravaError = summary.stravaFailed[0].error
+    }
+  }
+
+  const challenges = (asDict((await db.ref('challenges').get()).val()) ?? {}) as Record<
+    string,
+    Dict
+  >
+  const progress = collectProgressUpdates(challenges, activitiesByUid, Date.now(), uid)
+  await applyRootUpdates(progress.updates)
+
+  let levelChanged = false
+  if (row.email != null) {
+    const level = calculateLevelFromChallenges(uid, challenges)
+    if (level !== (Number(row.level ?? 0) || 0)) {
+      await db.ref(`users/${uid}/level`).set(level)
+      levelChanged = true
+    }
+  }
+
+  return {
+    uid,
+    stravaError,
+    activitiesFetched: summary.activitiesFetched,
+    challengesProcessed: progress.challengesProcessed,
+    progressRowsUpdated: progress.rowsUpdated,
+    levelChanged,
+  }
+}
+
+/**
+ * Đồng bộ Strava cho mọi user có token, tính lại tiến độ các thử thách đang diễn ra
+ * (và vừa kết thúc) theo đúng logic của web, rồi cập nhật level.
+ */
+export async function runFullSync(trigger: string): Promise<FullSyncSummary> {
+  if (running) throw new SyncAlreadyRunningError()
+  running = true
+  const started = Date.now()
+  const summary = emptySummary(trigger, started)
 
   try {
     const db = getDatabase()
@@ -232,32 +337,10 @@ export async function runFullSync(trigger: string): Promise<FullSyncSummary> {
       string,
       Dict
     >
-    const now = Date.now()
-    const progressUpdates: Dict = {}
-    for (const [challengeId, challenge] of Object.entries(challenges)) {
-      if (!asDict(challenge) || !shouldRecalculate(challenge, now)) continue
-      summary.challengesProcessed += 1
-      const rows = asDict(challenge.user_challenges) ?? {}
-      for (const [uid, rawRow] of Object.entries(rows)) {
-        const row = asDict(rawRow)
-        if (!row) continue
-        const activities = Object.values(activitiesByUid.get(uid) ?? {}).filter(
-          (a): a is Dict => asDict(a) != null,
-        )
-        const next = computeUserChallengeUpdate(challenge, row, activities)
-        if (!next) continue
-        let changed = false
-        for (const [field, value] of Object.entries(next)) {
-          if (sameValue(row[field], value)) continue
-          progressUpdates[`challenges/${challengeId}/user_challenges/${uid}/${field}`] = value
-          if (value == null) delete row[field]
-          else row[field] = value
-          changed = true
-        }
-        if (changed) summary.progressRowsUpdated += 1
-      }
-    }
-    await applyRootUpdates(progressUpdates)
+    const progress = collectProgressUpdates(challenges, activitiesByUid, Date.now())
+    summary.challengesProcessed = progress.challengesProcessed
+    summary.progressRowsUpdated = progress.rowsUpdated
+    await applyRootUpdates(progress.updates)
 
     const levelUpdates: Dict = {}
     for (const [uid, raw] of Object.entries(users)) {

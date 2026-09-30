@@ -1,11 +1,19 @@
 import { initializeApp } from 'firebase-admin/app'
 import { getAuth } from 'firebase-admin/auth'
 import { getDatabase } from 'firebase-admin/database'
+import type { PubSub } from '@google-cloud/pubsub'
 import { onRequest } from 'firebase-functions/v2/https'
+import { onMessagePublished } from 'firebase-functions/v2/pubsub'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { setGlobalOptions } from 'firebase-functions/v2'
 import * as logger from 'firebase-functions/logger'
 import { handleStravaRoute } from './stravaCore'
+import {
+  handleStravaEvent,
+  parseWebhookEvent,
+  STRAVA_EVENTS_TOPIC,
+  type StravaWebhookEvent,
+} from './stravaWebhook'
 import { runFullSync, SyncAlreadyRunningError } from './syncAll'
 
 setGlobalOptions({ region: 'us-central1', maxInstances: 10 })
@@ -141,5 +149,92 @@ export const adminSync = onRequest(
       logger.error('adminSync failed', err)
       res.status(500).json({ error: err instanceof Error ? err.message : 'Đồng bộ thất bại' })
     }
+  },
+)
+
+let pubsub: PubSub | null = null
+
+async function publishStravaEvent(event: StravaWebhookEvent): Promise<void> {
+  if (!pubsub) {
+    // Nạp muộn để thư viện Pub/Sub không làm chậm khởi động các function khác
+    const { PubSub } = await import('@google-cloud/pubsub')
+    pubsub = new PubSub()
+  }
+  await pubsub.topic(STRAVA_EVENTS_TOPIC).publishMessage({ json: event })
+}
+
+/**
+ * Callback của Strava Webhook Events API. Strava đòi trả 200 trong 2 giây, nên chỉ
+ * đẩy sự kiện vào Pub/Sub; processStravaEvent làm phần đồng bộ.
+ */
+export const stravaWebhook = onRequest(
+  {
+    cors: false,
+    minInstances: 1,
+    maxInstances: 3,
+    memory: '256MiB',
+    timeoutSeconds: 30,
+  },
+  async (req, res) => {
+    if (req.method === 'GET') {
+      const params = new URL(req.originalUrl || req.url, 'https://localhost').searchParams
+      const verifyToken = process.env.STRAVA_WEBHOOK_VERIFY_TOKEN
+      if (
+        verifyToken &&
+        params.get('hub.mode') === 'subscribe' &&
+        params.get('hub.verify_token') === verifyToken
+      ) {
+        res.status(200).json({ 'hub.challenge': params.get('hub.challenge') ?? '' })
+      } else {
+        res.status(403).json({ error: 'Forbidden' })
+      }
+      return
+    }
+    if (req.method !== 'POST') {
+      res.status(405).json({ error: 'Method not allowed' })
+      return
+    }
+
+    const event = parseWebhookEvent(req.body)
+    if (!event) {
+      res.status(400).json({ error: 'Invalid event' })
+      return
+    }
+    const expectedSubscription = Number(process.env.STRAVA_WEBHOOK_SUBSCRIPTION_ID || 0)
+    if (expectedSubscription && event.subscription_id !== expectedSubscription) {
+      logger.warn('stravaWebhook: unexpected subscription_id', {
+        subscriptionId: event.subscription_id,
+      })
+      res.status(403).json({ error: 'Unknown subscription' })
+      return
+    }
+
+    try {
+      await publishStravaEvent(event)
+      res.status(200).json({ ok: true })
+    } catch (err) {
+      logger.error('stravaWebhook: publish failed', err)
+      res.status(500).json({ error: 'Publish failed' })
+    }
+  },
+)
+
+/** Xử lý tuần tự từng sự kiện Strava: đồng bộ hoạt động, tính lại thử thách và level của user đó. */
+export const processStravaEvent = onMessagePublished(
+  {
+    topic: STRAVA_EVENTS_TOPIC,
+    maxInstances: 1,
+    concurrency: 1,
+    memory: '512MiB',
+    timeoutSeconds: 120,
+    retry: false,
+  },
+  async (message) => {
+    const event = parseWebhookEvent(message.data.message.json)
+    if (!event) {
+      logger.warn('processStravaEvent: invalid message')
+      return
+    }
+    await handleStravaEvent(event)
   },
 )

@@ -11,18 +11,43 @@ const tabs = [
   { to: '/profile', label: 'Hồ sơ' },
 ]
 
-const menuItems = [
-  { to: '/', label: 'Home', end: true },
-  { to: '/challenges', label: 'Thử thách' },
-  { to: '/activities', label: 'Hoạt động' },
-  { to: '/rewards', label: 'Thưởng - Phạt' },
-  { to: '/events', label: 'Sự kiện' },
-  { to: '/hall-of-fame', label: 'Bảng vàng' },
-  { to: '/notifications', label: 'Thông báo' },
-  { to: '/members', label: 'Thành viên' },
-  { to: '/stats', label: 'Thống kê' },
-  { to: '/profile', label: 'Hồ sơ' },
+type MenuItem = { to: string; label: string; end?: boolean }
+type MenuGroup = { key: string; title?: string; items: MenuItem[] }
+
+const menuGroups: MenuGroup[] = [
+  { key: 'home', items: [{ to: '/', label: 'Home', end: true }] },
+  {
+    key: 'personal',
+    title: 'Cá nhân',
+    items: [
+      { to: '/activities', label: 'Hoạt động' },
+      { to: '/stats', label: 'Thống kê' },
+      { to: '/profile', label: 'Hồ sơ' },
+    ],
+  },
+  {
+    key: 'club',
+    title: 'Câu lạc bộ',
+    items: [
+      { to: '/notifications', label: 'Thông báo' },
+      { to: '/challenges', label: 'Thử thách' },
+      { to: '/events', label: 'Sự kiện' },
+      { to: '/members', label: 'Thành viên' },
+      { to: '/hall-of-fame', label: 'Bảng vàng' },
+      { to: '/rewards', label: 'Thưởng - Phạt' },
+    ],
+  },
 ]
+
+const adminGroup: MenuGroup = {
+  key: 'admin',
+  title: 'Admin',
+  items: [
+    { to: '/admin/challenges/new', label: 'Tạo thử thách' },
+    { to: '/admin/users', label: 'Quản lý thành viên' },
+    { to: '/admin/records', label: 'Xác thực thành tích' },
+  ],
+}
 
 export function Layout() {
   const { profile, logout } = useAuth()
@@ -31,15 +56,7 @@ export function Layout() {
   const menuRef = useRef<HTMLDivElement>(null)
   const menuId = useId()
 
-  const navMenuItems = profile?.admin
-    ? [
-        ...menuItems.slice(0, 2),
-        { to: '/admin/challenges/new', label: 'Tạo thử thách' },
-        { to: '/admin/users', label: 'Quản lý thành viên' },
-        { to: '/admin/records', label: 'Xác thực thành tích' },
-        ...menuItems.slice(2),
-      ]
-    : menuItems
+  const navGroups = profile?.admin ? [...menuGroups, adminGroup] : menuGroups
 
   useEffect(() => {
     setMenuOpen(false)
@@ -85,22 +102,27 @@ export function Layout() {
 
           {menuOpen && (
             <nav id={menuId} className="brand-dropdown" aria-label="Menu chức năng">
-              <ul className="brand-menu-list" role="menu">
-                {navMenuItems.map((item) => (
-                  <li key={item.to} role="none">
-                    <NavLink
-                      to={item.to}
-                      end={item.end}
-                      role="menuitem"
-                      className={({ isActive }) =>
-                        isActive ? 'brand-menu-link active' : 'brand-menu-link'
-                      }
-                    >
-                      {item.label}
-                    </NavLink>
-                  </li>
-                ))}
-              </ul>
+              {navGroups.map((group) => (
+                <div key={group.key} className="brand-menu-group" role="group" aria-label={group.title}>
+                  {group.title && <p className="brand-menu-group-title">{group.title}</p>}
+                  <ul className="brand-menu-list" role="menu">
+                    {group.items.map((item) => (
+                      <li key={item.to} role="none">
+                        <NavLink
+                          to={item.to}
+                          end={item.end}
+                          role="menuitem"
+                          className={({ isActive }) =>
+                            isActive ? 'brand-menu-link active' : 'brand-menu-link'
+                          }
+                        >
+                          {item.label}
+                        </NavLink>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
               <button
                 type="button"
                 className="brand-menu-logout"

@@ -131,6 +131,24 @@ select {
   border: 1px solid var(--line);
   box-shadow: 0 18px 40px rgba(15, 28, 36, 0.16);
   z-index: 40;
+  max-height: calc(100dvh - 90px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.brand-menu-group + .brand-menu-group {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+.brand-menu-group-title {
+  margin: 2px 12px 2px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
 }
 
 .brand-menu-list {

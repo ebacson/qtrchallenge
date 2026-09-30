@@ -4,7 +4,13 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="manifest" id="app-manifest" href="/manifest.webmanifest" />
+    <script>
+      // Android: cài được như app toàn màn hình. iOS giữ display "browser" để OAuth Strava chạy trong Safari.
+      if (/Android/i.test(navigator.userAgent)) {
+        document.getElementById('app-manifest').href = '/manifest-android.webmanifest'
+      }
+    </script>
     <meta name="theme-color" content="#d0102b" />
     <meta name="apple-mobile-web-app-title" content="QTR" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

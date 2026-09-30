@@ -74,7 +74,7 @@ select {
   max-width: 920px;
   margin: 0 auto;
   min-height: 100vh;
-  padding: 0 16px 88px;
+  padding: 0 16px 96px;
   display: flex;
   flex-direction: column;
 }
@@ -163,6 +163,28 @@ select {
   color: #7c3aed;
 }
 
+.menu-icon {
+  flex-shrink: 0;
+  color: var(--ink-soft);
+}
+
+.brand-menu-group.personal .menu-icon {
+  color: #0d7377;
+}
+
+.brand-menu-group.club .menu-icon {
+  color: var(--accent);
+}
+
+.brand-menu-group.admin .menu-icon {
+  color: #7c3aed;
+}
+
+.brand-menu-link.active .menu-icon,
+.brand-menu-logout .menu-icon {
+  color: currentColor;
+}
+
 .brand-menu-list {
   list-style: none;
   margin: 0;
@@ -174,7 +196,9 @@ select {
 
 .brand-menu-link,
 .brand-menu-logout {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   width: 100%;
   padding: 10px 12px;
   border-radius: 10px;
@@ -287,8 +311,8 @@ select {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 4px;
-  padding: 8px;
-  border-radius: 999px;
+  padding: 6px;
+  border-radius: 24px;
   background: rgba(15, 28, 36, 0.92);
   box-shadow: var(--shadow);
   z-index: 20;
@@ -311,13 +335,23 @@ select {
 }
 
 .tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
   color: rgba(255, 252, 246, 0.65);
   text-align: center;
-  padding: 10px 4px;
-  border-radius: 999px;
-  font-size: 0.82rem;
+  padding: 6px 2px;
+  border-radius: 18px;
+  font-size: 0.72rem;
   font-weight: 600;
+  line-height: 1.2;
   text-decoration: none;
+  white-space: nowrap;
+}
+
+.tab-icon {
+  flex-shrink: 0;
 }
 
 .tab.active {

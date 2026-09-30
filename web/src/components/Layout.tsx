@@ -1,39 +1,55 @@
 import { Suspense, useEffect, useId, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import {
+  Activity,
+  Bell,
+  CalendarDays,
+  CirclePlus,
+  Flag,
+  House,
+  LogOut,
+  ShieldCheck,
+  Trophy,
+  UserCog,
+  UserRound,
+  Users,
+  Wallet,
+  type LucideIcon,
+} from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { brandLogoSrc, brandTitle } from '../lib/brand'
 
-const tabs = [
-  { to: '/', label: 'Home', end: true },
-  { to: '/challenges', label: 'Thử thách' },
-  { to: '/events', label: 'Sự kiện' },
-  { to: '/hall-of-fame', label: 'Bảng vàng' },
-  { to: '/profile', label: 'Hồ sơ' },
-]
-
-type MenuItem = { to: string; label: string; end?: boolean }
+type MenuItem = { to: string; label: string; icon: LucideIcon; end?: boolean }
 type MenuGroup = { key: string; title?: string; items: MenuItem[] }
 
+const tabs: MenuItem[] = [
+  { to: '/', label: 'Home', icon: House, end: true },
+  { to: '/challenges', label: 'Thử thách', icon: Flag },
+  { to: '/events', label: 'Sự kiện', icon: CalendarDays },
+  { to: '/hall-of-fame', label: 'Bảng vàng', icon: Trophy },
+  { to: '/profile', label: 'Hồ sơ', icon: UserRound },
+]
+
 const menuGroups: MenuGroup[] = [
-  { key: 'home', items: [{ to: '/', label: 'Home', end: true }] },
+  { key: 'home', items: [{ to: '/', label: 'Home', icon: House, end: true }] },
   {
     key: 'personal',
     title: 'Cá nhân',
     items: [
-      { to: '/activities', label: 'Hoạt động' },
-      { to: '/profile', label: 'Hồ sơ' },
+      { to: '/activities', label: 'Hoạt động', icon: Activity },
+      { to: '/profile', label: 'Hồ sơ', icon: UserRound },
     ],
   },
   {
     key: 'club',
     title: 'Câu lạc bộ',
     items: [
-      { to: '/notifications', label: 'Thông báo' },
-      { to: '/challenges', label: 'Thử thách' },
-      { to: '/events', label: 'Sự kiện' },
-      { to: '/members', label: 'Thành viên' },
-      { to: '/hall-of-fame', label: 'Bảng vàng' },
-      { to: '/rewards', label: 'Thưởng - Phạt' },
+      { to: '/notifications', label: 'Thông báo', icon: Bell },
+      { to: '/challenges', label: 'Thử thách', icon: Flag },
+      { to: '/events', label: 'Sự kiện', icon: CalendarDays },
+      { to: '/members', label: 'Thành viên', icon: Users },
+      { to: '/hall-of-fame', label: 'Bảng vàng', icon: Trophy },
+      { to: '/rewards', label: 'Thưởng - Phạt', icon: Wallet },
     ],
   },
 ]
@@ -42,9 +58,9 @@ const adminGroup: MenuGroup = {
   key: 'admin',
   title: 'Admin',
   items: [
-    { to: '/admin/challenges/new', label: 'Tạo thử thách' },
-    { to: '/admin/users', label: 'Quản lý thành viên' },
-    { to: '/admin/records', label: 'Xác thực thành tích' },
+    { to: '/admin/challenges/new', label: 'Tạo thử thách', icon: CirclePlus },
+    { to: '/admin/users', label: 'Quản lý thành viên', icon: UserCog },
+    { to: '/admin/records', label: 'Xác thực thành tích', icon: ShieldCheck },
   ],
 }
 
@@ -102,7 +118,12 @@ export function Layout() {
           {menuOpen && (
             <nav id={menuId} className="brand-dropdown" aria-label="Menu chức năng">
               {navGroups.map((group) => (
-                <div key={group.key} className="brand-menu-group" role="group" aria-label={group.title}>
+                <div
+                  key={group.key}
+                  className={`brand-menu-group ${group.key}`}
+                  role="group"
+                  aria-label={group.title}
+                >
                   {group.title && (
                     <p className={`brand-menu-group-title ${group.key}`}>{group.title}</p>
                   )}
@@ -117,7 +138,8 @@ export function Layout() {
                             isActive ? 'brand-menu-link active' : 'brand-menu-link'
                           }
                         >
-                          {item.label}
+                          <item.icon className="menu-icon" size={18} strokeWidth={2} aria-hidden />
+                          <span>{item.label}</span>
                         </NavLink>
                       </li>
                     ))}
@@ -130,7 +152,8 @@ export function Layout() {
                 role="menuitem"
                 onClick={() => void logout()}
               >
-                Đăng xuất
+                <LogOut className="menu-icon" size={18} strokeWidth={2} aria-hidden />
+                <span>Đăng xuất</span>
               </button>
             </nav>
           )}
@@ -173,7 +196,8 @@ export function Layout() {
             end={tab.end}
             className={({ isActive }) => (isActive ? 'tab active' : 'tab')}
           >
-            {tab.label}
+            <tab.icon className="tab-icon" size={20} strokeWidth={2} aria-hidden />
+            <span>{tab.label}</span>
           </NavLink>
         ))}
       </nav>

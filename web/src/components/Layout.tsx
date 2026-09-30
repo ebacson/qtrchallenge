@@ -8,6 +8,7 @@ import {
   Flag,
   House,
   LogOut,
+  RotateCw,
   ShieldCheck,
   Trophy,
   UserCog,
@@ -68,6 +69,7 @@ export function Layout() {
   const { profile, logout } = useAuth()
   const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [reloading, setReloading] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const menuId = useId()
 
@@ -173,6 +175,19 @@ export function Layout() {
               )}
             </span>
           )}
+          <button
+            type="button"
+            className={`topbar-icon-btn${reloading ? ' spinning' : ''}`}
+            aria-label="Tải lại trang"
+            title="Tải lại trang"
+            disabled={reloading}
+            onClick={() => {
+              setReloading(true)
+              window.location.reload()
+            }}
+          >
+            <RotateCw size={20} strokeWidth={2.2} aria-hidden />
+          </button>
         </div>
       </header>
 

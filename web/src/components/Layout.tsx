@@ -25,7 +25,7 @@ type MenuGroup = { key: string; title?: string; items: MenuItem[] }
 const tabs: MenuItem[] = [
   { to: '/', label: 'Home', icon: House, end: true },
   { to: '/challenges', label: 'Thử thách', icon: Flag },
-  { to: '/events', label: 'Sự kiện', icon: CalendarDays },
+  { to: '/activities', label: 'Hoạt động', icon: Activity },
   { to: '/hall-of-fame', label: 'Bảng vàng', icon: Trophy },
   { to: '/profile', label: 'Hồ sơ', icon: UserRound },
 ]

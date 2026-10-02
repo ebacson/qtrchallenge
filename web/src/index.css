@@ -2774,6 +2774,22 @@ code {
   border-color: var(--accent);
 }
 
+.member-since-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.member-since-edit input {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.88rem;
+}
+
 .admin-user-actions {
   display: flex;
   flex-wrap: wrap;

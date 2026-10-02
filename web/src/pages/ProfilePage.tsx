@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { uploadUserAvatar } from '../lib/avatarUpload'
 import { db } from '../lib/firebase'
 import { levelTone } from '../lib/levelCalculator'
+import { formatMemberSince } from '../lib/userProfile'
 import { formatHistoryTime, parseHistory, type HistoryEntry } from '../lib/userRecords'
 import { updateUser } from '../lib/userWrites'
 
@@ -244,7 +245,9 @@ export function ProfilePage() {
             )}
             <span className={`level-badge level-${tone}`}>Level {profile.level}</span>
             <span className={`member-badge ${profile.member ? 'yes' : 'no'}`}>
-              {profile.member ? 'Thành viên chính thức' : 'Thành viên tự do'}
+              {profile.member
+                ? `Thành viên chính thức${profile.memberSince ? ` từ ${formatMemberSince(profile.memberSince)}` : ''}`
+                : 'Thành viên tự do'}
             </span>
           </div>
         </div>

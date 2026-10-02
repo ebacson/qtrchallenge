@@ -12,6 +12,7 @@ import { deleteUserAvatar } from '../lib/adminOps'
 import { runAdminFullSync, type FullSyncSummary } from '../lib/adminSync'
 import { db } from '../lib/firebase'
 import { useSharedValue } from '../lib/sharedValue'
+import { formatMemberSince } from '../lib/userProfile'
 import { removeUser, updateUser, useUserProfiles } from '../lib/userWrites'
 
 type AdminUser = {
@@ -21,6 +22,7 @@ type AdminUser = {
   avatar: string
   level: number
   member: boolean
+  memberSince: number
   admin: boolean
   phone: string
   gender: string
@@ -53,6 +55,18 @@ function ageFromDob(dob: string): number | null {
   return age >= 0 && age < 120 ? age : null
 }
 
+/** ms → yyyy-MM-dd (ô date) theo giờ Việt Nam */
+function inputDateFromMs(ms: number): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(ms))
+}
+
+/** yyyy-MM-dd → 00:00 giờ Việt Nam (ms); '' → null */
+function msFromInputDate(value: string): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
+  const ms = Date.parse(`${value}T00:00:00+07:00`)
+  return Number.isFinite(ms) ? ms : null
+}
+
 export function AdminUsersPage() {
   const { user, profile } = useAuth()
   const profiles = useUserProfiles()
@@ -65,6 +79,7 @@ export function AdminUsersPage() {
   const challenges = useSharedValue<Record<string, Record<string, unknown>>>('challenges')
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<FullSyncSummary | null>(null)
+  const [editingSince, setEditingSince] = useState<{ uid: string; value: string } | null>(null)
 
   const users = useMemo<AdminUser[]>(
     () =>
@@ -76,6 +91,7 @@ export function AdminUsersPage() {
           avatar: String(row.avatar ?? ''),
           level: Number(row.level ?? 0) || 0,
           member: Boolean(row.member),
+          memberSince: Number(row.memberSince) || 0,
           admin: Boolean(row.admin),
           phone: String(row.phone ?? ''),
           gender: String(row.gender ?? ''),
@@ -170,7 +186,12 @@ export function AdminUsersPage() {
     setError('')
     setMessage('')
     try {
-      await updateUser(uid, { [field]: value })
+      await updateUser(
+        uid,
+        field === 'member'
+          ? { member: value, memberSince: value ? Date.now() : null }
+          : { admin: value },
+      )
       setMessage(
         field === 'admin'
           ? value
@@ -182,6 +203,38 @@ export function AdminUsersPage() {
       )
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không cập nhật được')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  function startEditSince(target: AdminUser) {
+    setEditingSince({
+      uid: target.id,
+      value: target.memberSince ? inputDateFromMs(target.memberSince) : '',
+    })
+  }
+
+  async function saveMemberSince(target: AdminUser) {
+    if (!editingSince) return
+    const ms = msFromInputDate(editingSince.value)
+    if (editingSince.value && ms === null) {
+      setError('Ngày không hợp lệ.')
+      return
+    }
+    setBusyId(target.id)
+    setError('')
+    setMessage('')
+    try {
+      await updateUser(target.id, { memberSince: ms })
+      setEditingSince(null)
+      setMessage(
+        ms
+          ? `Đã lưu ngày chính thức của ${target.fullName || target.email}.`
+          : `Đã xóa ngày chính thức của ${target.fullName || target.email}.`,
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không lưu được')
     } finally {
       setBusyId(null)
     }
@@ -409,6 +462,54 @@ export function AdminUsersPage() {
                     <dt>Thử thách đã tham gia</dt>
                     <dd>{joinedCounts[u.id] ?? 0}</dd>
                   </div>
+                  {u.member && (
+                    <div>
+                      <dt>Chính thức từ</dt>
+                      <dd>
+                        {editingSince?.uid === u.id ? (
+                          <span className="member-since-edit">
+                            <input
+                              type="date"
+                              value={editingSince.value}
+                              max={inputDateFromMs(Date.now())}
+                              onChange={(e) =>
+                                setEditingSince({ uid: u.id, value: e.target.value })
+                              }
+                            />
+                            <button
+                              type="button"
+                              className="btn primary compact"
+                              disabled={busy}
+                              onClick={() => void saveMemberSince(u)}
+                            >
+                              Lưu
+                            </button>
+                            <button
+                              type="button"
+                              className="btn ghost compact"
+                              disabled={busy}
+                              onClick={() => setEditingSince(null)}
+                            >
+                              Hủy
+                            </button>
+                          </span>
+                        ) : (
+                          <>
+                            {formatMemberSince(u.memberSince) || (
+                              <span className="muted">Chưa rõ</span>
+                            )}{' '}
+                            <button
+                              type="button"
+                              className="admin-uid"
+                              onClick={() => startEditSince(u)}
+                            >
+                              Sửa
+                            </button>
+                          </>
+                        )}
+                      </dd>
+                    </div>
+                  )}
                 </dl>
 
                 <div className="admin-user-actions">

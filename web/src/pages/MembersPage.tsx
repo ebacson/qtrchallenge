@@ -5,6 +5,7 @@ import {
   MemberTypeFilter,
   type MemberType,
 } from '../components/MemberTypeFilter'
+import { formatMemberSince } from '../lib/userProfile'
 import { useUserProfiles } from '../lib/userWrites'
 
 type Member = {
@@ -14,6 +15,7 @@ type Member = {
   avatar: string
   level: number
   member: boolean
+  memberSince: string
 }
 
 export function MembersPage() {
@@ -32,6 +34,7 @@ export function MembersPage() {
           avatar: String(row.avatar ?? ''),
           level: Number(row.level ?? 0) || 0,
           member: Boolean(row.member),
+          memberSince: row.member ? formatMemberSince(row.memberSince) : '',
         }))
         .filter((m) => m.email.toLowerCase() !== 'echiptime@gmail.com')
         .sort((a, b) => {
@@ -90,6 +93,9 @@ export function MembersPage() {
                 <div className="hof-meta">
                   <strong>{m.fullName || 'Runner'}</strong>
                   <span className="tiny muted">{m.email}</span>
+                  {m.memberSince && (
+                    <span className="tiny muted">Chính thức từ {m.memberSince}</span>
+                  )}
                 </div>
                 <div className="member-right">
                   <span className="level-badge level-bronze">Lv {m.level}</span>

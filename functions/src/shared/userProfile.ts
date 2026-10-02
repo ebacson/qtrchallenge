@@ -12,6 +12,7 @@ export const PROFILE_FIELDS = [
   'avatar',
   'level',
   'member',
+  'memberSince',
   'admin',
   'phone',
   'gender',
@@ -27,6 +28,18 @@ export const PROFILE_FIELDS = [
 ] as const
 
 const PROFILE_FIELD_SET: ReadonlySet<string> = new Set(PROFILE_FIELDS)
+
+/** `memberSince` (ms) → "dd/MM/yyyy" theo giờ Việt Nam; '' nếu chưa có. */
+export function formatMemberSince(value: unknown): string {
+  const ms = Number(value)
+  if (!(ms > 0)) return ''
+  return new Intl.DateTimeFormat('vi-VN', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date(ms))
+}
 
 export function pickProfile(row: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {}

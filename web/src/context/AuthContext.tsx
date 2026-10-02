@@ -51,6 +51,7 @@ function mapProfile(id: string, data: Record<string, unknown>): UserProfile {
     user_strava: String(data.user_strava ?? ''),
     admin: Boolean(data.admin),
     member: Boolean(data.member),
+    memberSince: Number(data.memberSince) || undefined,
     level: Number(data.level ?? 0) || 0,
   }
 }

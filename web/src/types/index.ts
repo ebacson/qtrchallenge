@@ -29,6 +29,8 @@ export interface UserProfile {
   user_strava: string
   admin: boolean
   member: boolean
+  /** Thời điểm (ms) được phê duyệt thành viên chính thức; không có với thành viên duyệt trước khi lưu mốc này */
+  memberSince?: number
   level: number
 }
 

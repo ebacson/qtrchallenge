@@ -238,7 +238,7 @@ function ChallengeReportView({ report, names }: { report: ChallengeReport; names
         </h2>
         <p className="tiny muted">
           {challenge.absentPenalty
-            ? `Phạt ${formatVnd(challenge.absentPenalty)} (không áp dụng nếu được duyệt chính thức sau hạn đăng ký)`
+            ? `Phạt ${formatVnd(challenge.absentPenalty)} (không áp dụng nếu được duyệt chính thức từ ngày bắt đầu thử thách)`
             : 'Thử thách không đặt mức phạt không tham gia'}
           {ongoing && ' · vẫn có thể đăng ký nếu còn hạn tham gia'}
         </p>
@@ -253,7 +253,7 @@ function ChallengeReportView({ report, names }: { report: ChallengeReport; names
                   <strong>{r.name}</strong>
                   <span className="tiny muted">
                     {r.absent.lateMember
-                      ? 'Chưa đăng ký · chính thức sau hạn đăng ký'
+                      ? 'Chưa đăng ký · chính thức sau khi thử thách bắt đầu'
                       : 'Chưa đăng ký tham gia'}
                   </span>
                   {r.absent.originalPenalty > 0 && (

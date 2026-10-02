@@ -1043,7 +1043,7 @@ function ChallengeForm({ edit }: { edit?: EditContext }) {
           </label>
           <p className="tiny muted" style={{ marginTop: 6 }}>
             Áp dụng cho thành viên chính thức không đăng ký thử thách (trừ người được duyệt chính
-            thức sau hạn đăng ký). Để trống hoặc 0 nếu không phạt.
+            thức từ ngày bắt đầu thử thách trở về sau). Để trống hoặc 0 nếu không phạt.
           </p>
         </fieldset>
 

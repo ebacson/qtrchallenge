@@ -4,7 +4,13 @@ import { Gift } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { STATUS_FINISHED } from '../lib/challengeRules'
 import { db } from '../lib/firebase'
-import { drawWinners, pickRandom, rewardCandidates } from '../lib/rewardPenalty'
+import {
+  assignPrizes,
+  drawWinners,
+  pickRandom,
+  rewardCandidates,
+  rewardItemsSummary,
+} from '../lib/rewardPenalty'
 import type { Challenge, RewardTier } from '../types'
 
 const SPIN_MS = 2600
@@ -72,6 +78,7 @@ function RewardDrawCard({
     setBusy(true)
     setError('')
     const winners = drawWinners(candidates, reward.gifts)
+    const prizes = assignPrizes(winners, reward.items)
     try {
       if (candidates.length > reward.gifts) {
         await new Promise<void>((resolve) => {
@@ -92,6 +99,7 @@ function RewardDrawCard({
         prize: reward.prize,
         candidates,
         winners,
+        prizes,
         drawnAt: Date.now(),
         drawnBy: user.uid,
       })
@@ -123,8 +131,7 @@ function RewardDrawCard({
         <div>
           <strong>{reward.target}</strong>
           <span className="tiny muted">
-            {reward.gifts} phần quà{reward.prize ? ` · ${reward.prize}` : ''} ·{' '}
-            {candidates.length} người hoàn thành
+            {rewardItemsSummary(reward.items)} · {candidates.length} người hoàn thành
           </span>
         </div>
       </div>
@@ -140,7 +147,7 @@ function RewardDrawCard({
             {draw.candidates.length <= draw.gifts ? ' (đủ quà cho tất cả)' : ''}.
           </p>
           <ol className="reward-winners">
-            {draw.winners.map((uid) => (
+            {draw.winners.map((uid, i) => (
               <li key={uid}>
                 <span className="hof-avatar">
                   {names[uid]?.avatar ? (
@@ -150,6 +157,7 @@ function RewardDrawCard({
                   )}
                 </span>
                 <strong>{displayName(names, uid)}</strong>
+                {draw.prizes[i] && <span className="reward-winner-prize">{draw.prizes[i]}</span>}
               </li>
             ))}
           </ol>
@@ -219,8 +227,9 @@ export function RewardDrawSection({
     <section className="section panel reward-section">
       <h2>Quay số trúng thưởng</h2>
       <p className="tiny muted">
-        Mỗi mục tiêu quay ngẫu nhiên trong số thành viên chính thức hoàn thành mục tiêu đó; số
-        người hoàn thành không vượt số quà thì tất cả đều nhận.
+        Mỗi mục tiêu quay ngẫu nhiên trong số thành viên chính thức hoàn thành mục tiêu đó và
+        trao lần lượt từng món theo thứ tự quà đã đặt; số người hoàn thành không vượt số quà
+        thì tất cả đều nhận.
       </p>
       <div className="reward-draw-list">
         {rewards.map((r) => (

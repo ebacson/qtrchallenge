@@ -639,9 +639,21 @@ export function parsePenaltyTiers(raw: unknown): PenaltyTier[] | undefined {
 export function parseRewardTiers(raw: unknown): RewardTier[] | undefined {
   const list = listValues(raw).flatMap((o) => {
     const target = String(o.target ?? '')
-    const gifts = Number(o.gifts)
-    if (!target || !Number.isInteger(gifts) || gifts < 1) return []
-    return [{ target, gifts, prize: String(o.prize ?? '') }]
+    if (!target) return []
+    const prize = String(o.prize ?? '')
+    let items = listValues(o.items).flatMap((it) => {
+      const quantity = Number(it.quantity)
+      if (!Number.isInteger(quantity) || quantity < 1) return []
+      return [{ name: String(it.name ?? '').trim(), quantity }]
+    })
+    if (!items.length) {
+      // Dữ liệu trước khi có danh sách quà: một món với mô tả chung
+      const gifts = Number(o.gifts)
+      if (!Number.isInteger(gifts) || gifts < 1) return []
+      items = [{ name: prize, quantity: gifts }]
+    }
+    const gifts = items.reduce((sum, it) => sum + it.quantity, 0)
+    return [{ target, gifts, prize, items }]
   })
   return list.length ? list : undefined
 }
@@ -657,6 +669,7 @@ export function parseRewardDraws(raw: unknown): RewardDraw[] | undefined {
         prize: String(o.prize ?? ''),
         candidates: stringList(o.candidates),
         winners: stringList(o.winners),
+        prizes: Array.isArray(o.prizes) ? o.prizes.map((p) => String(p ?? '')) : [],
         drawnAt: Number(o.drawnAt) || 0,
         drawnBy: String(o.drawnBy ?? ''),
       },

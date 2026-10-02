@@ -61,10 +61,18 @@ export interface PenaltyTier {
 }
 
 /** Phần thưởng quay số cho người hoàn thành mục tiêu `target` (nhãn trong targetDistances) */
+export interface RewardItem {
+  name: string
+  quantity: number
+}
+
 export interface RewardTier {
   target: string
+  /** Tổng số lượng các món quà */
   gifts: number
+  /** Mô tả gộp, VD "1 Áo, 2 Tất" */
   prize: string
+  items: RewardItem[]
 }
 
 export interface RewardDraw {
@@ -74,6 +82,8 @@ export interface RewardDraw {
   /** uid người hoàn thành mục tiêu lúc quay */
   candidates: string[]
   winners: string[]
+  /** Món quà của từng người trúng, cùng thứ tự với winners (rỗng với kết quả cũ) */
+  prizes: string[]
   drawnAt: number
   drawnBy: string
 }

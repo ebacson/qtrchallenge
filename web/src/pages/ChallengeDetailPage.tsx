@@ -10,6 +10,7 @@ import {
   formatVnd,
   isRewardEligible,
   penaltyTiersOf,
+  rewardItemsSummary,
   tierRangeLabel,
 } from '../lib/rewardPenalty'
 import {
@@ -509,8 +510,8 @@ export function ChallengeDetailPage() {
               <ul className="goal-details">
                 {challenge.rewards.map((r) => (
                   <li key={r.target}>
-                    {r.target}: {r.gifts} phần quà{r.prize ? ` (${r.prize})` : ''}, quay số
-                    trong số người hoàn thành mục tiêu này
+                    {r.target}: {rewardItemsSummary(r.items)}, quay số trong số người hoàn thành
+                    mục tiêu này
                   </li>
                 ))}
               </ul>

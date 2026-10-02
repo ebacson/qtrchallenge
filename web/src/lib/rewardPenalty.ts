@@ -1,5 +1,5 @@
 import { parseChallengeDay, userDayQuotaProgress } from './challengeRules'
-import type { Challenge, PenaltyTier } from '../types'
+import type { Challenge, PenaltyTier, RewardItem } from '../types'
 
 /** Mức phạt cho thử thách không tự đặt: dưới 50% phạt 150.000đ, 50% – dưới 100% phạt 100.000đ */
 export const DEFAULT_PENALTY_TIERS: PenaltyTier[] = [
@@ -177,6 +177,21 @@ export function drawWinners(candidates: string[], gifts: number): string[] {
     ;[pool[i], pool[j]] = [pool[j], pool[i]]
   }
   return pool.slice(0, Math.max(0, Math.min(gifts, pool.length)))
+}
+
+export function rewardItemLabel(name: string): string {
+  return name || 'Phần quà'
+}
+
+/** "1 Áo, 2 Tất" */
+export function rewardItemsSummary(items: RewardItem[]): string {
+  return items.map((it) => `${it.quantity} ${rewardItemLabel(it.name)}`).join(', ')
+}
+
+/** Món quà cho từng người trúng: lần lượt theo thứ tự quà đã đặt (winners đã ngẫu nhiên) */
+export function assignPrizes(winners: string[], items: RewardItem[]): string[] {
+  const slots = items.flatMap((it) => Array<string>(it.quantity).fill(rewardItemLabel(it.name)))
+  return winners.map((_, i) => slots[i] ?? '')
 }
 
 export function pickRandom<T>(list: T[]): T | undefined {

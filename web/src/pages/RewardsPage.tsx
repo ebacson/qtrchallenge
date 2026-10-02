@@ -18,6 +18,7 @@ import {
   penaltySummary,
   penaltyTiersOf,
   REWARD_START_YEAR,
+  rewardItemsSummary,
   tierRangeLabel,
   tierStyle,
   type ParticipantCompletion,
@@ -103,7 +104,9 @@ function ChallengeReportView({ report, names }: { report: ChallengeReport; names
         <span className="tiny muted">
           Mức phạt: {penaltySummary(tiers)} · Thưởng:{' '}
           {challenge.rewards?.length
-            ? challenge.rewards.map((r) => `${r.target} ${r.gifts} quà`).join(', ')
+            ? challenge.rewards
+                .map((r) => `${r.target}: ${rewardItemsSummary(r.items)}`)
+                .join(' · ')
             : 'không đặt'}
         </span>
         {ongoing && (

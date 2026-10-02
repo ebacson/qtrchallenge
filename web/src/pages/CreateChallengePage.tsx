@@ -23,8 +23,8 @@ import {
   STATUS_UPCOMING,
 } from '../lib/challengeRules'
 import { db } from '../lib/firebase'
-import { DEFAULT_PENALTY_TIERS, penaltySummary } from '../lib/rewardPenalty'
-import type { DayQuotaOption, PenaltyTier, RewardTier } from '../types'
+import { DEFAULT_PENALTY_TIERS, penaltySummary, rewardItemsSummary } from '../lib/rewardPenalty'
+import type { DayQuotaOption, PenaltyTier, RewardItem, RewardTier } from '../types'
 
 const PRESET_DISTANCES = ['50 km', '100 km', '150 km', '200 km', '250 km', '300 km']
 type Mode = 'monthly_pace' | 'day_quota'
@@ -37,7 +37,9 @@ type QuotaDraft = {
 }
 
 type PenaltyDraft = { minPercent: string; amount: string }
-type RewardDraft = { gifts: string; prize: string }
+type RewardItemDraft = { name: string; quantity: string }
+/** Các món quà của một mục tiêu; rỗng = không có thưởng */
+type RewardDraft = RewardItemDraft[]
 
 type FormInitial = {
   /** 'legacy': loại thử thách cũ form không hỗ trợ — chỉ sửa thông tin chung, thưởng/phạt */
@@ -141,13 +143,25 @@ function parseRewardDrafts(
 ): RewardTier[] | string {
   const rewards: RewardTier[] = []
   for (const target of targets) {
-    const d = drafts[target]
-    const raw = d?.gifts.trim() ?? ''
-    const gifts = raw ? Number(raw) : 0
-    if (!Number.isInteger(gifts) || gifts < 0) {
-      return `Phần thưởng "${target}": số quà phải là số nguyên ≥ 0.`
+    const items: RewardItem[] = []
+    for (const [i, d] of (drafts[target] ?? []).entries()) {
+      const name = d.name.trim()
+      const raw = d.quantity.trim()
+      if (!name && !raw) continue
+      const quantity = Number(raw)
+      if (!name) return `Phần thưởng "${target}", quà ${i + 1}: nhập tên quà.`
+      if (!raw || !Number.isInteger(quantity) || quantity < 1) {
+        return `Phần thưởng "${target}", quà "${name}": số lượng phải là số nguyên ≥ 1.`
+      }
+      items.push({ name, quantity })
     }
-    if (gifts > 0) rewards.push({ target, gifts, prize: d?.prize.trim() ?? '' })
+    if (!items.length) continue
+    rewards.push({
+      target,
+      gifts: items.reduce((sum, it) => sum + it.quantity, 0),
+      prize: rewardItemsSummary(items),
+      items,
+    })
   }
   return rewards
 }
@@ -212,7 +226,10 @@ function editContextFrom(id: string, raw: Record<string, unknown>): EditContext 
       icon: c.icon ?? '',
       penaltyRows: toPenaltyDrafts(c.penaltyTiers ?? []),
       rewardDrafts: Object.fromEntries(
-        (c.rewards ?? []).map((r) => [r.target, { gifts: String(r.gifts), prize: r.prize }]),
+        (c.rewards ?? []).map((r) => [
+          r.target,
+          r.items.map((it) => ({ name: it.name, quantity: String(it.quantity) })),
+        ]),
       ),
     },
   }
@@ -425,10 +442,24 @@ function ChallengeForm({ edit }: { edit?: EditContext }) {
     })
   }
 
-  function updateReward(target: string, patch: Partial<RewardDraft>) {
+  function updateRewardItem(target: string, index: number, patch: Partial<RewardItemDraft>) {
     setRewardDrafts((prev) => ({
       ...prev,
-      [target]: { ...(prev[target] ?? { gifts: '', prize: '' }), ...patch },
+      [target]: (prev[target] ?? []).map((it, i) => (i === index ? { ...it, ...patch } : it)),
+    }))
+  }
+
+  function addRewardItem(target: string) {
+    setRewardDrafts((prev) => ({
+      ...prev,
+      [target]: [...(prev[target] ?? []), { name: '', quantity: '1' }],
+    }))
+  }
+
+  function removeRewardItem(target: string, index: number) {
+    setRewardDrafts((prev) => ({
+      ...prev,
+      [target]: (prev[target] ?? []).filter((_, i) => i !== index),
     }))
   }
 
@@ -939,39 +970,70 @@ function ChallengeForm({ edit }: { edit?: EditContext }) {
         <fieldset className="distance-fieldset">
           <legend>Phần thưởng khi hoàn thành (quay số)</legend>
           <p className="tiny muted" style={{ marginBottom: 10 }}>
-            Đặt số phần quà cho từng mục tiêu (0 = không có thưởng). Khi thử thách kết thúc, admin
-            quay số ngẫu nhiên trong những thành viên chính thức hoàn thành mục tiêu đó; nếu số
-            người hoàn thành không vượt số quà thì tất cả đều nhận.
+            Mỗi mục tiêu có thể có nhiều món quà, VD 1 áo và 2 đôi tất (không thêm quà = không có
+            thưởng). Khi thử thách kết thúc, admin quay số ngẫu nhiên trong những thành viên chính
+            thức hoàn thành mục tiêu đó và trao lần lượt theo thứ tự quà bên dưới (quà giá trị
+            cao đặt trước); nếu số người hoàn thành không vượt tổng số quà thì tất cả đều nhận.
           </p>
           {distances.length === 0 ? (
             <p className="empty">Chọn mục tiêu trước.</p>
           ) : (
             distances.map((target) => {
-              const d = rewardDrafts[target]
+              const items = rewardDrafts[target] ?? []
+              const total = items.reduce((sum, it) => {
+                const q = Number(it.quantity)
+                return sum + (Number.isInteger(q) && q > 0 ? q : 0)
+              }, 0)
               return (
                 <div key={target} className="reward-row">
-                  <strong className="reward-row-target">{target}</strong>
-                  <label>
-                    Số quà
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min={0}
-                      step={1}
-                      value={d?.gifts ?? ''}
-                      placeholder="0"
-                      onChange={(e) => updateReward(target, { gifts: e.target.value })}
-                    />
-                  </label>
-                  <label>
-                    Phần quà
-                    <input
-                      value={d?.prize ?? ''}
-                      placeholder="VD: Áo QTR, voucher 200.000đ"
-                      maxLength={120}
-                      onChange={(e) => updateReward(target, { prize: e.target.value })}
-                    />
-                  </label>
+                  <strong className="reward-row-target">
+                    {target}
+                    <span className="tiny muted">
+                      {total ? ` · ${total} phần quà` : ' · không có thưởng'}
+                    </span>
+                  </strong>
+                  {items.map((it, index) => (
+                    <div key={index} className="reward-item-row">
+                      <label>
+                        Tên quà
+                        <input
+                          value={it.name}
+                          placeholder="VD: Áo QTR"
+                          maxLength={80}
+                          onChange={(e) =>
+                            updateRewardItem(target, index, { name: e.target.value })
+                          }
+                        />
+                      </label>
+                      <label>
+                        Số lượng
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={1}
+                          step={1}
+                          value={it.quantity}
+                          onChange={(e) =>
+                            updateRewardItem(target, index, { quantity: e.target.value })
+                          }
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="btn ghost compact danger"
+                        onClick={() => removeRewardItem(target, index)}
+                      >
+                        Xóa
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    className="btn ghost compact"
+                    onClick={() => addRewardItem(target)}
+                  >
+                    + Thêm quà
+                  </button>
                 </div>
               )
             })

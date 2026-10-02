@@ -1298,6 +1298,15 @@ select {
   font-size: 0.9rem;
 }
 
+.auth-subtitle {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.auth-hint {
+  margin: -6px 0 0;
+}
+
 .auth-footer {
   margin-top: 20px;
   color: var(--ink-soft);

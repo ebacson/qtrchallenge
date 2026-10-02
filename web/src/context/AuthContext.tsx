@@ -134,7 +134,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const resetPassword = useCallback(async (email: string) => {
-    await sendPasswordResetEmail(auth, email.trim())
+    auth.languageCode = 'vi'
+    try {
+      await sendPasswordResetEmail(auth, email.trim(), {
+        url: `${window.location.origin}/login`,
+      })
+    } catch (err) {
+      // Tên miền chưa nằm trong Authorized domains: gửi không kèm link quay lại
+      if ((err as { code?: unknown } | null)?.code !== 'auth/unauthorized-continue-uri') throw err
+      await sendPasswordResetEmail(auth, email.trim())
+    }
   }, [])
 
   const logout = useCallback(async () => {

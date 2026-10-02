@@ -12,7 +12,6 @@ import {
 } from '../lib/challengeRules'
 import {
   completionPercent,
-  DEFAULT_PENALTY_TIERS,
   formatVnd,
   isRewardEligible,
   participantCompletion,
@@ -73,12 +72,21 @@ function ChallengeReportView({ report, names }: { report: ChallengeReport; names
   const tiers = penaltyTiersOf(challenge)
   const sections = [
     { key: 'completed', index: -1, title: 'Hoàn thành', hint: 'Đạt 100% mục tiêu' },
-    ...tiers.map((t, i) => ({
-      key: `tier-${i}`,
-      index: i,
-      title: `Không hoàn thành (${tierRangeLabel(tiers, i).toLowerCase()})`,
-      hint: t.amount ? `Phạt ${formatVnd(t.amount)}` : 'Không phạt',
-    })),
+    ...(tiers.length
+      ? tiers.map((t, i) => ({
+          key: `tier-${i}`,
+          index: i,
+          title: `Không hoàn thành (${tierRangeLabel(tiers, i).toLowerCase()})`,
+          hint: t.amount ? `Phạt ${formatVnd(t.amount)}` : 'Không phạt',
+        }))
+      : [
+          {
+            key: 'tier-0',
+            index: 0,
+            title: 'Không hoàn thành',
+            hint: 'Thử thách không đặt mức phạt',
+          },
+        ]),
   ]
 
   return (
@@ -89,9 +97,15 @@ function ChallengeReportView({ report, names }: { report: ChallengeReport; names
         </Link>
         <span className={`status-pill ${statusClass(challenge.status)}`}>{challenge.status}</span>
         <span className="tiny muted">
-          {challenge.startDate} → {challenge.endDate} · {rows.length} người tham gia
+          {challenge.startDate} → {challenge.endDate} · {rows.length} thành viên chính thức
+          tham gia
         </span>
-        <span className="tiny muted">Mức phạt: {penaltySummary(tiers)}</span>
+        <span className="tiny muted">
+          Mức phạt: {penaltySummary(tiers)} · Thưởng:{' '}
+          {challenge.rewards?.length
+            ? challenge.rewards.map((r) => `${r.target} ${r.gifts} quà`).join(', ')
+            : 'không đặt'}
+        </span>
         {ongoing && (
           <span className="tiny form-info">
             Thử thách đang diễn ra — số liệu tạm tính theo tiến độ hiện tại.
@@ -245,8 +259,8 @@ function SummaryView({ reports }: { reports: ChallengeReport[] }) {
   return (
     <>
       <p className="tiny muted">
-        Tổng hợp {finished.length} thử thách đã kết thúc từ năm {REWARD_START_YEAR} (không tính
-        thử thách đang diễn ra).
+        Tổng hợp {finished.length} thử thách đã kết thúc từ năm {REWARD_START_YEAR} của thành
+        viên chính thức (không tính thử thách đang diễn ra).
       </p>
       <div className="stat-row">
         <div className="stat">
@@ -322,14 +336,16 @@ export function RewardsPage() {
   )
 
   const reports = useMemo(() => {
+    const officialIds = new Set(officialMembers.map((m) => m.uid))
     const list: ChallengeReport[] = []
     for (const [id, val] of Object.entries(rawChallenges)) {
       const challenge = parseChallenge(id, val)
       if (challenge.status === STATUS_UPCOMING || !isRewardEligible(challenge)) continue
-      const userChallenges = (val.user_challenges ?? {}) as Record<
-        string,
-        Record<string, unknown>
-      >
+      // Thưởng – phạt chỉ áp dụng cho thành viên chính thức
+      const userChallenges = Object.fromEntries(
+        Object.entries((val.user_challenges ?? {}) as Record<string, Record<string, unknown>>)
+          .filter(([uid]) => officialIds.has(uid)),
+      )
       const rows: ReportRow[] = []
       for (const [uid, row] of Object.entries(userChallenges)) {
         const completion = participantCompletion(challenge, row ?? {})
@@ -371,9 +387,10 @@ export function RewardsPage() {
         <p className="eyebrow">Thử thách</p>
         <h1>Thưởng - Phạt</h1>
         <p className="lede">
-          Thống kê thành viên hoàn thành và không hoàn thành thử thách, kèm quay số trúng thưởng.
-          Mức phạt theo từng thử thách (mặc định: {penaltySummary(DEFAULT_PENALTY_TIERS)}). Chỉ
-          tính các thử thách bắt đầu từ năm {REWARD_START_YEAR} trở đi.
+          Thống kê thành viên chính thức hoàn thành và không hoàn thành thử thách, kèm quay số
+          trúng thưởng. Mức phạt và phần thưởng theo cài đặt lúc tạo từng thử thách; thử thách
+          chưa cài đặt thì không thưởng, không phạt. Chỉ tính các thử thách bắt đầu từ năm{' '}
+          {REWARD_START_YEAR} trở đi.
         </p>
       </header>
 
@@ -381,7 +398,7 @@ export function RewardsPage() {
         <p className="empty">Đang tải…</p>
       ) : reports.length === 0 ? (
         <p className="empty">
-          Chưa có thử thách nào từ năm {REWARD_START_YEAR} có người tham gia.
+          Chưa có thử thách nào từ năm {REWARD_START_YEAR} có thành viên chính thức tham gia.
         </p>
       ) : (
         <>

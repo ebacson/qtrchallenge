@@ -210,7 +210,7 @@ function editContextFrom(id: string, raw: Record<string, unknown>): EditContext 
       password: c.password ?? '',
       joinDeadlineInput: String(c.joinDeadlineDays),
       icon: c.icon ?? '',
-      penaltyRows: toPenaltyDrafts(c.penaltyTiers ?? DEFAULT_PENALTY_TIERS),
+      penaltyRows: toPenaltyDrafts(c.penaltyTiers ?? []),
       rewardDrafts: Object.fromEntries(
         (c.rewards ?? []).map((r) => [r.target, { gifts: String(r.gifts), prize: r.prize }]),
       ),
@@ -407,6 +407,7 @@ function ChallengeForm({ edit }: { edit?: EditContext }) {
   /** Chèn một mức ngay trên mức cuối (0%), tỉ lệ bằng nửa mức kế trên */
   function addPenaltyRow() {
     setPenaltyRows((prev) => {
+      if (!prev.length) return [{ minPercent: '0', amount: '100000' }]
       const above = prev.length >= 2 ? Number(prev[prev.length - 2].minPercent) || 100 : 100
       const row = {
         minPercent: String(Math.max(1, Math.floor(above / 2))),
@@ -418,9 +419,8 @@ function ChallengeForm({ edit }: { edit?: EditContext }) {
 
   function removePenaltyRow(index: number) {
     setPenaltyRows((prev) => {
-      if (prev.length <= 1) return prev
       const next = prev.filter((_, i) => i !== index)
-      next[next.length - 1] = { ...next[next.length - 1], minPercent: '0' }
+      if (next.length) next[next.length - 1] = { ...next[next.length - 1], minPercent: '0' }
       return next
     })
   }
@@ -521,7 +521,7 @@ function ChallengeForm({ edit }: { edit?: EditContext }) {
         description: description.trim(),
         password: password.trim(),
         joinDeadlineDays,
-        penaltyTiers: parsedPenalty,
+        penaltyTiers: parsedPenalty.length ? parsedPenalty : null,
         rewards: rewards.length ? rewards : null,
       }
       if (iconFile) payload.icon = await uploadChallengeIcon(iconFile)
@@ -884,9 +884,11 @@ function ChallengeForm({ edit }: { edit?: EditContext }) {
         <fieldset className="distance-fieldset">
           <legend>Mức phạt khi không hoàn thành</legend>
           <p className="tiny muted" style={{ marginBottom: 10 }}>
-            Tính theo tỉ lệ hoàn thành mục tiêu; đạt 100% không bị phạt. Đặt số tiền 0 nếu mức đó
+            Tính theo tỉ lệ hoàn thành mục tiêu, chỉ áp dụng cho thành viên chính thức; đạt 100%
+            không bị phạt. Đặt số tiền 0 nếu mức đó không phạt; xóa hết các mức nếu thử thách
             không phạt.
           </p>
+          {penaltyRows.length === 0 && <p className="empty">Không phạt.</p>}
           {penaltyRows.map((row, index) => {
             const last = index === penaltyRows.length - 1
             const upper = index === 0 ? '100' : penaltyRows[index - 1].minPercent || '…'
@@ -919,7 +921,6 @@ function ChallengeForm({ edit }: { edit?: EditContext }) {
                 <button
                   type="button"
                   className="btn ghost compact danger"
-                  disabled={penaltyRows.length <= 1}
                   onClick={() => removePenaltyRow(index)}
                 >
                   Xóa
@@ -939,8 +940,8 @@ function ChallengeForm({ edit }: { edit?: EditContext }) {
           <legend>Phần thưởng khi hoàn thành (quay số)</legend>
           <p className="tiny muted" style={{ marginBottom: 10 }}>
             Đặt số phần quà cho từng mục tiêu (0 = không có thưởng). Khi thử thách kết thúc, admin
-            quay số ngẫu nhiên trong những người hoàn thành mục tiêu đó; nếu số người hoàn thành
-            không vượt số quà thì tất cả đều nhận.
+            quay số ngẫu nhiên trong những thành viên chính thức hoàn thành mục tiêu đó; nếu số
+            người hoàn thành không vượt số quà thì tất cả đều nhận.
           </p>
           {distances.length === 0 ? (
             <p className="empty">Chọn mục tiêu trước.</p>

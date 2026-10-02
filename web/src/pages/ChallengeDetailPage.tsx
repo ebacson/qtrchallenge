@@ -142,6 +142,19 @@ export function ChallengeDetailPage() {
     return map
   }, [rawProfiles])
 
+  /** Quay thưởng chỉ trong thành viên chính thức */
+  const officialUserChallenges = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(rawUserChallenges).filter(
+          ([uid]) =>
+            rawProfiles?.[uid]?.member === true &&
+            String(rawProfiles[uid].email ?? '').toLowerCase() !== 'echiptime@gmail.com',
+        ),
+      ),
+    [rawUserChallenges, rawProfiles],
+  )
+
   const drawNames = useMemo(() => {
     const map: Record<string, { name: string; avatar: string }> = {}
     for (const [uid, p] of Object.entries(profiles)) map[uid] = { name: p.fullName, avatar: p.avatar }
@@ -472,10 +485,12 @@ export function ChallengeDetailPage() {
         </section>
       )}
 
-      {(isRewardEligible(challenge) || Boolean(challenge.rewards?.length)) && (
+      {isRewardEligible(challenge) &&
+        (penaltyTiers.length > 0 || Boolean(challenge.rewards?.length)) && (
         <section className="section panel">
           <h2>Thưởng – phạt</h2>
-          {isRewardEligible(challenge) && (
+          <p className="tiny muted">Áp dụng cho thành viên chính thức.</p>
+          {penaltyTiers.length > 0 && (
             <>
               <h3 className="goal-rules-title">Phạt khi không hoàn thành</h3>
               <ul className="goal-details">
@@ -504,11 +519,13 @@ export function ChallengeDetailPage() {
         </section>
       )}
 
-      <RewardDrawSection
-        challenge={challenge}
-        userChallenges={rawUserChallenges}
-        names={drawNames}
-      />
+      {isRewardEligible(challenge) && (
+        <RewardDrawSection
+          challenge={challenge}
+          userChallenges={officialUserChallenges}
+          names={drawNames}
+        />
+      )}
 
       {challenge.description && (
         <section className="section panel">

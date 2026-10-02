@@ -219,8 +219,8 @@ export function RewardDrawSection({
     <section className="section panel reward-section">
       <h2>Quay số trúng thưởng</h2>
       <p className="tiny muted">
-        Mỗi mục tiêu quay ngẫu nhiên trong số người hoàn thành mục tiêu đó; số người hoàn thành
-        không vượt số quà thì tất cả đều nhận.
+        Mỗi mục tiêu quay ngẫu nhiên trong số thành viên chính thức hoàn thành mục tiêu đó; số
+        người hoàn thành không vượt số quà thì tất cả đều nhận.
       </p>
       <div className="reward-draw-list">
         {rewards.map((r) => (

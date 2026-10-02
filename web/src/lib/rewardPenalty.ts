@@ -15,8 +15,9 @@ export function isRewardEligible(challenge: Challenge): boolean {
   return start !== null && start.getFullYear() >= REWARD_START_YEAR
 }
 
+/** Thử thách không đặt mức phạt (kể cả thử thách cũ) thì không phạt */
 export function penaltyTiersOf(challenge: Challenge): PenaltyTier[] {
-  return challenge.penaltyTiers?.length ? challenge.penaltyTiers : DEFAULT_PENALTY_TIERS
+  return challenge.penaltyTiers ?? []
 }
 
 /** Màu hiển thị: hoàn thành / mức phạt cao nhất về tỉ lệ / các mức thấp hơn */
@@ -41,14 +42,16 @@ function extractNumber(value: unknown): number {
 
 export function tierStyle(tierIndex: number, tierCount: number): CompletionTier {
   if (tierIndex < 0) return 'completed'
-  return tierIndex === 0 && tierCount > 1 ? 'partial' : 'underHalf'
+  return tierIndex === 0 && tierCount !== 1 ? 'partial' : 'underHalf'
 }
 
+/** Không có mức phạt: người chưa hoàn thành vào nhóm 0, không phạt */
 export function penaltyForRatio(
   ratio: number,
   tiers: PenaltyTier[],
 ): { tierIndex: number; amount: number } {
   if (ratio >= 1) return { tierIndex: -1, amount: 0 }
+  if (!tiers.length) return { tierIndex: 0, amount: 0 }
   const percent = ratio * 100
   const found = tiers.findIndex((t) => percent >= t.minPercent)
   const tierIndex = found >= 0 ? found : tiers.length - 1
@@ -63,6 +66,7 @@ export function tierRangeLabel(tiers: PenaltyTier[], index: number): string {
 }
 
 export function penaltySummary(tiers: PenaltyTier[]): string {
+  if (!tiers.length) return 'Không đặt mức phạt'
   if (tiers.every((t) => t.amount === 0)) return 'Không phạt'
   return tiers
     .map((t, i) => `${tierRangeLabel(tiers, i)}: ${t.amount ? formatVnd(t.amount) : 'không phạt'}`)

@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate } from 'react-router-dom'
+import { ArrowLeft, Lock, Mail } from 'lucide-react'
+import { AuthAlert, AuthField, AuthLayout } from '../components/AuthLayout'
 import { useAuth } from '../context/AuthContext'
-import { brandLogoSrc, brandTitle } from '../lib/brand'
 
 const INVALID_LOGIN_CODES = new Set([
   'auth/invalid-credential',
@@ -47,14 +48,19 @@ function resetErrorMessage(err: unknown): string {
   return 'Không gửi được email đặt lại mật khẩu. Vui lòng thử lại.'
 }
 
+const registerFooter = (
+  <>
+    Chưa có tài khoản? <Link to="/register">Đăng ký ngay</Link>
+  </>
+)
+
 export function LoginPage() {
   const { user, loading, login, resetPassword } = useAuth()
   const [mode, setMode] = useState<'login' | 'forgot'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
-  const [info, setInfo] = useState('')
+  const [sentTo, setSentTo] = useState('')
   const [busy, setBusy] = useState(false)
 
   if (!loading && user) return <Navigate to="/" replace />
@@ -62,13 +68,12 @@ export function LoginPage() {
   function switchMode(next: 'login' | 'forgot') {
     setMode(next)
     setError('')
-    setInfo('')
+    setSentTo('')
   }
 
-  async function onSubmit(e: FormEvent) {
+  async function onLogin(e: FormEvent) {
     e.preventDefault()
     setError('')
-    setInfo('')
     setBusy(true)
     try {
       await login(email, password)
@@ -82,13 +87,11 @@ export function LoginPage() {
   async function onForgot(e: FormEvent) {
     e.preventDefault()
     setError('')
-    setInfo('')
+    setSentTo('')
     setBusy(true)
     try {
       await resetPassword(email)
-      setInfo(
-        `Đã gửi email đặt lại mật khẩu tới ${email.trim()}. Mở thư và bấm vào liên kết để đặt mật khẩu mới (nếu không thấy, hãy kiểm tra mục Spam/Quảng cáo).`,
-      )
+      setSentTo(email.trim())
     } catch (err) {
       setError(resetErrorMessage(err))
     } finally {
@@ -96,90 +99,84 @@ export function LoginPage() {
     }
   }
 
+  if (mode === 'forgot') {
+    return (
+      <AuthLayout
+        title="Quên mật khẩu"
+        subtitle="Nhập email đã đăng ký, chúng tôi sẽ gửi liên kết để bạn đặt mật khẩu mới."
+        footer={registerFooter}
+      >
+        <form className="auth-form" onSubmit={onForgot}>
+          <AuthField
+            label="Email"
+            icon={Mail}
+            type="email"
+            autoComplete="email"
+            placeholder="ban@email.com"
+            value={email}
+            onChange={setEmail}
+            required
+            autoFocus
+          />
+
+          {error && <AuthAlert kind="error">{error}</AuthAlert>}
+          {sentTo && (
+            <AuthAlert kind="success">
+              Đã gửi email tới <strong>{sentTo}</strong>. Mở thư và bấm vào liên kết để đặt mật
+              khẩu mới (nếu không thấy, hãy kiểm tra mục Spam/Quảng cáo).
+            </AuthAlert>
+          )}
+
+          <button type="submit" className="btn primary wide auth-submit" disabled={busy}>
+            {busy ? 'Đang gửi…' : sentTo ? 'Gửi lại email' : 'Gửi liên kết đặt lại'}
+          </button>
+          <button type="button" className="auth-back" onClick={() => switchMode('login')}>
+            <ArrowLeft size={16} aria-hidden /> Quay lại đăng nhập
+          </button>
+        </form>
+      </AuthLayout>
+    )
+  }
+
   return (
-    <div className="auth-page">
-      <div className="auth-atmosphere" aria-hidden />
-      <div className="auth-panel">
-        <img src={brandLogoSrc} alt="" className="brand-logo auth-logo" />
-        <p className="brand-name hero-brand">{brandTitle}</p>
+    <AuthLayout
+      title="Đăng nhập"
+      subtitle="Chào mừng trở lại! Đăng nhập để tiếp tục thử thách."
+      footer={registerFooter}
+    >
+      <form className="auth-form" onSubmit={onLogin}>
+        <AuthField
+          label="Email"
+          icon={Mail}
+          type="email"
+          autoComplete="email"
+          placeholder="ban@email.com"
+          value={email}
+          onChange={setEmail}
+          required
+        />
+        <div className="auth-field-group">
+          <AuthField
+            label="Mật khẩu"
+            icon={Lock}
+            type="password"
+            autoComplete="current-password"
+            placeholder="Nhập mật khẩu"
+            value={password}
+            onChange={setPassword}
+            required
+          />
+          <button type="button" className="auth-link" onClick={() => switchMode('forgot')}>
+            Quên mật khẩu?
+          </button>
+        </div>
 
-        {mode === 'login' ? (
-          <form className="auth-form" onSubmit={onSubmit}>
-            <label>
-              Email
-              <input
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </label>
-            <label>
-              Mật khẩu
-              <div className="password-row">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-                <button
-                  type="button"
-                  className="btn ghost compact"
-                  onClick={() => setShowPassword((v) => !v)}
-                >
-                  {showPassword ? 'Ẩn' : 'Hiện'}
-                </button>
-              </div>
-            </label>
+        {error && <AuthAlert kind="error">{error}</AuthAlert>}
 
-            <button type="button" className="linkish" onClick={() => switchMode('forgot')}>
-              Quên mật khẩu?
-            </button>
-
-            {error && <p className="form-error">{error}</p>}
-            {info && <p className="form-info">{info}</p>}
-
-            <button type="submit" className="btn primary wide" disabled={busy}>
-              {busy ? 'Đang đăng nhập…' : 'Đăng nhập'}
-            </button>
-          </form>
-        ) : (
-          <form className="auth-form" onSubmit={onForgot}>
-            <h2 className="auth-subtitle">Quên mật khẩu</h2>
-            <p className="tiny muted auth-hint">
-              Nhập email đã đăng ký, hệ thống sẽ gửi thư có liên kết để bạn đặt mật khẩu mới.
-            </p>
-            <label>
-              Email
-              <input
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoFocus
-              />
-            </label>
-
-            {error && <p className="form-error">{error}</p>}
-            {info && <p className="form-info">{info}</p>}
-
-            <button type="submit" className="btn primary wide" disabled={busy}>
-              {busy ? 'Đang gửi…' : info ? 'Gửi lại email' : 'Gửi email đặt lại mật khẩu'}
-            </button>
-            <button type="button" className="linkish" onClick={() => switchMode('login')}>
-              ← Quay lại đăng nhập
-            </button>
-          </form>
-        )}
-
-        <p className="auth-footer">
-          Chưa có tài khoản? <Link to="/register">Đăng ký</Link>.
-        </p>
-      </div>
-    </div>
+        <button type="submit" className="btn primary wide auth-submit" disabled={busy}>
+          {busy ? 'Đang đăng nhập…' : 'Đăng nhập'}
+        </button>
+      </form>
+    </AuthLayout>
   )
 }

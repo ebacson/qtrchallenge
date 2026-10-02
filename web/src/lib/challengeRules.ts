@@ -2,6 +2,7 @@ import type {
   Challenge,
   ChallengeProgressResult,
   DayQuotaOption,
+  PenaltyPayment,
   PenaltyTier,
   RewardDraw,
   RewardTier,
@@ -678,6 +679,23 @@ export function parseRewardDraws(raw: unknown): RewardDraw[] | undefined {
   return list.length ? list : undefined
 }
 
+export function parsePenaltyPayments(
+  raw: unknown,
+): Record<string, PenaltyPayment> | undefined {
+  if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  const out: Record<string, PenaltyPayment> = {}
+  for (const [uid, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (v == null || typeof v !== 'object') continue
+    const o = v as Record<string, unknown>
+    out[uid] = {
+      amount: Number(o.amount) || 0,
+      confirmedAt: Number(o.confirmedAt) || 0,
+      confirmedBy: String(o.confirmedBy ?? ''),
+    }
+  }
+  return Object.keys(out).length ? out : undefined
+}
+
 function parseChallengeMode(
   raw: unknown,
 ): Challenge['challengeMode'] {
@@ -752,6 +770,7 @@ export function parseChallenge(
     penaltyTiers: parsePenaltyTiers(dict.penaltyTiers),
     rewards: parseRewardTiers(dict.rewards),
     rewardDraws: parseRewardDraws(dict.rewardDraws),
+    penaltyPayments: parsePenaltyPayments(dict.penaltyPayments),
     userTarget: userData?.userTarget != null ? String(userData.userTarget) : undefined,
     userDaysRequired: userDayQuota.length
       ? userDayQuota.reduce((sum, q) => sum + q.option.daysRequired, 0)

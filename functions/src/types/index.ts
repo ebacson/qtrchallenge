@@ -89,6 +89,14 @@ export interface RewardDraw {
   drawnBy: string
 }
 
+/** Admin xác nhận thành viên đã nộp tiền phạt của thử thách */
+export interface PenaltyPayment {
+  /** Số tiền phạt lúc xác nhận */
+  amount: number
+  confirmedAt: number
+  confirmedBy: string
+}
+
 export interface Challenge {
   id: string
   name: string
@@ -112,6 +120,8 @@ export interface Challenge {
   penaltyTiers?: PenaltyTier[]
   rewards?: RewardTier[]
   rewardDraws?: RewardDraw[]
+  /** Theo uid */
+  penaltyPayments?: Record<string, PenaltyPayment>
   /** Fields from current user's join row */
   userTarget?: string
   /** Tổng số ngày yêu cầu của các tùy chọn đã chọn */

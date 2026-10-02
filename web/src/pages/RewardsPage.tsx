@@ -90,6 +90,21 @@ function Avatar({ name, avatar }: { name: string; avatar: string }) {
   )
 }
 
+function PaidSplit({ paid, unpaid }: { paid: number; unpaid: number }) {
+  return (
+    <div className="stat-split">
+      <div className="stat-split-paid">
+        <em>Đã nộp</em>
+        <b>{formatVnd(paid)}</b>
+      </div>
+      <div className="stat-split-unpaid">
+        <em>Chưa nộp</em>
+        <b>{formatVnd(unpaid)}</b>
+      </div>
+    </div>
+  )
+}
+
 function ChallengeReportView({ report, names }: { report: ChallengeReport; names: Names }) {
   const { challenge, rows, absent } = report
   const completed = rows.filter((r) => r.completion.tier === 'completed').length
@@ -169,6 +184,9 @@ function ChallengeReportView({ report, names }: { report: ChallengeReport; names
         <div className="stat">
           <strong className="stat-money">{formatVnd(totalPenalty)}</strong>
           <span>Tổng phạt</span>
+          {challenge.status === STATUS_FINISHED && totalPenalty > 0 && (
+            <PaidSplit paid={paidAmount} unpaid={totalPenalty - paidAmount} />
+          )}
         </div>
       </div>
       {absentPenaltyTotal > 0 && (
@@ -178,8 +196,7 @@ function ChallengeReportView({ report, names }: { report: ChallengeReport; names
       )}
       {challenge.status === STATUS_FINISHED && (owing.length > 0 || waivedCount > 0) && (
         <p className="tiny muted penalty-pay-summary">
-          Đã nộp {paid.length}/{owing.length} người · {formatVnd(paidAmount)} · Còn lại{' '}
-          {formatVnd(totalPenalty - paidAmount)}
+          Đã nộp {paid.length}/{owing.length} người
           {waivedCount > 0 && ` · Miễn phạt ${waivedCount} người`}
         </p>
       )}
@@ -439,13 +456,9 @@ function SummaryView({ reports, year }: { reports: ChallengeReport[]; year: numb
         <div className="stat">
           <strong className="stat-money">{formatVnd(totalPenalty)}</strong>
           <span>Tổng phạt</span>
+          {totalPenalty > 0 && <PaidSplit paid={totalPaid} unpaid={totalPenalty - totalPaid} />}
         </div>
       </div>
-      {totalPenalty > 0 && (
-        <p className="tiny muted penalty-pay-summary">
-          Đã nộp {formatVnd(totalPaid)} · Còn lại {formatVnd(totalPenalty - totalPaid)}
-        </p>
-      )}
 
       <section className="section panel">
         <h2>Theo thành viên</h2>

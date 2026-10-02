@@ -58,7 +58,12 @@ type ChallengeReport = {
 
 const SYSTEM_EMAILS = new Set(['echiptime@gmail.com'])
 
-const ALL = 'all'
+/** Giá trị select cho mục tổng hợp theo năm, VD "year:2026" */
+const YEAR_PREFIX = 'year:'
+
+function challengeYear(challenge: Challenge): number {
+  return parseChallengeDay(challenge.startDate)?.getFullYear() ?? 0
+}
 
 type Names = Record<string, { name: string; avatar: string }>
 
@@ -352,8 +357,14 @@ function MemberPenaltyDetail({ member }: { member: MemberSummary }) {
   )
 }
 
-function SummaryView({ reports }: { reports: ChallengeReport[] }) {
-  const finished = reports.filter((r) => r.challenge.status === STATUS_FINISHED)
+function SummaryView({ reports, year }: { reports: ChallengeReport[]; year: number }) {
+  const finished = useMemo(
+    () =>
+      reports.filter(
+        (r) => r.challenge.status === STATUS_FINISHED && challengeYear(r.challenge) === year,
+      ),
+    [reports, year],
+  )
   const [openUid, setOpenUid] = useState<string | null>(null)
 
   const members = useMemo(() => {
@@ -413,8 +424,8 @@ function SummaryView({ reports }: { reports: ChallengeReport[] }) {
   return (
     <>
       <p className="tiny muted">
-        Tổng hợp {finished.length} thử thách đã kết thúc từ năm {REWARD_START_YEAR} của thành
-        viên chính thức (không tính thử thách đang diễn ra).
+        Tổng hợp {finished.length} thử thách đã kết thúc năm {year} của thành viên chính thức
+        (không tính thử thách đang diễn ra).
       </p>
       <div className="stat-row">
         <div className="stat">
@@ -574,7 +585,22 @@ export function RewardsPage() {
     setSelected(latestFinished?.challenge.id ?? reports[0].challenge.id)
   }, [reports, selected])
 
+  const summaryYears = useMemo(
+    () =>
+      [
+        ...new Set(
+          reports
+            .filter((r) => r.challenge.status === STATUS_FINISHED)
+            .map((r) => challengeYear(r.challenge)),
+        ),
+      ].sort((a, b) => b - a),
+    [reports],
+  )
+
   const current = reports.find((r) => r.challenge.id === selected)
+  const selectedYear = selected.startsWith(YEAR_PREFIX)
+    ? Number(selected.slice(YEAR_PREFIX.length))
+    : null
 
   return (
     <div className="page">
@@ -591,23 +617,33 @@ export function RewardsPage() {
         </p>
       ) : (
         <>
-          <label className="search-field">
-            Thử thách
-            <select value={selected} onChange={(e) => setSelected(e.target.value)}>
-              <option value={ALL}>
-                Tổng hợp thử thách đã kết thúc (từ {REWARD_START_YEAR})
-              </option>
-              {reports.map((r) => (
-                <option key={r.challenge.id} value={r.challenge.id}>
-                  {r.challenge.name || 'Thử thách'}
-                  {r.challenge.status === STATUS_ONGOING ? ' (đang diễn ra)' : ''}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="reward-picker">
+            <label className="search-field">
+              Thử thách
+              <select value={selected} onChange={(e) => setSelected(e.target.value)}>
+                {summaryYears.length > 0 && (
+                  <optgroup label="Tổng hợp thử thách đã kết thúc">
+                    {summaryYears.map((y) => (
+                      <option key={y} value={`${YEAR_PREFIX}${y}`}>
+                        Tổng hợp năm {y}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                <optgroup label="Từng thử thách">
+                  {reports.map((r) => (
+                    <option key={r.challenge.id} value={r.challenge.id}>
+                      {r.challenge.name || 'Thử thách'}
+                      {r.challenge.status === STATUS_ONGOING ? ' (đang diễn ra)' : ''}
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
+            </label>
+          </div>
 
-          {selected === ALL ? (
-            <SummaryView reports={reports} />
+          {selectedYear != null ? (
+            <SummaryView reports={reports} year={selectedYear} />
           ) : current ? (
             <ChallengeReportView report={current} names={names} />
           ) : null}

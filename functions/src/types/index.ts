@@ -123,6 +123,8 @@ export interface Challenge {
   dayQuotaOptions?: DayQuotaOption[]
   /** Sắp xếp giảm dần theo minPercent; không có thì dùng mức phạt mặc định */
   penaltyTiers?: PenaltyTier[]
+  /** Phạt thành viên chính thức không đăng ký tham gia (đồng); không có = không phạt */
+  absentPenalty?: number
   rewards?: RewardTier[]
   rewardDraws?: RewardDraw[]
   /** Theo uid */

@@ -770,6 +770,7 @@ export function parseChallenge(
     totalDays,
     dayQuotaOptions,
     penaltyTiers: parsePenaltyTiers(dict.penaltyTiers),
+    absentPenalty: Number(dict.absentPenalty) > 0 ? Number(dict.absentPenalty) : undefined,
     rewards: parseRewardTiers(dict.rewards),
     rewardDraws: parseRewardDraws(dict.rewardDraws),
     penaltyPayments: parsePenaltyPayments(dict.penaltyPayments),

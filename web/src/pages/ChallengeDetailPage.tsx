@@ -249,7 +249,9 @@ export function ChallengeDetailPage() {
   const penaltyTiers = penaltyTiersOf(challenge)
   const hasRewardInfo =
     isRewardEligible(challenge) &&
-    (penaltyTiers.length > 0 || Boolean(challenge.rewards?.length))
+    (penaltyTiers.length > 0 ||
+      Boolean(challenge.absentPenalty) ||
+      Boolean(challenge.rewards?.length))
   const goals = challengeGoals(challenge)
   const generalRules = challengeGeneralRules(challenge)
   const myGoalIndexes = new Set(
@@ -522,6 +524,17 @@ export function ChallengeDetailPage() {
                       </ul>
                     </>
                   )}
+                  {challenge.absentPenalty ? (
+                    <>
+                      <h4 className="goal-rules-subtitle">Phạt không tham gia</h4>
+                      <ul className="goal-details">
+                        <li>
+                          Thành viên chính thức không đăng ký thử thách:{' '}
+                          {formatVnd(challenge.absentPenalty)}
+                        </li>
+                      </ul>
+                    </>
+                  ) : null}
                   {challenge.rewards?.length ? (
                     <>
                       <h4 className="goal-rules-subtitle">Phần thưởng khi hoàn thành</h4>

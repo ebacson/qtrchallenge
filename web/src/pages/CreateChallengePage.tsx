@@ -23,7 +23,12 @@ import {
   STATUS_UPCOMING,
 } from '../lib/challengeRules'
 import { db } from '../lib/firebase'
-import { DEFAULT_PENALTY_TIERS, penaltySummary, rewardItemsSummary } from '../lib/rewardPenalty'
+import {
+  DEFAULT_PENALTY_TIERS,
+  formatVnd,
+  penaltySummary,
+  rewardItemsSummary,
+} from '../lib/rewardPenalty'
 import type { DayQuotaOption, PenaltyTier, RewardItem, RewardTier } from '../types'
 
 const PRESET_DISTANCES = ['50 km', '100 km', '150 km', '200 km', '250 km', '300 km']
@@ -59,6 +64,8 @@ type FormInitial = {
   penaltyRows: PenaltyDraft[]
   /** Thử thách khoảng ngày: một mức phạt cho người không hoàn thành ('' = không phạt) */
   flatPenalty: string
+  /** Phạt thành viên chính thức không tham gia ('' = không phạt) */
+  absentPenalty: string
   rewardDrafts: Record<string, RewardDraft>
 }
 
@@ -195,6 +202,7 @@ function defaultInitial(): FormInitial {
     icon: '',
     penaltyRows: toPenaltyDrafts(DEFAULT_PENALTY_TIERS),
     flatPenalty: '100000',
+    absentPenalty: '50000',
     rewardDrafts: {},
   }
 }
@@ -240,6 +248,7 @@ function editContextFrom(id: string, raw: Record<string, unknown>): EditContext 
       flatPenalty: c.penaltyTiers?.length
         ? String(c.penaltyTiers[c.penaltyTiers.length - 1].amount)
         : '',
+      absentPenalty: c.absentPenalty ? String(c.absentPenalty) : '',
       rewardDrafts: Object.fromEntries(
         (c.rewards ?? []).map((r) => [
           r.target,
@@ -275,6 +284,7 @@ function ChallengeForm({ edit }: { edit?: EditContext }) {
   const [iconPreview, setIconPreview] = useState<string | null>(init.icon || null)
   const [penaltyRows, setPenaltyRows] = useState<PenaltyDraft[]>(init.penaltyRows)
   const [flatPenalty, setFlatPenalty] = useState(init.flatPenalty)
+  const [absentPenalty, setAbsentPenalty] = useState(init.absentPenalty)
   const [rewardDrafts, setRewardDrafts] = useState<Record<string, RewardDraft>>(
     init.rewardDrafts,
   )
@@ -355,6 +365,11 @@ function ChallengeForm({ edit }: { edit?: EditContext }) {
     () => (flatPenaltyMode ? parseFlatPenalty(flatPenalty) : parsePenaltyRows(penaltyRows)),
     [flatPenaltyMode, flatPenalty, penaltyRows],
   )
+  const parsedAbsentPenalty = useMemo(() => {
+    const tiers = parseFlatPenalty(absentPenalty)
+    if (typeof tiers === 'string') return 'Phạt không tham gia: số tiền phải là số nguyên ≥ 0.'
+    return tiers[0]?.amount ?? 0
+  }, [absentPenalty])
 
   const preview = useMemo(() => {
     const startLabel = inputDateToChallengeDay(startDate)
@@ -554,6 +569,10 @@ function ChallengeForm({ edit }: { edit?: EditContext }) {
       setError(parsedPenalty)
       return
     }
+    if (typeof parsedAbsentPenalty === 'string') {
+      setError(parsedAbsentPenalty)
+      return
+    }
     const rewards = parseRewardDrafts(distances, rewardDrafts)
     if (typeof rewards === 'string') {
       setError(rewards)
@@ -573,6 +592,7 @@ function ChallengeForm({ edit }: { edit?: EditContext }) {
         password: password.trim(),
         joinDeadlineDays,
         penaltyTiers: parsedPenalty.length ? parsedPenalty : null,
+        absentPenalty: parsedAbsentPenalty > 0 ? parsedAbsentPenalty : null,
         rewards: rewards.length ? rewards : null,
       }
       if (iconFile) payload.icon = await uploadChallengeIcon(iconFile)
@@ -1009,6 +1029,22 @@ function ChallengeForm({ edit }: { edit?: EditContext }) {
           <p className="tiny muted" style={{ marginTop: 8 }}>
             {typeof parsedPenalty === 'string' ? parsedPenalty : penaltySummary(parsedPenalty)}
           </p>
+          <label style={{ marginTop: 12 }}>
+            Phạt thành viên chính thức không tham gia (đồng)
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={1000}
+              value={absentPenalty}
+              placeholder="0"
+              onChange={(e) => setAbsentPenalty(e.target.value)}
+            />
+          </label>
+          <p className="tiny muted" style={{ marginTop: 6 }}>
+            Áp dụng cho thành viên chính thức không đăng ký thử thách (trừ người được duyệt chính
+            thức sau hạn đăng ký). Để trống hoặc 0 nếu không phạt.
+          </p>
         </fieldset>
 
         <fieldset className="distance-fieldset">
@@ -1119,6 +1155,8 @@ function ChallengeForm({ edit }: { edit?: EditContext }) {
             <>
               <br />
               Phạt: {penaltySummary(parsedPenalty)}
+              {typeof parsedAbsentPenalty === 'number' &&
+                ` · Không tham gia: ${parsedAbsentPenalty ? formatVnd(parsedAbsentPenalty) : 'không phạt'}`}
             </>
           )}
         </p>

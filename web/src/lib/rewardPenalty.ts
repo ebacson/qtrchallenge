@@ -1,4 +1,4 @@
-import { parseChallengeDay, userDayQuotaProgress } from './challengeRules'
+import { joinDeadlineDate, parseChallengeDay, userDayQuotaProgress } from './challengeRules'
 import type { Challenge, PenaltyTier, RewardItem } from '../types'
 
 /** Mức phạt cho thử thách không tự đặt: dưới 50% phạt 150.000đ, 50% – dưới 100% phạt 100.000đ */
@@ -35,6 +35,35 @@ export type ParticipantCompletion = {
   penalty: number
   /** Admin miễn phạt: penalty = 0, giữ mức gốc để hiển thị */
   waived?: { reason: string; originalPenalty: number }
+}
+
+export type AbsentPenalty = {
+  /** Mức phải nộp sau khi miễn (0 nếu miễn hoặc không áp dụng) */
+  penalty: number
+  /** Mức gốc theo cài đặt thử thách */
+  originalPenalty: number
+  waived?: { reason: string }
+  /** Không áp dụng vì được duyệt chính thức sau hạn đăng ký */
+  lateMember?: boolean
+}
+
+/** Phạt thành viên chính thức không đăng ký tham gia thử thách. */
+export function absentPenaltyFor(
+  challenge: Challenge,
+  uid: string,
+  memberSince: number | undefined,
+): AbsentPenalty {
+  const amount = challenge.absentPenalty ?? 0
+  if (!(amount > 0)) return { penalty: 0, originalPenalty: 0 }
+  const deadline = joinDeadlineDate(challenge.startDate, challenge.joinDeadlineDays)
+  if (memberSince && deadline && memberSince >= deadline.getTime() + 86_400_000) {
+    return { penalty: 0, originalPenalty: 0, lateMember: true }
+  }
+  const payment = challenge.penaltyPayments?.[uid]
+  if (payment?.waived) {
+    return { penalty: 0, originalPenalty: amount, waived: { reason: payment.reason ?? '' } }
+  }
+  return { penalty: amount, originalPenalty: amount }
 }
 
 /** Áp dụng miễn phạt (nếu có) của `uid` trong thử thách. */

@@ -479,11 +479,13 @@ export function ChallengeDetailPage() {
                             </strong>
                             {mine && <span className="goal-badge">Bạn đã chọn</span>}
                           </div>
-                          <ul className="goal-details">
-                            {g.details.map((d) => (
-                              <li key={d}>{d}</li>
-                            ))}
-                          </ul>
+                          {g.details.length > 0 && (
+                            <ul className="goal-details">
+                              {g.details.map((d) => (
+                                <li key={d}>{d}</li>
+                              ))}
+                            </ul>
+                          )}
                           {g.kmList && (
                             <ul className="goal-km-chips">
                               {g.kmList.map((km, i) => (

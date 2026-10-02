@@ -243,22 +243,31 @@ export function challengeGoals(challenge: Challenge): ChallengeGoal[] {
     index,
     title: `Mục tiêu ${index + 1}`,
     summary: `${label} tích lũy`,
-    details: [
-      `Tổng cự ly các hoạt động hợp lệ đạt ${label} trong khoảng ${period}.`,
-      `Chỉ tính hoạt động từ ${formatKmVi(MIN_DISTANCE_KM)} km trở lên.`,
-    ],
+    details: [],
   }))
+}
+
+function isDistanceMode(challenge: Challenge): boolean {
+  if (challenge.challengeMode === 'activity_count') return false
+  return !(challenge.challengeMode === 'day_quota' && challenge.dayQuotaOptions?.length)
 }
 
 /** Quy định chung áp dụng cho mọi mục tiêu của thử thách. */
 export function challengeGeneralRules(challenge: Challenge): string[] {
   const paceMin = challenge.paceMinMinutes ?? MIN_PACE
   const paceMax = challenge.paceMaxMinutes ?? MAX_PACE
-  const rules = [
+  const rules: string[] = []
+  if (isDistanceMode(challenge)) {
+    rules.push(
+      `Tổng cự ly các hoạt động hợp lệ đạt mục tiêu đã đăng ký trong khoảng ${challenge.startDate} → ${challenge.endDate}.`,
+      `Chỉ tính hoạt động từ ${formatKmVi(MIN_DISTANCE_KM)} km trở lên.`,
+    )
+  }
+  rules.push(
     `Tính các hoạt động ${[...ELIGIBLE_ACTIVITY_TYPES].join(', ')} đồng bộ từ Strava.`,
     `Pace hợp lệ: ${formatPaceMinutes(paceMin)}–${formatPaceMinutes(paceMax)} phút/km.`,
     'Ngày tính theo giờ Việt Nam (GMT+7).',
-  ]
+  )
   if (challenge.challengeMode === 'day_quota' && (challenge.dayQuotaOptions?.length ?? 0) > 1) {
     rules.push(
       'Được chọn một hoặc nhiều tùy chọn; mỗi tùy chọn tính tiến độ riêng.',

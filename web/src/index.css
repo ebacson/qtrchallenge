@@ -2365,7 +2365,63 @@ code {
 }
 
 .reward-picker .search-field {
-  margin-bottom: 4px;
+  margin-bottom: 0;
+  min-width: 0;
+}
+
+.reward-picker {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+@media (min-width: 640px) {
+  .reward-picker {
+    grid-template-columns: 3fr 2fr;
+  }
+}
+
+.reward-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.reward-search > svg {
+  position: absolute;
+  left: 12px;
+  color: var(--ink-soft);
+  pointer-events: none;
+}
+
+.reward-search input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 38px 12px 36px;
+  background: #fff;
+  font: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.reward-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.reward-search button {
+  position: absolute;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
 }
 
 .reward-scroll {

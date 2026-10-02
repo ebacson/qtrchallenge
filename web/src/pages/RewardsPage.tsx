@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Search, X } from 'lucide-react'
 import { useSharedValue } from '../lib/sharedValue'
 import { useUserProfiles } from '../lib/userWrites'
 import {
@@ -67,6 +68,21 @@ function challengeYear(challenge: Challenge): number {
 
 type Names = Record<string, { name: string; avatar: string }>
 
+/** Chuẩn hoá để tìm không phân biệt hoa thường / dấu tiếng Việt */
+function foldText(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .trim()
+}
+
+function matchesQuery(name: string, folded: string): boolean {
+  return !folded || foldText(name).includes(folded)
+}
+
 function formatAmount(value: number, unit: ParticipantCompletion['unit']): string {
   return value.toLocaleString('vi-VN', { maximumFractionDigits: unit === 'km' ? 2 : 0 })
 }
@@ -112,8 +128,18 @@ function PenaltyStats({ total, paid }: { total: number; paid: number | null }) {
   )
 }
 
-function ChallengeReportView({ report, names }: { report: ChallengeReport; names: Names }) {
+function ChallengeReportView({
+  report,
+  names,
+  query,
+}: {
+  report: ChallengeReport
+  names: Names
+  query: string
+}) {
   const { challenge, rows, absent } = report
+  const searching = query !== ''
+  const visibleAbsent = absent.filter((a) => matchesQuery(a.name, query))
   const completed = rows.filter((r) => r.completion.tier === 'completed').length
   const failed = rows.length - completed
   // Người phải nộp: không hoàn thành + không tham gia (sau khi miễn)
@@ -215,13 +241,24 @@ function ChallengeReportView({ report, names }: { report: ChallengeReport; names
         names={names}
       />
 
+      {searching &&
+        visibleAbsent.length === 0 &&
+        !rows.some((r) => matchesQuery(r.name, query)) && (
+          <p className="empty">Không tìm thấy thành viên phù hợp trong thử thách này.</p>
+        )}
+
       {sections.map(({ key, index, title, hint }) => {
-        const list = rows.filter((r) => r.completion.tierIndex === index)
+        const all = rows.filter((r) => r.completion.tierIndex === index)
+        const list = all.filter((r) => matchesQuery(r.name, query))
         const tier = tierStyle(index, tiers.length)
+        if (searching && list.length === 0) return null
         return (
           <section key={key} className={`section panel reward-section reward-${tier}`}>
             <h2>
-              {title} <span className="tiny muted">· {list.length} người</span>
+              {title}{' '}
+              <span className="tiny muted">
+                · {searching ? `${list.length}/${all.length}` : list.length} người
+              </span>
             </h2>
             <p className="tiny muted">{hint}</p>
             {list.length === 0 ? (
@@ -261,52 +298,56 @@ function ChallengeReportView({ report, names }: { report: ChallengeReport; names
         )
       })}
 
-      <section className="section panel reward-section">
-        <h2>
-          Thành viên chính thức không tham gia{' '}
-          <span className="tiny muted">· {absent.length} người</span>
-        </h2>
-        <p className="tiny muted">
-          {challenge.absentPenalty
-            ? `Phạt ${formatVnd(challenge.absentPenalty)} (không áp dụng nếu được duyệt chính thức từ ngày bắt đầu thử thách)`
-            : 'Thử thách không đặt mức phạt không tham gia'}
-          {ongoing && ' · vẫn có thể đăng ký nếu còn hạn tham gia'}
-        </p>
-        {absent.length === 0 ? (
-          <p className="empty">Tất cả thành viên chính thức đã đăng ký.</p>
-        ) : (
-          <ul className="participant-list reward-scroll">
-            {absent.map((r) => (
-              <li key={r.uid} className="participant-row">
-                <Avatar name={r.name} avatar={r.avatar} />
-                <div className="participant-meta">
-                  <strong>{r.name}</strong>
-                  <span className="tiny muted">
-                    {r.absent.lateMember
-                      ? 'Chưa đăng ký · chính thức sau khi thử thách bắt đầu'
-                      : 'Chưa đăng ký tham gia'}
-                  </span>
-                  {r.absent.originalPenalty > 0 && (
-                    <PenaltyPaymentControl
-                      challenge={challenge}
-                      uid={r.uid}
-                      name={r.name}
-                      amount={r.absent.originalPenalty}
-                    />
-                  )}
-                </div>
-                {challenge.absentPenalty ? (
-                  <span
-                    className={`reward-amount ${r.absent.penalty > 0 ? 'underHalf' : 'completed'}`}
-                  >
-                    {absentLabel(r.absent)}
-                  </span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {(!searching || visibleAbsent.length > 0) && (
+        <section className="section panel reward-section">
+          <h2>
+            Thành viên chính thức không tham gia{' '}
+            <span className="tiny muted">
+              · {searching ? `${visibleAbsent.length}/${absent.length}` : absent.length} người
+            </span>
+          </h2>
+          <p className="tiny muted">
+            {challenge.absentPenalty
+              ? `Phạt ${formatVnd(challenge.absentPenalty)} (không áp dụng nếu được duyệt chính thức từ ngày bắt đầu thử thách)`
+              : 'Thử thách không đặt mức phạt không tham gia'}
+            {ongoing && ' · vẫn có thể đăng ký nếu còn hạn tham gia'}
+          </p>
+          {absent.length === 0 ? (
+            <p className="empty">Tất cả thành viên chính thức đã đăng ký.</p>
+          ) : (
+            <ul className="participant-list reward-scroll">
+              {visibleAbsent.map((r) => (
+                <li key={r.uid} className="participant-row">
+                  <Avatar name={r.name} avatar={r.avatar} />
+                  <div className="participant-meta">
+                    <strong>{r.name}</strong>
+                    <span className="tiny muted">
+                      {r.absent.lateMember
+                        ? 'Chưa đăng ký · chính thức sau khi thử thách bắt đầu'
+                        : 'Chưa đăng ký tham gia'}
+                    </span>
+                    {r.absent.originalPenalty > 0 && (
+                      <PenaltyPaymentControl
+                        challenge={challenge}
+                        uid={r.uid}
+                        name={r.name}
+                        amount={r.absent.originalPenalty}
+                      />
+                    )}
+                  </div>
+                  {challenge.absentPenalty ? (
+                    <span
+                      className={`reward-amount ${r.absent.penalty > 0 ? 'underHalf' : 'completed'}`}
+                    >
+                      {absentLabel(r.absent)}
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
     </>
   )
 }
@@ -382,7 +423,15 @@ function MemberPenaltyDetail({ member }: { member: MemberSummary }) {
   )
 }
 
-function SummaryView({ reports, year }: { reports: ChallengeReport[]; year: number }) {
+function SummaryView({
+  reports,
+  year,
+  query,
+}: {
+  reports: ChallengeReport[]
+  year: number
+  query: string
+}) {
   const finished = useMemo(
     () =>
       reports.filter(
@@ -442,6 +491,7 @@ function SummaryView({ reports, year }: { reports: ChallengeReport[]; year: numb
   const totalAbsent = members.reduce((sum, m) => sum + m.absentCount, 0)
   const totalPenalty = members.reduce((sum, m) => sum + m.penalty, 0)
   const totalPaid = members.reduce((sum, m) => sum + m.paid, 0)
+  const visibleMembers = members.filter((m) => matchesQuery(m.name, query))
 
   if (finished.length === 0) {
     return <p className="empty">Chưa có thử thách nào kết thúc.</p>
@@ -470,10 +520,18 @@ function SummaryView({ reports, year }: { reports: ChallengeReport[]; year: numb
       </div>
 
       <section className="section panel">
-        <h2>Theo thành viên</h2>
+        <h2>
+          Theo thành viên{' '}
+          {query && (
+            <span className="tiny muted">
+              · {visibleMembers.length}/{members.length} người
+            </span>
+          )}
+        </h2>
+        {visibleMembers.length === 0 && <p className="empty">Không tìm thấy thành viên phù hợp.</p>}
         <ul className="participant-list">
-          {members.map((m) => {
-            const open = openUid === m.uid
+          {visibleMembers.map((m) => {
+            const open = openUid === m.uid || (query !== '' && visibleMembers.length === 1)
             const owed = m.penalty - m.paid
             return (
               <li key={m.uid} className="summary-member">
@@ -520,6 +578,8 @@ export function RewardsPage() {
   const loading = challengesValue === undefined
   const rawChallenges = useMemo(() => challengesValue ?? {}, [challengesValue])
   const [selected, setSelected] = useState('')
+  const [search, setSearch] = useState('')
+  const query = foldText(search)
 
   const profiles = useMemo(() => {
     const map: Record<string, Profile> = {}
@@ -641,7 +701,7 @@ export function RewardsPage() {
         <>
           <div className="reward-picker">
             <label className="search-field">
-              Thử thách
+              <span className="sr-only">Thử thách</span>
               <select value={selected} onChange={(e) => setSelected(e.target.value)}>
                 {summaryYears.length > 0 && (
                   <optgroup label="Tổng hợp thử thách đã kết thúc">
@@ -662,12 +722,27 @@ export function RewardsPage() {
                 </optgroup>
               </select>
             </label>
+            <div className="reward-search">
+              <Search size={16} aria-hidden="true" />
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Tìm nhanh thành viên"
+                aria-label="Tìm nhanh thành viên"
+              />
+              {search && (
+                <button type="button" aria-label="Xóa tìm kiếm" onClick={() => setSearch('')}>
+                  <X size={16} />
+                </button>
+              )}
+            </div>
           </div>
 
           {selectedYear != null ? (
-            <SummaryView reports={reports} year={selectedYear} />
+            <SummaryView reports={reports} year={selectedYear} query={query} />
           ) : current ? (
-            <ChallengeReportView report={current} names={names} />
+            <ChallengeReportView report={current} names={names} query={query} />
           ) : null}
         </>
       )}

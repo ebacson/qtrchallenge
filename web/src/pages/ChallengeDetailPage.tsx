@@ -98,6 +98,7 @@ export function ChallengeDetailPage() {
   >({})
   const rawProfiles = useUserProfiles()
   const [showDescription, setShowDescription] = useState(false)
+  const [showInfo, setShowInfo] = useState(true)
   const [selectedTarget, setSelectedTarget] = useState('')
   const [selectedOptions, setSelectedOptions] = useState<number[]>([0])
   const [editingOptions, setEditingOptions] = useState(false)
@@ -246,6 +247,9 @@ export function ChallengeDetailPage() {
     challenge.challengeMode === 'day_quota' && Boolean(challenge.dayQuotaOptions?.length)
   const rules = challengeRulesSummary(challenge)
   const penaltyTiers = penaltyTiersOf(challenge)
+  const hasRewardInfo =
+    isRewardEligible(challenge) &&
+    (penaltyTiers.length > 0 || Boolean(challenge.rewards?.length))
   const goals = challengeGoals(challenge)
   const generalRules = challengeGeneralRules(challenge)
   const myGoalIndexes = new Set(
@@ -444,88 +448,104 @@ export function ChallengeDetailPage() {
         </div>
       </div>
 
-      {goals.length > 0 && (
+      {(goals.length > 0 || hasRewardInfo) && (
         <section className="section panel">
-          <h2>Mục tiêu thử thách</h2>
-          <ol className="goal-list">
-            {goals.map((g) => {
-              const mine = joined && myGoalIndexes.has(g.index)
-              return (
-                <li key={g.index} className={mine ? 'goal-item mine' : 'goal-item'}>
-                  <div className="goal-head">
-                    <strong>
-                      {g.title}: <span className="goal-summary">{g.summary}</span>
-                    </strong>
-                    {mine && <span className="goal-badge">Bạn đã chọn</span>}
-                  </div>
+          <div className="desc-toggle-row">
+            <h2>Thông tin thử thách</h2>
+            <button
+              type="button"
+              className="btn ghost compact"
+              onClick={() => setShowInfo((v) => !v)}
+              aria-expanded={showInfo}
+            >
+              {showInfo ? 'Ẩn nội dung' : 'Xem nội dung'}
+            </button>
+          </div>
+          {showInfo && (
+            <div className="challenge-info-body">
+              {goals.length > 0 && (
+                <>
+                  <h3 className="goal-rules-title">Mục tiêu</h3>
+                  <ol className="goal-list">
+                    {goals.map((g) => {
+                      const mine = joined && myGoalIndexes.has(g.index)
+                      return (
+                        <li key={g.index} className={mine ? 'goal-item mine' : 'goal-item'}>
+                          <div className="goal-head">
+                            <strong>
+                              {g.title}: <span className="goal-summary">{g.summary}</span>
+                            </strong>
+                            {mine && <span className="goal-badge">Bạn đã chọn</span>}
+                          </div>
+                          <ul className="goal-details">
+                            {g.details.map((d) => (
+                              <li key={d}>{d}</li>
+                            ))}
+                          </ul>
+                          {g.kmList && (
+                            <ul className="goal-km-chips">
+                              {g.kmList.map((km, i) => (
+                                <li key={i}>
+                                  <span>Ngày {i + 1}</span>
+                                  <strong>{km} km</strong>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </li>
+                      )
+                    })}
+                  </ol>
+                  <h3 className="goal-rules-title">Quy định chung</h3>
                   <ul className="goal-details">
-                    {g.details.map((d) => (
-                      <li key={d}>{d}</li>
+                    {generalRules.map((r) => (
+                      <li key={r}>{r}</li>
                     ))}
                   </ul>
-                  {g.kmList && (
-                    <ul className="goal-km-chips">
-                      {g.kmList.map((km, i) => (
-                        <li key={i}>
-                          <span>Ngày {i + 1}</span>
-                          <strong>{km} km</strong>
-                        </li>
-                      ))}
-                    </ul>
+                </>
+              )}
+
+              {hasRewardInfo && (
+                <>
+                  <h3 className="goal-rules-title">Thưởng – phạt</h3>
+                  <p className="tiny muted">Áp dụng cho thành viên chính thức.</p>
+                  {penaltyTiers.length > 0 && (
+                    <>
+                      <h4 className="goal-rules-subtitle">Phạt khi không hoàn thành</h4>
+                      <ul className="goal-details">
+                        {penaltyTiers.map((t, i) => (
+                          <li key={t.minPercent}>
+                            {tierRangeLabel(penaltyTiers, i)} mục tiêu:{' '}
+                            {t.amount ? formatVnd(t.amount) : 'không phạt'}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
                   )}
-                </li>
-              )
-            })}
-          </ol>
-          <h3 className="goal-rules-title">Quy định chung</h3>
-          <ul className="goal-details">
-            {generalRules.map((r) => (
-              <li key={r}>{r}</li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {isRewardEligible(challenge) &&
-        (penaltyTiers.length > 0 || Boolean(challenge.rewards?.length)) && (
-        <section className="section panel">
-          <h2>Thưởng – phạt</h2>
-          <p className="tiny muted">Áp dụng cho thành viên chính thức.</p>
-          {penaltyTiers.length > 0 && (
-            <>
-              <h3 className="goal-rules-title">Phạt khi không hoàn thành</h3>
-              <ul className="goal-details">
-                {penaltyTiers.map((t, i) => (
-                  <li key={t.minPercent}>
-                    {tierRangeLabel(penaltyTiers, i)} mục tiêu:{' '}
-                    {t.amount ? formatVnd(t.amount) : 'không phạt'}
-                  </li>
-                ))}
-              </ul>
-            </>
+                  {challenge.rewards?.length ? (
+                    <>
+                      <h4 className="goal-rules-subtitle">Phần thưởng khi hoàn thành</h4>
+                      <ul className="goal-details">
+                        {challenge.rewards.map((r) => (
+                          <li key={r.target}>
+                            {r.target}: {rewardItemsSummary(r.items)}, quay số trong số người
+                            hoàn thành mục tiêu này
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : null}
+                  <RewardDrawSection
+                    challenge={challenge}
+                    userChallenges={officialUserChallenges}
+                    names={drawNames}
+                    embedded
+                  />
+                </>
+              )}
+            </div>
           )}
-          {challenge.rewards?.length ? (
-            <>
-              <h3 className="goal-rules-title">Phần thưởng khi hoàn thành</h3>
-              <ul className="goal-details">
-                {challenge.rewards.map((r) => (
-                  <li key={r.target}>
-                    {r.target}: {rewardItemsSummary(r.items)}, quay số trong số người hoàn thành
-                    mục tiêu này
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : null}
         </section>
-      )}
-
-      {isRewardEligible(challenge) && (
-        <RewardDrawSection
-          challenge={challenge}
-          userChallenges={officialUserChallenges}
-          names={drawNames}
-        />
       )}
 
       {challenge.description && (

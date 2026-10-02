@@ -1020,6 +1020,16 @@ select {
   font-size: 0.95rem;
 }
 
+.challenge-info-body > .goal-rules-title:first-child {
+  margin-top: 12px;
+}
+
+.goal-rules-subtitle {
+  margin: 12px 0 0;
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+}
+
 .card-goal-list {
   list-style: none;
   margin: 6px 0 8px;

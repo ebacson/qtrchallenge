@@ -216,16 +216,24 @@ export function RewardDrawSection({
   challenge,
   userChallenges,
   names,
+  embedded = false,
 }: {
   challenge: Challenge
   userChallenges: Record<string, Record<string, unknown> | null>
   names: Names
+  /** Hiển thị như một mục con trong khung khác thay vì một section riêng */
+  embedded?: boolean
 }) {
   const rewards = challenge.rewards ?? []
   if (!rewards.length) return null
+  const Wrapper = embedded ? 'div' : 'section'
   return (
-    <section className="section panel reward-section">
-      <h2>Quay số trúng thưởng</h2>
+    <Wrapper className={embedded ? 'reward-section' : 'section panel reward-section'}>
+      {embedded ? (
+        <h4 className="goal-rules-subtitle">Quay số trúng thưởng</h4>
+      ) : (
+        <h2>Quay số trúng thưởng</h2>
+      )}
       <p className="tiny muted">
         Mỗi mục tiêu quay ngẫu nhiên trong số thành viên chính thức hoàn thành mục tiêu đó và
         trao lần lượt từng món theo thứ tự quà đã đặt; số người hoàn thành không vượt số quà
@@ -242,6 +250,6 @@ export function RewardDrawSection({
           />
         ))}
       </div>
-    </section>
+    </Wrapper>
   )
 }

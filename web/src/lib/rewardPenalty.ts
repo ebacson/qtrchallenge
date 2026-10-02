@@ -60,6 +60,7 @@ export function penaltyForRatio(
 
 /** "50% – dưới 100%" cho mức thứ `index` (danh sách giảm dần theo %) */
 export function tierRangeLabel(tiers: PenaltyTier[], index: number): string {
+  if (tiers.length === 1) return 'Không hoàn thành'
   const upper = index === 0 ? 100 : tiers[index - 1].minPercent
   const min = index === tiers.length - 1 ? 0 : tiers[index].minPercent
   return min === 0 ? `Dưới ${upper}%` : `${min}% – dưới ${upper}%`

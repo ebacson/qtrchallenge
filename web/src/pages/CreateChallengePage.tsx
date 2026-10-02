@@ -57,6 +57,8 @@ type FormInitial = {
   joinDeadlineInput: string
   icon: string
   penaltyRows: PenaltyDraft[]
+  /** Thử thách khoảng ngày: một mức phạt cho người không hoàn thành ('' = không phạt) */
+  flatPenalty: string
   rewardDrafts: Record<string, RewardDraft>
 }
 
@@ -137,6 +139,15 @@ function parsePenaltyRows(rows: PenaltyDraft[]): PenaltyTier[] | string {
   return tiers
 }
 
+/** Một mức cho mọi người không hoàn thành; trống hoặc 0 = không phạt. */
+function parseFlatPenalty(raw: string): PenaltyTier[] | string {
+  const text = raw.replace(/[.\s]/g, '')
+  if (!text) return []
+  const amount = Number(text)
+  if (!Number.isInteger(amount) || amount < 0) return 'Mức phạt: số tiền phải là số nguyên ≥ 0.'
+  return amount > 0 ? [{ minPercent: 0, amount }] : []
+}
+
 function parseRewardDrafts(
   targets: string[],
   drafts: Record<string, RewardDraft>,
@@ -183,6 +194,7 @@ function defaultInitial(): FormInitial {
     joinDeadlineInput: '7',
     icon: '',
     penaltyRows: toPenaltyDrafts(DEFAULT_PENALTY_TIERS),
+    flatPenalty: '100000',
     rewardDrafts: {},
   }
 }
@@ -225,6 +237,9 @@ function editContextFrom(id: string, raw: Record<string, unknown>): EditContext 
       joinDeadlineInput: String(c.joinDeadlineDays),
       icon: c.icon ?? '',
       penaltyRows: toPenaltyDrafts(c.penaltyTiers ?? []),
+      flatPenalty: c.penaltyTiers?.length
+        ? String(c.penaltyTiers[c.penaltyTiers.length - 1].amount)
+        : '',
       rewardDrafts: Object.fromEntries(
         (c.rewards ?? []).map((r) => [
           r.target,
@@ -259,6 +274,7 @@ function ChallengeForm({ edit }: { edit?: EditContext }) {
   const [iconFile, setIconFile] = useState<File | null>(null)
   const [iconPreview, setIconPreview] = useState<string | null>(init.icon || null)
   const [penaltyRows, setPenaltyRows] = useState<PenaltyDraft[]>(init.penaltyRows)
+  const [flatPenalty, setFlatPenalty] = useState(init.flatPenalty)
   const [rewardDrafts, setRewardDrafts] = useState<Record<string, RewardDraft>>(
     init.rewardDrafts,
   )
@@ -334,7 +350,11 @@ function ChallengeForm({ edit }: { edit?: EditContext }) {
     [selected],
   )
 
-  const parsedPenalty = useMemo(() => parsePenaltyRows(penaltyRows), [penaltyRows])
+  const flatPenaltyMode = mode === 'day_quota'
+  const parsedPenalty = useMemo(
+    () => (flatPenaltyMode ? parseFlatPenalty(flatPenalty) : parsePenaltyRows(penaltyRows)),
+    [flatPenaltyMode, flatPenalty, penaltyRows],
+  )
 
   const preview = useMemo(() => {
     const startLabel = inputDateToChallengeDay(startDate)
@@ -914,54 +934,78 @@ function ChallengeForm({ edit }: { edit?: EditContext }) {
 
         <fieldset className="distance-fieldset">
           <legend>Mức phạt khi không hoàn thành</legend>
-          <p className="tiny muted" style={{ marginBottom: 10 }}>
-            Tính theo tỉ lệ hoàn thành mục tiêu, chỉ áp dụng cho thành viên chính thức; đạt 100%
-            không bị phạt. Đặt số tiền 0 nếu mức đó không phạt; xóa hết các mức nếu thử thách
-            không phạt.
-          </p>
-          {penaltyRows.length === 0 && <p className="empty">Không phạt.</p>}
-          {penaltyRows.map((row, index) => {
-            const last = index === penaltyRows.length - 1
-            const upper = index === 0 ? '100' : penaltyRows[index - 1].minPercent || '…'
-            return (
-              <div key={index} className="penalty-row">
-                <label>
-                  {last ? `Dưới ${upper}%` : `Từ (%) đến dưới ${upper}%`}
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    min={0}
-                    max={99}
-                    step={1}
-                    value={last ? '0' : row.minPercent}
-                    disabled={last}
-                    onChange={(e) => updatePenalty(index, { minPercent: e.target.value })}
-                  />
-                </label>
-                <label>
-                  Phạt (đồng)
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    min={0}
-                    step={1000}
-                    value={row.amount}
-                    onChange={(e) => updatePenalty(index, { amount: e.target.value })}
-                  />
-                </label>
-                <button
-                  type="button"
-                  className="btn ghost compact danger"
-                  onClick={() => removePenaltyRow(index)}
-                >
-                  Xóa
-                </button>
-              </div>
-            )
-          })}
-          <button type="button" className="btn ghost" onClick={addPenaltyRow}>
-            + Thêm mức phạt
-          </button>
+          {flatPenaltyMode ? (
+            <>
+              <p className="tiny muted" style={{ marginBottom: 10 }}>
+                Chỉ áp dụng cho thành viên chính thức: hoàn thành đủ số ngày của các tùy chọn đã
+                chọn thì không phạt, không hoàn thành thì phạt một mức. Để trống hoặc 0 nếu thử
+                thách không phạt.
+              </p>
+              <label>
+                Phạt khi không hoàn thành (đồng)
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  step={1000}
+                  value={flatPenalty}
+                  placeholder="0"
+                  onChange={(e) => setFlatPenalty(e.target.value)}
+                />
+              </label>
+            </>
+          ) : (
+            <>
+              <p className="tiny muted" style={{ marginBottom: 10 }}>
+                Tính theo tỉ lệ hoàn thành mục tiêu, chỉ áp dụng cho thành viên chính thức; đạt 100%
+                không bị phạt. Đặt số tiền 0 nếu mức đó không phạt; xóa hết các mức nếu thử thách
+                không phạt.
+              </p>
+              {penaltyRows.length === 0 && <p className="empty">Không phạt.</p>}
+              {penaltyRows.map((row, index) => {
+                const last = index === penaltyRows.length - 1
+                const upper = index === 0 ? '100' : penaltyRows[index - 1].minPercent || '…'
+                return (
+                  <div key={index} className="penalty-row">
+                    <label>
+                      {last ? `Dưới ${upper}%` : `Từ (%) đến dưới ${upper}%`}
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        max={99}
+                        step={1}
+                        value={last ? '0' : row.minPercent}
+                        disabled={last}
+                        onChange={(e) => updatePenalty(index, { minPercent: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      Phạt (đồng)
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        step={1000}
+                        value={row.amount}
+                        onChange={(e) => updatePenalty(index, { amount: e.target.value })}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="btn ghost compact danger"
+                      onClick={() => removePenaltyRow(index)}
+                    >
+                      Xóa
+                    </button>
+                  </div>
+                )
+              })}
+              <button type="button" className="btn ghost" onClick={addPenaltyRow}>
+                + Thêm mức phạt
+              </button>
+            </>
+          )}
           <p className="tiny muted" style={{ marginTop: 8 }}>
             {typeof parsedPenalty === 'string' ? parsedPenalty : penaltySummary(parsedPenalty)}
           </p>

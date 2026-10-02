@@ -81,7 +81,10 @@ function ChallengeReportView({ report, names }: { report: ChallengeReport; names
       ? tiers.map((t, i) => ({
           key: `tier-${i}`,
           index: i,
-          title: `Không hoàn thành (${tierRangeLabel(tiers, i).toLowerCase()})`,
+          title:
+            tiers.length === 1
+              ? 'Không hoàn thành'
+              : `Không hoàn thành (${tierRangeLabel(tiers, i).toLowerCase()})`,
           hint: t.amount ? `Phạt ${formatVnd(t.amount)}` : 'Không phạt',
         }))
       : [

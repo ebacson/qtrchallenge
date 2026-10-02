@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { onValue, ref } from 'firebase/database'
 import { useAuth } from '../context/AuthContext'
-import { db } from '../lib/firebase'
+import { useSharedValue } from '../lib/sharedValue'
 import {
   parseChallenge,
   parseChallengeDayStartMs,
@@ -30,23 +29,19 @@ function sortChallenges(list: Challenge[], forUpcoming: boolean): Challenge[] {
 
 export function ChallengesPage() {
   const { user, profile } = useAuth()
-  const [challenges, setChallenges] = useState<Challenge[]>([])
   const [filter, setFilter] = useState<Filter>('all')
-  const [loading, setLoading] = useState(true)
+  const raw = useSharedValue<Record<string, Record<string, unknown>>>(
+    user ? 'challenges' : null,
+  )
+  const loading = raw === undefined
 
-  useEffect(() => {
-    if (!user) return
-    const challengesRef = ref(db, 'challenges')
-    const unsub = onValue(challengesRef, (snap) => {
-      const val = (snap.val() ?? {}) as Record<string, Record<string, unknown>>
-      const list = Object.entries(val).map(([id, dict]) =>
-        parseChallenge(id, dict, user.uid),
-      )
-      setChallenges(list)
-      setLoading(false)
-    })
-    return unsub
-  }, [user])
+  const challenges = useMemo<Challenge[]>(
+    () =>
+      user
+        ? Object.entries(raw ?? {}).map(([id, dict]) => parseChallenge(id, dict, user.uid))
+        : [],
+    [raw, user],
+  )
 
   const filtered = useMemo(() => {
     const list = challenges.filter((c) => {

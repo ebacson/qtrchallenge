@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { onValue, ref, update } from 'firebase/database'
-import { db } from '../lib/firebase'
+import { updateUser, useUserProfiles } from '../lib/userWrites'
 import { formatRankTime } from '../lib/prRanking'
 import {
   RECORD_FIELDS as FIELDS,
@@ -23,18 +22,17 @@ type RecordRow = {
 }
 
 export function AdminRecordsPage() {
-  const [rows, setRows] = useState<RecordRow[]>([])
-  const [loading, setLoading] = useState(true)
+  const profiles = useUserProfiles()
+  const loading = profiles === null
   const [filter, setFilter] = useState<Filter>('pending')
   const [q, setQ] = useState('')
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    const unsub = onValue(ref(db, 'users'), (snap) => {
-      const val = (snap.val() ?? {}) as Record<string, Record<string, unknown>>
-      const list = Object.entries(val)
+  const rows = useMemo<RecordRow[]>(
+    () =>
+      Object.entries(profiles ?? {})
         .map(([id, row]) => ({
           id,
           fullName: String(row.fullName ?? ''),
@@ -45,12 +43,9 @@ export function AdminRecordsPage() {
           HM: recordStatus(row, 'HM'),
         }))
         .filter((r) => r.FM.submitted || r.HM.submitted)
-        .sort((a, b) => a.fullName.localeCompare(b.fullName, 'vi'))
-      setRows(list)
-      setLoading(false)
-    })
-    return unsub
-  }, [])
+        .sort((a, b) => a.fullName.localeCompare(b.fullName, 'vi')),
+    [profiles],
+  )
 
   const pendingCount = rows.filter((r) => r.FM.pending || r.HM.pending).length
 
@@ -79,8 +74,8 @@ export function AdminRecordsPage() {
     setMessage('')
     try {
       // Giống app iOS: cờ ở gốc user + bản sao đã duyệt trong personalRecord (Bảng vàng đọc ở đây)
-      await update(
-        ref(db, `users/${row.id}`),
+      await updateUser(
+        row.id,
         value
           ? {
               [flag]: true,

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { get, onValue, ref, remove, set } from 'firebase/database'
+import { get, ref, remove } from 'firebase/database'
 import { AdminUserAchievements } from '../components/AdminUserAchievements'
 import {
   matchesMemberType,
@@ -11,6 +11,8 @@ import { useAuth } from '../context/AuthContext'
 import { deleteUserAvatar } from '../lib/adminOps'
 import { runAdminFullSync, type FullSyncSummary } from '../lib/adminSync'
 import { db } from '../lib/firebase'
+import { useSharedValue } from '../lib/sharedValue'
+import { removeUser, updateUser, useUserProfiles } from '../lib/userWrites'
 
 type AdminUser = {
   id: string
@@ -53,22 +55,20 @@ function ageFromDob(dob: string): number | null {
 
 export function AdminUsersPage() {
   const { user, profile } = useAuth()
-  const [users, setUsers] = useState<AdminUser[]>([])
-  const [loading, setLoading] = useState(true)
+  const profiles = useUserProfiles()
+  const loading = profiles === null
   const [q, setQ] = useState('')
   const [memberType, setMemberType] = useState<MemberType>('all')
   const [busyId, setBusyId] = useState<string | null>(null)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
-  const [joinedCounts, setJoinedCounts] = useState<Record<string, number>>({})
+  const challenges = useSharedValue<Record<string, Record<string, unknown>>>('challenges')
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<FullSyncSummary | null>(null)
 
-  useEffect(() => {
-    const usersRef = ref(db, 'users')
-    const unsub = onValue(usersRef, (snap) => {
-      const val = (snap.val() ?? {}) as Record<string, Record<string, unknown>>
-      const list = Object.entries(val)
+  const users = useMemo<AdminUser[]>(
+    () =>
+      Object.entries(profiles ?? {})
         .map(([id, row]) => ({
           id,
           fullName: String(row.fullName ?? ''),
@@ -88,28 +88,21 @@ export function AdminUsersPage() {
           if (a.admin !== b.admin) return a.admin ? -1 : 1
           if (a.member !== b.member) return a.member ? -1 : 1
           return a.fullName.localeCompare(b.fullName, 'vi')
-        })
-      setUsers(list)
-      setLoading(false)
-    })
-    return unsub
-  }, [])
+        }),
+    [profiles],
+  )
 
-  useEffect(() => {
-    const unsub = onValue(ref(db, 'challenges'), (snap) => {
-      const val = (snap.val() ?? {}) as Record<string, Record<string, unknown>>
-      const counts: Record<string, number> = {}
-      for (const challenge of Object.values(val)) {
-        const participants = challenge?.user_challenges
-        if (!participants || typeof participants !== 'object') continue
-        for (const uid of Object.keys(participants)) {
-          counts[uid] = (counts[uid] ?? 0) + 1
-        }
+  const joinedCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const challenge of Object.values(challenges ?? {})) {
+      const participants = challenge?.user_challenges
+      if (!participants || typeof participants !== 'object') continue
+      for (const uid of Object.keys(participants)) {
+        counts[uid] = (counts[uid] ?? 0) + 1
       }
-      setJoinedCounts(counts)
-    })
-    return unsub
-  }, [])
+    }
+    return counts
+  }, [challenges])
 
   async function syncEveryone() {
     if (!user) return
@@ -177,7 +170,7 @@ export function AdminUsersPage() {
     setError('')
     setMessage('')
     try {
-      await set(ref(db, `users/${uid}/${field}`), value)
+      await updateUser(uid, { [field]: value })
       setMessage(
         field === 'admin'
           ? value
@@ -220,18 +213,17 @@ export function AdminUsersPage() {
     setError('')
     setMessage('')
     try {
-      const challengesSnap = await get(ref(db, 'challenges'))
-      const challenges = (challengesSnap.val() ?? {}) as Record<
+      const latest = ((await get(ref(db, 'challenges'))).val() ?? {}) as Record<
         string,
         Record<string, unknown>
       >
       await Promise.all(
-        Object.keys(challenges).map((challengeId) =>
+        Object.keys(latest).map((challengeId) =>
           remove(ref(db, `challenges/${challengeId}/user_challenges/${target.id}`)),
         ),
       )
       await deleteUserAvatar(target.id)
-      await remove(ref(db, `users/${target.id}`))
+      await removeUser(target.id)
       setMessage(`Đã xóa thành viên ${target.fullName || target.email}.`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không xóa được')

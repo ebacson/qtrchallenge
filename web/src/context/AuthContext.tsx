@@ -16,9 +16,10 @@ import {
   signOut,
   type User,
 } from 'firebase/auth'
-import { onValue, ref } from 'firebase/database'
-import { refreshUserLevel } from '../lib/challengeProgress'
+import { get, onValue, ref, update } from 'firebase/database'
 import { auth, db } from '../lib/firebase'
+import { resetSharedValues } from '../lib/sharedValue'
+import { PROFILE_FIELDS, USER_PROFILES_PATH } from '../lib/userProfile'
 import type { UserProfile } from '../types'
 
 interface AuthContextValue {
@@ -63,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsub = onAuthStateChanged(auth, (next) => {
       setUser(next)
       if (!next) {
+        resetSharedValues()
         setProfile(null)
         setLoading(false)
       }
@@ -70,27 +72,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return unsub
   }, [])
 
+  const healedFor = useRef<string | null>(null)
+
   useEffect(() => {
     if (!user) return
-    const userRef = ref(db, `users/${user.uid}`)
-    const unsub = onValue(userRef, (snap) => {
-      const val = snap.val() as Record<string, unknown> | null
-      setProfile(val ? mapProfile(user.uid, val) : null)
-      setLoading(false)
-    })
-    return unsub
-  }, [user])
+    const uid = user.uid
+    let healDone = healedFor.current === uid
+    let latest: Record<string, unknown> | null = null
+    let cancelled = false
 
-  // Thử thách kết thúc không tự kích hoạt tính lại level → làm một lần mỗi phiên khi đã có hồ sơ
-  const hasProfile = profile !== null
-  const levelRefreshedFor = useRef<string | null>(null)
-  useEffect(() => {
-    if (!user || !hasProfile || levelRefreshedFor.current === user.uid) return
-    levelRefreshedFor.current = user.uid
-    void refreshUserLevel(user.uid).catch((err) => {
-      console.warn('refreshUserLevel failed', err)
+    const unsub = onValue(ref(db, `${USER_PROFILES_PATH}/${uid}`), (snap) => {
+      latest = snap.val() as Record<string, unknown> | null
+      setProfile(latest ? mapProfile(uid, latest) : null)
+      // Chưa có hồ sơ gọn (vd. đăng ký từ app iOS): chờ tự đồng bộ xong mới kết luận
+      if (latest || healDone) setLoading(false)
     })
-  }, [user, hasProfile])
+
+    if (!healDone) {
+      healedFor.current = uid
+      // App iOS/Android chỉ ghi vào users/{uid} → mỗi phiên so lại từng trường hồ sơ (vài KB)
+      void Promise.all(
+        PROFILE_FIELDS.map(async (field) => {
+          const snap = await get(ref(db, `users/${uid}/${field}`))
+          return [field, snap.val()] as const
+        }),
+      )
+        .then(async (pairs) => {
+          const source = Object.fromEntries(pairs.filter(([, v]) => v != null))
+          if (Object.keys(source).length === 0) return
+          const current = latest ?? {}
+          const updates: Record<string, unknown> = {}
+          for (const [field, value] of pairs) {
+            if (JSON.stringify(current[field] ?? null) !== JSON.stringify(value ?? null)) {
+              updates[`${USER_PROFILES_PATH}/${uid}/${field}`] = value ?? null
+            }
+          }
+          if (Object.keys(updates).length > 0) await update(ref(db), updates)
+        })
+        .catch((err) => {
+          console.warn('profile mirror sync failed', err)
+        })
+        .finally(() => {
+          healDone = true
+          if (!cancelled) setLoading(false)
+        })
+    }
+
+    return () => {
+      cancelled = true
+      unsub()
+    }
+  }, [user])
 
   const login = useCallback(async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email.trim(), password)

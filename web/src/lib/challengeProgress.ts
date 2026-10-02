@@ -3,6 +3,7 @@ import { db } from './firebase'
 import { calculateStatus, STATUS_FINISHED } from './challengeRules'
 import { calculateLevelFromChallenges } from './levelCalculator'
 import { computeUserChallengeUpdate } from './progressCompute'
+import { updateUser } from './userWrites'
 
 const THROTTLE_MS = 300_000
 
@@ -46,7 +47,7 @@ export async function refreshUserLevel(
   }
 
   if (level !== current) {
-    await update(ref(db, `users/${uid}`), { level })
+    await updateUser(uid, { level })
   }
   return level
 }
@@ -101,15 +102,13 @@ export async function syncOngoingChallengeProgress(
           ref(db, `challenges/${challengeId}/user_challenges/${uid}`),
           updates,
         )
+        // Áp vào bản đã đọc để tính level, khỏi đọc lại cả `challenges`
+        Object.assign(userRow, updates)
         updatedChallengeIds.push(challengeId)
       }),
     )
 
-    // Progress vừa ghi có thể là lần cuối của thử thách vừa kết thúc → đọc lại trước khi tính level
-    const latestChallenges = updatedChallengeIds.length
-      ? ((await get(ref(db, 'challenges'))).val() ?? {})
-      : challenges
-    await refreshUserLevel(uid, latestChallenges)
+    await refreshUserLevel(uid, challenges)
 
     lastSyncAt = Date.now()
     return {

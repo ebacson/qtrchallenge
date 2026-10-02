@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { get, onValue, ref } from 'firebase/database'
+import { get, ref } from 'firebase/database'
 import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
+import { useSharedValue } from '../lib/sharedValue'
 import type { Activity } from '../types'
 
 const RUN_TYPES = new Set(['Run', 'TrailRun', 'VirtualRun'])
@@ -127,25 +128,24 @@ export function ActivitiesPage() {
   const targetUid = paramUid || user?.uid || ''
   const isSelf = !paramUid || paramUid === user?.uid
 
-  const [activities, setActivities] = useState<Activity[]>([])
-  const [loading, setLoading] = useState(true)
   const [typeFilter, setTypeFilter] = useState('all')
   const [owner, setOwner] = useState<{ fullName: string; avatar: string } | null>(null)
+  const raw = useSharedValue<Record<string, Record<string, unknown>>>(
+    targetUid ? `users/${targetUid}/strava_activities` : null,
+    isSelf ? undefined : 60_000,
+  )
+  const loading = raw === undefined
+
+  const activities = useMemo<Activity[]>(
+    () =>
+      Object.entries(raw ?? {})
+        .map(([id, dict]) => mapActivity(id, dict))
+        .sort((a, b) => activityTimeMs(b.startDate) - activityTimeMs(a.startDate)),
+    [raw],
+  )
 
   useEffect(() => {
-    if (!targetUid) return
-    setLoading(true)
     setTypeFilter('all')
-    const actRef = ref(db, `users/${targetUid}/strava_activities`)
-    const unsub = onValue(actRef, (snap) => {
-      const val = (snap.val() ?? {}) as Record<string, Record<string, unknown>>
-      const list = Object.entries(val)
-        .map(([id, dict]) => mapActivity(id, dict))
-        .sort((a, b) => activityTimeMs(b.startDate) - activityTimeMs(a.startDate))
-      setActivities(list)
-      setLoading(false)
-    })
-    return unsub
   }, [targetUid])
 
   useEffect(() => {

@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { onValue, ref, remove, update } from 'firebase/database'
 import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
+import { useUserProfiles } from '../lib/userWrites'
 import {
   canJoin,
   challengeGeneralRules,
@@ -86,9 +87,7 @@ export function ChallengeDetailPage() {
   const [rawUserChallenges, setRawUserChallenges] = useState<
     Record<string, Record<string, unknown>>
   >({})
-  const [profiles, setProfiles] = useState<
-    Record<string, { fullName: string; avatar: string }>
-  >({})
+  const rawProfiles = useUserProfiles()
   const [showDescription, setShowDescription] = useState(false)
   const [selectedTarget, setSelectedTarget] = useState('')
   const [selectedOptions, setSelectedOptions] = useState<number[]>([0])
@@ -124,21 +123,16 @@ export function ChallengeDetailPage() {
     return unsub
   }, [id, user])
 
-  useEffect(() => {
-    const usersRef = ref(db, 'users')
-    const unsub = onValue(usersRef, (snap) => {
-      const val = (snap.val() ?? {}) as Record<string, Record<string, unknown>>
-      const map: Record<string, { fullName: string; avatar: string }> = {}
-      for (const [uid, row] of Object.entries(val)) {
-        map[uid] = {
-          fullName: String(row.fullName ?? ''),
-          avatar: String(row.avatar ?? ''),
-        }
+  const profiles = useMemo(() => {
+    const map: Record<string, { fullName: string; avatar: string }> = {}
+    for (const [uid, row] of Object.entries(rawProfiles ?? {})) {
+      map[uid] = {
+        fullName: String(row.fullName ?? ''),
+        avatar: String(row.avatar ?? ''),
       }
-      setProfiles(map)
-    })
-    return unsub
-  }, [])
+    }
+    return map
+  }, [rawProfiles])
 
   const participants = useMemo(() => {
     const isDayQuotaChallenge = challenge?.challengeMode === 'day_quota'

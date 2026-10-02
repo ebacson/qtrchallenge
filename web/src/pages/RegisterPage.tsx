@@ -1,9 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
-import { ref, set } from 'firebase/database'
 import { useAuth } from '../context/AuthContext'
 import { brandLogoSrc, brandTitle } from '../lib/brand'
-import { db } from '../lib/firebase'
+import { createUser } from '../lib/userWrites'
 
 export function RegisterPage() {
   const { user, loading, register } = useAuth()
@@ -22,7 +21,7 @@ export function RegisterPage() {
     setBusy(true)
     try {
       const newUser = await register(email, password)
-      await set(ref(db, `users/${newUser.uid}`), {
+      await createUser(newUser.uid, {
         fullName: fullName.trim(),
         email: email.trim(),
         phone: '',

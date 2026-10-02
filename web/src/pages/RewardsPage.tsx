@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { onValue, ref } from 'firebase/database'
-import { db } from '../lib/firebase'
+import { useSharedValue } from '../lib/sharedValue'
+import { useUserProfiles } from '../lib/userWrites'
 import {
   parseChallenge,
   parseChallengeDay,
@@ -273,35 +273,24 @@ function SummaryView({ reports }: { reports: ChallengeReport[] }) {
 }
 
 export function RewardsPage() {
-  const [rawChallenges, setRawChallenges] = useState<Record<string, Record<string, unknown>>>({})
-  const [profiles, setProfiles] = useState<Record<string, Profile>>({})
-  const [loading, setLoading] = useState(true)
+  const rawProfiles = useUserProfiles()
+  const challengesValue = useSharedValue<Record<string, Record<string, unknown>>>('challenges')
+  const loading = challengesValue === undefined
+  const rawChallenges = useMemo(() => challengesValue ?? {}, [challengesValue])
   const [selected, setSelected] = useState('')
 
-  useEffect(() => {
-    const unsub = onValue(ref(db, 'challenges'), (snap) => {
-      setRawChallenges((snap.val() ?? {}) as Record<string, Record<string, unknown>>)
-      setLoading(false)
-    })
-    return unsub
-  }, [])
-
-  useEffect(() => {
-    const unsub = onValue(ref(db, 'users'), (snap) => {
-      const val = (snap.val() ?? {}) as Record<string, Record<string, unknown>>
-      const map: Record<string, Profile> = {}
-      for (const [uid, row] of Object.entries(val)) {
-        map[uid] = {
-          fullName: String(row.fullName ?? ''),
-          avatar: String(row.avatar ?? ''),
-          member: row.member === true,
-          email: String(row.email ?? '').toLowerCase(),
-        }
+  const profiles = useMemo(() => {
+    const map: Record<string, Profile> = {}
+    for (const [uid, row] of Object.entries(rawProfiles ?? {})) {
+      map[uid] = {
+        fullName: String(row.fullName ?? ''),
+        avatar: String(row.avatar ?? ''),
+        member: row.member === true,
+        email: String(row.email ?? '').toLowerCase(),
       }
-      setProfiles(map)
-    })
-    return unsub
-  }, [])
+    }
+    return map
+  }, [rawProfiles])
 
   const officialMembers = useMemo(
     () =>

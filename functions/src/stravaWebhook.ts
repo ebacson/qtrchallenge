@@ -1,5 +1,6 @@
 import { getDatabase } from 'firebase-admin/database'
 import * as logger from 'firebase-functions/logger'
+import { USER_PROFILES_PATH } from './shared/userProfile'
 import { syncSingleUser } from './syncAll'
 
 export const STRAVA_EVENTS_TOPIC = 'strava-events'
@@ -36,25 +37,35 @@ export function parseWebhookEvent(body: unknown): StravaWebhookEvent | null {
   }
 }
 
-/** Đọc cả nhánh users rất nặng (có strava_activities), nên chỉ dựng lại chỉ mục tối đa 1 lần/phút. */
+/** Dựng chỉ mục từ `user_profiles` (hồ sơ gọn), tối đa 1 lần/phút. */
 const INDEX_REBUILD_MIN_MS = 60_000
 let athleteIndex = new Map<string, string>()
 let indexBuiltAt = 0
 
 async function rebuildAthleteIndex(): Promise<void> {
-  const snap = await getDatabase().ref('users').get()
-  const next = new Map<string, string>()
-  const connected = new Set<string>()
+  const db = getDatabase()
+  const snap = await db.ref(USER_PROFILES_PATH).get()
+  const candidates = new Map<string, string[]>()
   snap.forEach((child) => {
     const athleteId = String(child.child('id_strava').val() ?? '').trim()
     if (!athleteId || !child.key) return
-    const hasToken = Boolean(child.child('refresh_token').val())
-    // Trùng athlete ID: ưu tiên tài khoản đang có token Strava
-    if (!next.has(athleteId) || (hasToken && !connected.has(athleteId))) {
-      next.set(athleteId, child.key)
-      if (hasToken) connected.add(athleteId)
-    }
+    candidates.set(athleteId, [...(candidates.get(athleteId) ?? []), child.key])
   })
+
+  const next = new Map<string, string>()
+  for (const [athleteId, uids] of candidates) {
+    let chosen = uids[0]
+    if (uids.length > 1) {
+      // Trùng athlete ID: ưu tiên tài khoản đang có token Strava
+      for (const uid of uids) {
+        if ((await db.ref(`users/${uid}/refresh_token`).get()).val()) {
+          chosen = uid
+          break
+        }
+      }
+    }
+    next.set(athleteId, chosen)
+  }
   athleteIndex = next
   indexBuiltAt = Date.now()
 }

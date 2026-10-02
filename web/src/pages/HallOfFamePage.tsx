@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { onValue, ref } from 'firebase/database'
-import { db } from '../lib/firebase'
+import { useUserProfiles } from '../lib/userWrites'
 import {
   displayTime,
   mapAthleteFromUser,
@@ -85,27 +84,20 @@ function TopLaureateCard({
 }
 
 export function HallOfFamePage() {
-  const [athletes, setAthletes] = useState<AthletePrRow[]>([])
-  const [histories, setHistories] = useState<Record<string, HistoryEntry[]>>({})
-  const [loading, setLoading] = useState(true)
+  const profiles = useUserProfiles()
+  const loading = profiles === null
   const [distance, setDistance] = useState<DistanceKey>('FM')
   const [gender, setGender] = useState<GenderKey>('Nam')
 
-  useEffect(() => {
-    const usersRef = ref(db, 'users')
-    const unsub = onValue(usersRef, (snap) => {
-      const val = (snap.val() ?? {}) as Record<string, Record<string, unknown>>
-      const list = Object.entries(val)
-        .map(([id, data]) => mapAthleteFromUser(id, data))
-        .filter((a): a is AthletePrRow => a != null)
-      const historyMap: Record<string, HistoryEntry[]> = {}
-      for (const a of list) historyMap[a.id] = parseHistory(val[a.id]?.history)
-      setAthletes(list)
-      setHistories(historyMap)
-      setLoading(false)
-    })
-    return unsub
-  }, [])
+  const { athletes, histories } = useMemo(() => {
+    const val = profiles ?? {}
+    const list = Object.entries(val)
+      .map(([id, data]) => mapAthleteFromUser(id, data))
+      .filter((a): a is AthletePrRow => a != null)
+    const historyMap: Record<string, HistoryEntry[]> = {}
+    for (const a of list) historyMap[a.id] = parseHistory(val[a.id]?.history)
+    return { athletes: list, histories: historyMap }
+  }, [profiles])
 
   const ranked = useMemo(
     () => rankAthletes(athletes, distance, gender),

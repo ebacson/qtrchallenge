@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { onValue, ref } from 'firebase/database'
 import { useAuth } from '../context/AuthContext'
-import { db } from '../lib/firebase'
+import { useSharedValue } from '../lib/sharedValue'
 import { parseChallenge, parseChallengeDayStartMs, STATUS_ONGOING } from '../lib/challengeRules'
 import type { Challenge } from '../types'
 import { ChallengeCard } from '../components/ChallengeCard'
@@ -18,37 +17,28 @@ const shortcuts = [
 
 export function HomePage() {
   const { profile, user } = useAuth()
-  const [ongoing, setOngoing] = useState<Challenge[]>([])
-  const [activityCount, setActivityCount] = useState(0)
+  const challenges = useSharedValue<Record<string, Record<string, unknown>>>(
+    user ? 'challenges' : null,
+  )
+  const activities = useSharedValue<Record<string, unknown>>(
+    user ? `users/${user.uid}/strava_activities` : null,
+  )
 
-  useEffect(() => {
-    if (!user) return
-    const challengesRef = ref(db, 'challenges')
-    const unsub = onValue(challengesRef, (snap) => {
-      const val = (snap.val() ?? {}) as Record<string, Record<string, unknown>>
-      const list = Object.entries(val)
-        .map(([id, dict]) => parseChallenge(id, dict, user.uid))
-        .filter((c) => c.status === STATUS_ONGOING && c.userTarget)
-        .sort(
-          (a, b) =>
-            (parseChallengeDayStartMs(b.startDate) ?? 0) -
-            (parseChallengeDayStartMs(a.startDate) ?? 0),
-        )
-        .slice(0, 3)
-      setOngoing(list)
-    })
-    return unsub
-  }, [user])
+  const ongoing = useMemo<Challenge[]>(() => {
+    if (!user) return []
+    return Object.entries(challenges ?? {})
+      .map(([id, dict]) => parseChallenge(id, dict, user.uid))
+      .filter((c) => c.status === STATUS_ONGOING && c.userTarget)
+      .sort(
+        (a, b) =>
+          (parseChallengeDayStartMs(b.startDate) ?? 0) -
+          (parseChallengeDayStartMs(a.startDate) ?? 0),
+      )
+      .slice(0, 3)
+  }, [challenges, user])
 
-  useEffect(() => {
-    if (!user) return
-    const actRef = ref(db, `users/${user.uid}/strava_activities`)
-    const unsub = onValue(actRef, (snap) => {
-      const val = snap.val()
-      setActivityCount(val && typeof val === 'object' ? Object.keys(val).length : 0)
-    })
-    return unsub
-  }, [user])
+  const activityCount =
+    activities && typeof activities === 'object' ? Object.keys(activities).length : 0
 
   return (
     <div className="page">

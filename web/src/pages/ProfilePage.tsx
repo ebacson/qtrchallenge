@@ -1,18 +1,13 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import {
-  onValue,
-  ref,
-  remove,
-  set,
-  update,
-} from 'firebase/database'
+import { onValue, ref } from 'firebase/database'
 import { StravaConnectPanel } from '../components/StravaConnectPanel'
 import { useAuth } from '../context/AuthContext'
 import { uploadUserAvatar } from '../lib/avatarUpload'
 import { db } from '../lib/firebase'
 import { levelTone } from '../lib/levelCalculator'
 import { formatHistoryTime, parseHistory, type HistoryEntry } from '../lib/userRecords'
+import { updateUser } from '../lib/userWrites'
 
 export function ProfilePage() {
   const { user, profile } = useAuth()
@@ -72,7 +67,7 @@ export function ProfilePage() {
       const localUrl = URL.createObjectURL(file)
       setAvatarPreview(localUrl)
       const downloadUrl = await uploadUserAvatar(user.uid, file)
-      await update(ref(db, `users/${user.uid}`), { avatar: downloadUrl })
+      await updateUser(user.uid, { avatar: downloadUrl })
       setMessage('Đã cập nhật ảnh đại diện.')
       URL.revokeObjectURL(localUrl)
       setAvatarPreview(downloadUrl)
@@ -104,7 +99,7 @@ export function ProfilePage() {
       }
       if (fmChanged) payload.isFullMarathonVerified = false
       if (hmChanged) payload.isHalfMarathonVerified = false
-      await update(ref(db, `users/${user.uid}`), payload)
+      await updateUser(user.uid, payload)
       setMessage(
         fmChanged || hmChanged
           ? 'Đã lưu. PR đổi sẽ cần admin xác minh lại để lên Bảng vàng.'
@@ -130,19 +125,22 @@ export function ProfilePage() {
     try {
       if (editingId) {
         const existing = history.find((h) => h.id === editingId)
-        await update(ref(db, `users/${user.uid}/history/${editingId}`), {
-          content,
-          timestamp: existing?.timestamp || editingId,
-          createdAt: existing?.createdAt || Date.now() / 1000,
-          updatedAt: Date.now() / 1000,
+        const base = `history/${editingId}`
+        await updateUser(user.uid, {
+          [`${base}/content`]: content,
+          [`${base}/timestamp`]: existing?.timestamp || editingId,
+          [`${base}/createdAt`]: existing?.createdAt || Date.now() / 1000,
+          [`${base}/updatedAt`]: Date.now() / 1000,
         })
       } else {
         const nowMs = Date.now()
         const key = String(nowMs)
-        await set(ref(db, `users/${user.uid}/history/${key}`), {
-          content,
-          timestamp: key,
-          createdAt: nowMs / 1000,
+        await updateUser(user.uid, {
+          [`history/${key}`]: {
+            content,
+            timestamp: key,
+            createdAt: nowMs / 1000,
+          },
         })
       }
       setHistoryDraft('')
@@ -172,7 +170,7 @@ export function ProfilePage() {
     setHistoryBusy(true)
     setHistoryError('')
     try {
-      await remove(ref(db, `users/${user.uid}/history/${id}`))
+      await updateUser(user.uid, { [`history/${id}`]: null })
       if (editingId === id) cancelEditHistory()
     } catch (err) {
       setHistoryError(err instanceof Error ? err.message : 'Không xóa được')

@@ -1,6 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { ref, remove, set, update } from 'firebase/database'
-import { db } from '../lib/firebase'
+import { updateUser } from '../lib/userWrites'
 import { formatRankTime, timeToSeconds } from '../lib/prRanking'
 import {
   RECORD_FIELDS,
@@ -94,7 +93,7 @@ export function AdminUserAchievements({ uid, displayName, row }: Props) {
     setError('')
     setMessage('')
     try {
-      await update(ref(db, `users/${uid}`), updates)
+      await updateUser(uid, updates)
       setMessage(`Đã lưu PR của ${displayName}.`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không lưu được PR')
@@ -116,19 +115,22 @@ export function AdminUserAchievements({ uid, displayName, row }: Props) {
     try {
       if (editingId) {
         const existing = history.find((h) => h.id === editingId)
-        await update(ref(db, `users/${uid}/history/${editingId}`), {
-          content,
-          timestamp: existing?.timestamp || editingId,
-          createdAt: existing?.createdAt || Date.now() / 1000,
-          updatedAt: Date.now() / 1000,
+        const base = `history/${editingId}`
+        await updateUser(uid, {
+          [`${base}/content`]: content,
+          [`${base}/timestamp`]: existing?.timestamp || editingId,
+          [`${base}/createdAt`]: existing?.createdAt || Date.now() / 1000,
+          [`${base}/updatedAt`]: Date.now() / 1000,
         })
       } else {
         const nowMs = Date.now()
         const key = String(nowMs)
-        await set(ref(db, `users/${uid}/history/${key}`), {
-          content,
-          timestamp: key,
-          createdAt: nowMs / 1000,
+        await updateUser(uid, {
+          [`history/${key}`]: {
+            content,
+            timestamp: key,
+            createdAt: nowMs / 1000,
+          },
         })
       }
       setHistoryDraft('')
@@ -146,7 +148,7 @@ export function AdminUserAchievements({ uid, displayName, row }: Props) {
     setError('')
     setMessage('')
     try {
-      await remove(ref(db, `users/${uid}/history/${id}`))
+      await updateUser(uid, { [`history/${id}`]: null })
       if (editingId === id) {
         setEditingId(null)
         setHistoryDraft('')

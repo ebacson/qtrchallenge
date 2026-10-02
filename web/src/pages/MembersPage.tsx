@@ -1,12 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { onValue, ref } from 'firebase/database'
 import {
   matchesMemberType,
   MemberTypeFilter,
   type MemberType,
 } from '../components/MemberTypeFilter'
-import { db } from '../lib/firebase'
+import { useUserProfiles } from '../lib/userWrites'
 
 type Member = {
   id: string
@@ -18,16 +17,14 @@ type Member = {
 }
 
 export function MembersPage() {
-  const [members, setMembers] = useState<Member[]>([])
-  const [loading, setLoading] = useState(true)
+  const profiles = useUserProfiles()
+  const loading = profiles === null
   const [q, setQ] = useState('')
   const [memberType, setMemberType] = useState<MemberType>('all')
 
-  useEffect(() => {
-    const usersRef = ref(db, 'users')
-    const unsub = onValue(usersRef, (snap) => {
-      const val = (snap.val() ?? {}) as Record<string, Record<string, unknown>>
-      const list = Object.entries(val)
+  const members = useMemo<Member[]>(
+    () =>
+      Object.entries(profiles ?? {})
         .map(([id, row]) => ({
           id,
           fullName: String(row.fullName ?? ''),
@@ -40,12 +37,9 @@ export function MembersPage() {
         .sort((a, b) => {
           if (b.level !== a.level) return b.level - a.level
           return a.fullName.localeCompare(b.fullName, 'vi')
-        })
-      setMembers(list)
-      setLoading(false)
-    })
-    return unsub
-  }, [])
+        }),
+    [profiles],
+  )
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()

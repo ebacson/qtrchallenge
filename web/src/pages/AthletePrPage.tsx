@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { onValue, ref } from 'firebase/database'
-import { db } from '../lib/firebase'
 import { mapAthleteFromUser, type AthletePrRow } from '../lib/prRanking'
+import { useUserProfiles } from '../lib/userWrites'
 
 type HistoryEntry = {
   id: string
@@ -12,29 +11,26 @@ type HistoryEntry = {
 
 export function AthletePrPage() {
   const { uid } = useParams<{ uid: string }>()
-  const [athlete, setAthlete] = useState<AthletePrRow | null>(null)
-  const [history, setHistory] = useState<HistoryEntry[]>([])
-  const [loading, setLoading] = useState(true)
+  const profiles = useUserProfiles()
+  const loading = profiles === null
 
-  useEffect(() => {
-    if (!uid) return
-    const userRef = ref(db, `users/${uid}`)
-    const unsub = onValue(userRef, (snap) => {
-      const val = snap.val() as Record<string, unknown> | null
-      setAthlete(val ? mapAthleteFromUser(uid, val) : null)
-      const hist = (val?.history ?? {}) as Record<string, Record<string, unknown>>
-      const entries = Object.entries(hist)
+  const { athlete, history } = useMemo<{
+    athlete: AthletePrRow | null
+    history: HistoryEntry[]
+  }>(() => {
+    const val = uid ? profiles?.[uid] : undefined
+    const hist = (val?.history ?? {}) as Record<string, Record<string, unknown>>
+    return {
+      athlete: uid && val ? mapAthleteFromUser(uid, val) : null,
+      history: Object.entries(hist)
         .map(([id, row]) => ({
           id,
           content: String(row.content ?? ''),
           timestamp: String(row.timestamp ?? row.createdAt ?? ''),
         }))
-        .sort((a, b) => b.id.localeCompare(a.id))
-      setHistory(entries)
-      setLoading(false)
-    })
-    return unsub
-  }, [uid])
+        .sort((a, b) => b.id.localeCompare(a.id)),
+    }
+  }, [profiles, uid])
 
   if (loading) {
     return (

@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
-import { onValue, ref } from 'firebase/database'
+import { useMemo } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { db } from '../lib/firebase'
+import { useSharedValue } from '../lib/sharedValue'
 import { timeToSeconds } from '../lib/prRanking'
 
 type Act = {
@@ -20,26 +19,21 @@ function paceToMinutes(pace: string): number {
 
 export function StatsPage() {
   const { user, profile } = useAuth()
-  const [acts, setActs] = useState<Act[]>([])
-  const [loading, setLoading] = useState(true)
+  const raw = useSharedValue<Record<string, Record<string, unknown>>>(
+    user ? `users/${user.uid}/strava_activities` : null,
+  )
+  const loading = raw === undefined
 
-  useEffect(() => {
-    if (!user) return
-    const aRef = ref(db, `users/${user.uid}/strava_activities`)
-    const unsub = onValue(aRef, (snap) => {
-      const val = (snap.val() ?? {}) as Record<string, Record<string, unknown>>
-      setActs(
-        Object.values(val).map((row) => ({
-          type: String(row.type ?? ''),
-          distance: String(row.distance ?? ''),
-          pace: String(row.pace ?? ''),
-          startDate: String(row.startDate ?? ''),
-        })),
-      )
-      setLoading(false)
-    })
-    return unsub
-  }, [user])
+  const acts = useMemo<Act[]>(
+    () =>
+      Object.values(raw ?? {}).map((row) => ({
+        type: String(row.type ?? ''),
+        distance: String(row.distance ?? ''),
+        pace: String(row.pace ?? ''),
+        startDate: String(row.startDate ?? ''),
+      })),
+    [raw],
+  )
 
   const stats = useMemo(() => {
     const eligible = acts.filter((a) => STAT_TYPES.has(a.type))

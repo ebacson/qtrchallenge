@@ -14,6 +14,7 @@ import {
 } from './shared/challengeRules'
 import { calculateLevelFromChallenges } from './shared/levelCalculator'
 import { computeUserChallengeUpdate } from './shared/progressCompute'
+import { pickProfile, PROFILE_FIELDS, USER_PROFILES_PATH } from './shared/userProfile'
 
 type Dict = Record<string, unknown>
 
@@ -37,6 +38,7 @@ export type FullSyncSummary = {
   challengesProcessed: number
   progressRowsUpdated: number
   levelsUpdated: number
+  profilesUpdated: number
 }
 
 export class SyncAlreadyRunningError extends Error {
@@ -184,7 +186,46 @@ function emptySummary(trigger: string, started: number): FullSyncSummary {
     challengesProcessed: 0,
     progressRowsUpdated: 0,
     levelsUpdated: 0,
+    profilesUpdated: 0,
   }
+}
+
+/**
+ * Đưa `user_profiles` về khớp với `users` (app iOS/Android chỉ ghi vào `users`).
+ * Chỉ ghi các trường khác nhau; trả về số user có thay đổi.
+ */
+async function syncUserProfiles(users: Dict): Promise<number> {
+  const db = getDatabase()
+  const existing = asDict((await db.ref(USER_PROFILES_PATH).get()).val()) ?? {}
+  const updates: Dict = {}
+  const changed = new Set<string>()
+  const stale: [string, string][] = []
+  for (const [uid, raw] of Object.entries(users)) {
+    const row = asDict(raw)
+    if (!row) continue
+    const next = pickProfile(row)
+    const prev = asDict(existing[uid]) ?? {}
+    for (const field of PROFILE_FIELDS) {
+      if (!sameValue(prev[field], next[field])) stale.push([uid, field])
+    }
+  }
+  // `users` được đọc từ đầu lượt sync (vài phút trước) → đọc lại đúng các trường lệch
+  await forEachLimit(stale, 20, async ([uid, field]) => {
+    const fresh = (await db.ref(`users/${uid}/${field}`).get()).val()
+    const prev = asDict(existing[uid]) ?? {}
+    if (sameValue(prev[field], fresh)) return
+    updates[`${USER_PROFILES_PATH}/${uid}/${field}`] = fresh ?? null
+    changed.add(uid)
+  })
+  let changedUsers = changed.size
+  for (const uid of Object.keys(existing)) {
+    if (!asDict(users[uid])) {
+      updates[`${USER_PROFILES_PATH}/${uid}`] = null
+      changedUsers += 1
+    }
+  }
+  await applyRootUpdates(updates)
+  return changedUsers
 }
 
 /**
@@ -273,7 +314,10 @@ export async function syncSingleUser(uid: string, fetchStrava: boolean): Promise
   if (row.email != null) {
     const level = calculateLevelFromChallenges(uid, challenges)
     if (level !== (Number(row.level ?? 0) || 0)) {
-      await db.ref(`users/${uid}/level`).set(level)
+      await db.ref().update({
+        [`users/${uid}/level`]: level,
+        [`${USER_PROFILES_PATH}/${uid}/level`]: level,
+      })
       levelChanged = true
     }
   }
@@ -349,10 +393,13 @@ export async function runFullSync(trigger: string): Promise<FullSyncSummary> {
       const level = calculateLevelFromChallenges(uid, challenges)
       if (level !== (Number(row.level ?? 0) || 0)) {
         levelUpdates[`users/${uid}/level`] = level
+        row.level = level
         summary.levelsUpdated += 1
       }
     }
     await applyRootUpdates(levelUpdates)
+
+    summary.profilesUpdated = await syncUserProfiles(users)
 
     summary.durationMs = Date.now() - started
     logger.info('runFullSync done', {

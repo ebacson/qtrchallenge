@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { onValue, ref } from 'firebase/database'
-import { db } from '../lib/firebase'
+import { get, ref } from 'firebase/database'
+import { auth, db } from '../lib/firebase'
 
 export type ClubEvent = {
   id: string
@@ -12,11 +12,23 @@ export type ClubEvent = {
   description: string
 }
 
-function mapEvent(id: string, data: Record<string, unknown>): ClubEvent {
-  const info = (data.race_infor ?? {}) as Record<string, unknown>
+const INFO_FIELDS = ['name', 'raceday', 'infor', 'location', 'description'] as const
+
+/**
+ * Chỉ đọc các trường chữ: mỗi event còn ảnh base64 (race_infor.icon, adv) tới vài MB
+ * mà trang này không dùng.
+ */
+async function loadEvent(id: string): Promise<ClubEvent | null> {
+  const base = `EVENT/${id}`
+  const [rootName, ...infoSnaps] = await Promise.all([
+    get(ref(db, `${base}/name`)),
+    ...INFO_FIELDS.map((f) => get(ref(db, `${base}/race_infor/${f}`))),
+  ])
+  const info = Object.fromEntries(INFO_FIELDS.map((f, i) => [f, infoSnaps[i].val()]))
+  if (!rootName.exists() && infoSnaps.every((s) => !s.exists())) return null
   return {
     id,
-    name: String(info.name ?? data.name ?? id),
+    name: String(info.name ?? rootName.val() ?? id),
     raceday: String(info.raceday ?? ''),
     status: String(info.infor ?? 'Coming soon'),
     location: String(info.location ?? ''),
@@ -24,21 +36,51 @@ function mapEvent(id: string, data: Record<string, unknown>): ClubEvent {
   }
 }
 
+/** Danh sách id event không tải dữ liệu con (REST `shallow`). */
+async function loadEventIds(): Promise<string[]> {
+  const token = await auth.currentUser?.getIdToken()
+  const dbUrl = String(db.app.options.databaseURL ?? '').replace(/\/+$/, '')
+  const url = new URL(`${dbUrl}/EVENT.json`)
+  url.searchParams.set('shallow', 'true')
+  if (token) url.searchParams.set('auth', token)
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`Không tải được danh sách event (${res.status})`)
+  const val = (await res.json()) as Record<string, unknown> | null
+  return Object.keys(val ?? {})
+}
+
+/** Ngày "dd-MM-yyyy" → khoá sắp xếp "yyyyMMdd". */
+function racedayKey(raceday: string): string {
+  const m = raceday.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/)
+  return m ? `${m[3]}${m[2].padStart(2, '0')}${m[1].padStart(2, '0')}` : raceday
+}
+
 export function EventsPage() {
   const [events, setEvents] = useState<ClubEvent[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    const eRef = ref(db, 'EVENT')
-    const unsub = onValue(eRef, (snap) => {
-      const val = (snap.val() ?? {}) as Record<string, Record<string, unknown>>
-      const list = Object.entries(val)
-        .map(([id, data]) => mapEvent(id, data))
-        .sort((a, b) => b.raceday.localeCompare(a.raceday))
-      setEvents(list)
-      setLoading(false)
-    })
-    return unsub
+    let cancelled = false
+    void loadEventIds()
+      .then((ids) => Promise.all(ids.map(loadEvent)))
+      .then((list) => {
+        if (cancelled) return
+        setEvents(
+          list
+            .filter((e): e is ClubEvent => e != null)
+            .sort((a, b) => racedayKey(b.raceday).localeCompare(racedayKey(a.raceday))),
+        )
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Không tải được event')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   return (
@@ -50,6 +92,8 @@ export function EventsPage() {
 
       {loading ? (
         <p className="empty">Đang tải…</p>
+      ) : error ? (
+        <p className="form-error">{error}</p>
       ) : events.length === 0 ? (
         <p className="empty">Chưa có event.</p>
       ) : (
@@ -85,31 +129,33 @@ export function EventDetailPage() {
 
   useEffect(() => {
     if (!id) return
-    const eRef = ref(db, `EVENT/${id}`)
-    const unsub = onValue(eRef, (snap) => {
-      const val = snap.val() as Record<string, unknown> | null
-      if (!val) {
-        setEvent(null)
-        setLoading(false)
-        return
-      }
-      setEvent(mapEvent(id, val))
-      const raw = (val.race_results ?? {}) as Record<
-        string,
-        Record<string, unknown>
-      >
-      const rows = Object.values(raw).map((row) => {
-        const out: Record<string, string> = {}
-        for (const [k, v] of Object.entries(row)) out[k] = String(v ?? '')
-        return out
+    let cancelled = false
+    void Promise.all([loadEvent(id), get(ref(db, `EVENT/${id}/race_results`))])
+      .then(([info, resultsSnap]) => {
+        if (cancelled) return
+        setEvent(info)
+        const raw = (resultsSnap.val() ?? {}) as Record<string, Record<string, unknown> | null>
+        const rows = Object.values(raw)
+          .filter((row): row is Record<string, unknown> => row != null)
+          .map((row) => {
+            const out: Record<string, string> = {}
+            for (const [k, v] of Object.entries(row)) out[k] = String(v ?? '')
+            return out
+          })
+        rows.sort((a, b) =>
+          String(a['Chip Time'] || '').localeCompare(String(b['Chip Time'] || '')),
+        )
+        setResults(rows)
       })
-      rows.sort((a, b) =>
-        String(a['Chip Time'] || '').localeCompare(String(b['Chip Time'] || '')),
-      )
-      setResults(rows)
-      setLoading(false)
-    })
-    return unsub
+      .catch(() => {
+        if (!cancelled) setEvent(null)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [id])
 
   if (loading) {

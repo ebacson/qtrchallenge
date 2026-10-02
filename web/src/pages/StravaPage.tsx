@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { ref, update } from 'firebase/database'
 import { StravaConnectPanel } from '../components/StravaConnectPanel'
 import { useAuth } from '../context/AuthContext'
-import { db } from '../lib/firebase'
 import { consumeOAuthState, exchangeCode, fetchAthlete } from '../lib/stravaClient'
+import { updateUser } from '../lib/userWrites'
 
 export function StravaCallbackPage() {
   const { user } = useAuth()
@@ -45,7 +44,7 @@ export function StravaCallbackPage() {
           .filter(Boolean)
           .join(' ')
 
-        await update(ref(db, `users/${user!.uid}`), {
+        await updateUser(user!.uid, {
           access_token: tokens.access_token,
           refresh_token: tokens.refresh_token,
           expires_at: tokens.expires_at,

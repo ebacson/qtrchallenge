@@ -3,6 +3,7 @@ import { get, ref, update } from 'firebase/database'
 import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
 import { syncOngoingChallengeProgress } from '../lib/challengeProgress'
+import { updateUser } from '../lib/userWrites'
 import {
   ensureFreshAccessToken,
   fetchAthlete,
@@ -43,8 +44,17 @@ export function StravaConnectPanel() {
 
   async function readConnection(): Promise<Connection> {
     if (!user) return {}
-    const snap = await get(ref(db, `users/${user.uid}`))
-    return (snap.val() ?? {}) as Connection
+    const base = `users/${user.uid}`
+    const [access, refresh, expires] = await Promise.all([
+      get(ref(db, `${base}/access_token`)),
+      get(ref(db, `${base}/refresh_token`)),
+      get(ref(db, `${base}/expires_at`)),
+    ])
+    return {
+      access_token: access.val() ?? undefined,
+      refresh_token: refresh.val() ?? undefined,
+      expires_at: expires.val() ?? undefined,
+    }
   }
 
   async function onConnect() {
@@ -91,7 +101,7 @@ export function StravaConnectPanel() {
       }
 
       const athlete = await fetchAthlete(fresh.access_token)
-      await update(ref(db, `users/${user.uid}`), {
+      await updateUser(user.uid, {
         id_strava: String(athlete.id),
         user_strava: [athlete.firstname, athlete.lastname].filter(Boolean).join(' '),
       })
@@ -144,7 +154,7 @@ export function StravaConnectPanel() {
           // Still clear local tokens if revoke fails
         }
       }
-      await update(ref(db, `users/${user.uid}`), {
+      await updateUser(user.uid, {
         access_token: null,
         refresh_token: null,
         expires_at: null,

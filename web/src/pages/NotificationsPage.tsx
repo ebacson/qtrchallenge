@@ -10,6 +10,7 @@ type Noti = {
   content: string
   creatorUserID: string
   createdAt: string
+  updatedAt: string
   read: boolean
 }
 
@@ -32,6 +33,92 @@ function formatCreatedAt(value: string): string {
   return `${m[4]}:${m[5]} · ${m[3]}/${m[2]}/${m[1]}`
 }
 
+type NotiDraft = { title: string; content: string }
+
+function NotiForm({
+  initial,
+  submitLabel,
+  busyLabel,
+  onSubmit,
+  onCancel,
+}: {
+  initial: NotiDraft
+  submitLabel: string
+  busyLabel: string
+  onSubmit: (draft: NotiDraft) => Promise<void>
+  onCancel: () => void
+}) {
+  const [title, setTitle] = useState(initial.title)
+  const [content, setContent] = useState(initial.content)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    const cleanTitle = normalizeText(title).replace(/\n+/g, ' ')
+    const cleanContent = normalizeText(content)
+    if (!cleanTitle || !cleanContent) {
+      setError('Nhập tiêu đề và nội dung.')
+      return
+    }
+    setBusy(true)
+    setError('')
+    try {
+      await onSubmit({ title: cleanTitle, content: cleanContent })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không lưu được thông báo')
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form
+      className="auth-form panel"
+      onSubmit={(e) => void handleSubmit(e)}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <label>
+        Tiêu đề
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          maxLength={150}
+          required
+        />
+      </label>
+      <label>
+        Nội dung
+        <textarea
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          rows={8}
+          required
+        />
+      </label>
+      <p className="tiny muted">
+        Giữ nguyên xuống dòng; dòng bắt đầu bằng "-" hiện thành gạch đầu dòng, "-----" là đường
+        kẻ, link tự bấm được.
+      </p>
+      {content.trim() && (
+        <div className="noti-preview">
+          <p className="noti-preview-label">Xem trước</p>
+          <strong>{plainText(title) || 'Thông báo'}</strong>
+          <RichText text={content} />
+        </div>
+      )}
+      {error && <p className="form-error">{error}</p>}
+      <div className="cta-row">
+        <button type="submit" className="btn primary" disabled={busy}>
+          {busy ? busyLabel : submitLabel}
+        </button>
+        <button type="button" className="btn ghost" disabled={busy} onClick={onCancel}>
+          Hủy
+        </button>
+      </div>
+    </form>
+  )
+}
+
 export function NotificationsPage() {
   const { user, profile } = useAuth()
   const isAdmin = Boolean(profile?.admin)
@@ -40,10 +127,7 @@ export function NotificationsPage() {
   const [creatorNames, setCreatorNames] = useState<Record<string, string>>({})
 
   const [formOpen, setFormOpen] = useState(false)
-  const [title, setTitle] = useState('')
-  const [content, setContent] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [message, setMessage] = useState('')
 
   useEffect(() => {
@@ -58,6 +142,7 @@ export function NotificationsPage() {
           content: String(row.content ?? ''),
           creatorUserID: String(row.creatorUserID ?? ''),
           createdAt: readCreatedAt(row.createdAt),
+          updatedAt: row.updatedAt == null ? '' : readCreatedAt(row.updatedAt),
           read: Boolean(readBy[user.uid]),
         }
       })
@@ -88,35 +173,24 @@ export function NotificationsPage() {
     await update(ref(db, `notifications/${id}/readBy`), { [user.uid]: true })
   }
 
-  async function onCreate(e: FormEvent) {
-    e.preventDefault()
+  async function onCreate(draft: NotiDraft) {
     if (!user) return
-    const cleanTitle = normalizeText(title).replace(/\n+/g, ' ')
-    const cleanContent = normalizeText(content)
-    if (!cleanTitle || !cleanContent) {
-      setError('Nhập tiêu đề và nội dung.')
-      return
-    }
-    setBusy(true)
-    setError('')
-    setMessage('')
-    try {
-      await set(push(ref(db, 'notifications')), {
-        title: cleanTitle,
-        content: cleanContent,
-        creatorUserID: user.uid,
-        createdAt: vnDateTimeString(Date.now()),
-        readBy: { [user.uid]: true },
-      })
-      setTitle('')
-      setContent('')
-      setFormOpen(false)
-      setMessage('Đã đăng thông báo.')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không đăng được thông báo')
-    } finally {
-      setBusy(false)
-    }
+    await set(push(ref(db, 'notifications')), {
+      ...draft,
+      creatorUserID: user.uid,
+      createdAt: vnDateTimeString(Date.now()),
+      readBy: { [user.uid]: true },
+    })
+    setFormOpen(false)
+    setMessage('Đã đăng thông báo.')
+  }
+
+  async function onEdit(n: Noti, draft: NotiDraft) {
+    await update(ref(db, `notifications/${n.id}`), {
+      ...draft,
+      updatedAt: vnDateTimeString(Date.now()),
+    })
+    setEditingId(null)
   }
 
   async function onDelete(n: Noti) {
@@ -140,54 +214,13 @@ export function NotificationsPage() {
       {isAdmin && (
         <section className="section">
           {formOpen ? (
-            <form className="auth-form panel" onSubmit={(e) => void onCreate(e)}>
-              <label>
-                Tiêu đề
-                <input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  maxLength={150}
-                  required
-                />
-              </label>
-              <label>
-                Nội dung
-                <textarea
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  rows={8}
-                  required
-                />
-              </label>
-              <p className="tiny muted">
-                Giữ nguyên xuống dòng; dòng bắt đầu bằng "-" hiện thành gạch đầu dòng, "-----" là
-                đường kẻ, link tự bấm được.
-              </p>
-              {content.trim() && (
-                <div className="noti-preview">
-                  <p className="noti-preview-label">Xem trước</p>
-                  <strong>{plainText(title) || 'Thông báo'}</strong>
-                  <RichText text={content} />
-                </div>
-              )}
-              {error && <p className="form-error">{error}</p>}
-              <div className="cta-row">
-                <button type="submit" className="btn primary" disabled={busy}>
-                  {busy ? 'Đang đăng…' : 'Đăng thông báo'}
-                </button>
-                <button
-                  type="button"
-                  className="btn ghost"
-                  disabled={busy}
-                  onClick={() => {
-                    setFormOpen(false)
-                    setError('')
-                  }}
-                >
-                  Hủy
-                </button>
-              </div>
-            </form>
+            <NotiForm
+              initial={{ title: '', content: '' }}
+              submitLabel="Đăng thông báo"
+              busyLabel="Đang đăng…"
+              onSubmit={onCreate}
+              onCancel={() => setFormOpen(false)}
+            />
           ) : (
             <button
               type="button"
@@ -210,41 +243,75 @@ export function NotificationsPage() {
         <p className="empty">Chưa có thông báo.</p>
       ) : (
         <ul className="noti-list">
-          {items.map((n) => (
-            <li key={n.id}>
-              <article
-                className={n.read ? 'noti-card' : 'noti-card unread'}
-                onClick={() => {
-                  if (!n.read) void markRead(n.id)
-                }}
-              >
-                <div className="noti-top">
-                  <strong className="noti-title">{plainText(n.title) || 'Thông báo'}</strong>
-                  {!n.read && <span className="dot" />}
-                </div>
-                <p className="tiny muted noti-meta">
-                  {[creatorNames[n.creatorUserID], formatCreatedAt(n.createdAt)]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </p>
-                <RichText text={n.content} />
-                {isAdmin && (
-                  <div className="noti-actions">
-                    <button
-                      type="button"
-                      className="btn ghost compact danger"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        void onDelete(n)
-                      }}
-                    >
-                      Xóa
-                    </button>
+          {items.map((n) => {
+            const isCreator = Boolean(user && n.creatorUserID === user.uid)
+            if (editingId === n.id) {
+              return (
+                <li key={n.id}>
+                  <NotiForm
+                    initial={{ title: n.title, content: n.content }}
+                    submitLabel="Lưu thay đổi"
+                    busyLabel="Đang lưu…"
+                    onSubmit={(draft) => onEdit(n, draft)}
+                    onCancel={() => setEditingId(null)}
+                  />
+                </li>
+              )
+            }
+            return (
+              <li key={n.id}>
+                <article
+                  className={n.read ? 'noti-card' : 'noti-card unread'}
+                  onClick={() => {
+                    if (!n.read) void markRead(n.id)
+                  }}
+                >
+                  <div className="noti-top">
+                    <strong className="noti-title">{plainText(n.title) || 'Thông báo'}</strong>
+                    {!n.read && <span className="dot" />}
                   </div>
-                )}
-              </article>
-            </li>
-          ))}
+                  <p className="tiny muted noti-meta">
+                    {[
+                      creatorNames[n.creatorUserID],
+                      formatCreatedAt(n.createdAt),
+                      n.updatedAt && `đã sửa ${formatCreatedAt(n.updatedAt)}`,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                  <RichText text={n.content} />
+                  {(isCreator || isAdmin) && (
+                    <div className="noti-actions">
+                      {isCreator && (
+                        <button
+                          type="button"
+                          className="btn ghost compact"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setEditingId(n.id)
+                          }}
+                        >
+                          Sửa
+                        </button>
+                      )}
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          className="btn ghost compact danger"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            void onDelete(n)
+                          }}
+                        >
+                          Xóa
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </article>
+              </li>
+            )
+          })}
         </ul>
       )}
     </div>

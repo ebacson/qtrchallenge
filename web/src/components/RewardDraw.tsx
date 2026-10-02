@@ -13,8 +13,12 @@ import {
 } from '../lib/rewardPenalty'
 import type { Challenge, RewardTier } from '../types'
 
-const SPIN_MS = 2600
-const TICK_MS = 70
+/** Tổng thời gian quay; tên đổi nhanh lúc đầu rồi chậm dần */
+const SPIN_MS = 7000
+const TICK_START_MS = 90
+const TICK_END_MS = 650
+/** Dừng lại trên tên người trúng đầu tiên trước khi hiện kết quả */
+const HOLD_MS = 1500
 
 type Names = Record<string, { name: string; avatar: string }>
 
@@ -50,14 +54,38 @@ function RewardDrawCard({
   const [spinName, setSpinName] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const timers = useRef<ReturnType<typeof setInterval>[]>([])
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([])
 
   useEffect(
     () => () => {
-      for (const t of timers.current) clearInterval(t)
+      for (const t of timers.current) clearTimeout(t)
     },
     [],
   )
+
+  function wait(ms: number) {
+    return new Promise<void>((resolve) => {
+      timers.current.push(setTimeout(resolve, ms))
+    })
+  }
+
+  /** Đổi tên ngẫu nhiên, khoảng cách giữa các lần đổi tăng dần (ease-out) */
+  async function spin(finalUid: string) {
+    const startedAt = Date.now()
+    let last = ''
+    for (;;) {
+      const progress = Math.min(1, (Date.now() - startedAt) / SPIN_MS)
+      if (progress >= 1) break
+      let uid = pickRandom(candidates) ?? ''
+      if (candidates.length > 1) while (uid === last) uid = pickRandom(candidates) ?? ''
+      last = uid
+      setSpinName(displayName(names, uid))
+      const eased = progress * progress
+      await wait(TICK_START_MS + (TICK_END_MS - TICK_START_MS) * eased)
+    }
+    setSpinName(displayName(names, finalUid))
+    await wait(HOLD_MS)
+  }
 
   const isAdmin = Boolean(profile?.admin)
   const finished = challenge.status === STATUS_FINISHED
@@ -80,19 +108,7 @@ function RewardDrawCard({
     const winners = drawWinners(candidates, reward.gifts)
     const prizes = assignPrizes(winners, reward.items)
     try {
-      if (candidates.length > reward.gifts) {
-        await new Promise<void>((resolve) => {
-          const tick = setInterval(() => {
-            const uid = pickRandom(candidates)
-            setSpinName(uid ? displayName(names, uid) : '')
-          }, TICK_MS)
-          timers.current.push(tick)
-          setTimeout(() => {
-            clearInterval(tick)
-            resolve()
-          }, SPIN_MS)
-        })
-      }
+      if (candidates.length > reward.gifts && winners.length) await spin(winners[0])
       await set(ref(db, `challenges/${challenge.id}/rewardDraws/${targetIndex}`), {
         target: reward.target,
         gifts: reward.gifts,
@@ -138,7 +154,7 @@ function RewardDrawCard({
 
       {spinName != null ? (
         <div className="reward-draw-spin" aria-live="polite">
-          {spinName}
+          <span key={spinName}>{spinName}</span>
         </div>
       ) : draw ? (
         <>

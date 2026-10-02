@@ -2553,10 +2553,26 @@ code {
   background: var(--accent);
   color: #fff;
   font-family: var(--display);
-  font-size: 1.35rem;
+  font-size: 1.9rem;
   font-weight: 700;
   text-align: center;
   min-height: 1.4em;
+}
+
+.reward-draw-spin span {
+  display: inline-block;
+  animation: draw-pop 0.18s ease-out;
+}
+
+@keyframes draw-pop {
+  from {
+    opacity: 0.35;
+    transform: translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .reward-winners {

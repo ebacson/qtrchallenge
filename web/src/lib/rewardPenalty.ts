@@ -33,6 +33,23 @@ export type ParticipantCompletion = {
   /** Vị trí trong mức phạt (giảm dần theo %); -1 khi hoàn thành */
   tierIndex: number
   penalty: number
+  /** Admin miễn phạt: penalty = 0, giữ mức gốc để hiển thị */
+  waived?: { reason: string; originalPenalty: number }
+}
+
+/** Áp dụng miễn phạt (nếu có) của `uid` trong thử thách. */
+export function applyPenaltyWaiver(
+  challenge: Challenge,
+  uid: string,
+  completion: ParticipantCompletion,
+): ParticipantCompletion {
+  const payment = challenge.penaltyPayments?.[uid]
+  if (!payment?.waived || completion.tier === 'completed') return completion
+  return {
+    ...completion,
+    penalty: 0,
+    waived: { reason: payment.reason ?? '', originalPenalty: completion.penalty },
+  }
 }
 
 function extractNumber(value: unknown): number {

@@ -691,6 +691,7 @@ export function parsePenaltyPayments(
       amount: Number(o.amount) || 0,
       confirmedAt: Number(o.confirmedAt) || 0,
       confirmedBy: String(o.confirmedBy ?? ''),
+      ...(o.waived === true ? { waived: true, reason: String(o.reason ?? '') } : {}),
     }
   }
   return Object.keys(out).length ? out : undefined

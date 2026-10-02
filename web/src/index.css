@@ -2411,6 +2411,13 @@ code {
   color: var(--ok);
 }
 
+.penalty-pay-badge.waived {
+  background: rgba(217, 142, 4, 0.14);
+  color: #8a5a00;
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+}
+
 .penalty-pay-summary {
   margin: -8px 0 12px;
 }

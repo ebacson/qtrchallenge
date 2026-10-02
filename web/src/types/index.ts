@@ -96,6 +96,9 @@ export interface PenaltyPayment {
   amount: number
   confirmedAt: number
   confirmedBy: string
+  /** Admin miễn phạt (mức phạt tính là 0) thay vì xác nhận đã nộp */
+  waived?: boolean
+  reason?: string
 }
 
 export interface Challenge {

@@ -14,6 +14,7 @@ import {
   completionPercent,
   formatVnd,
   isRewardEligible,
+  applyPenaltyWaiver,
   participantCompletion,
   penaltySummary,
   penaltyTiersOf,
@@ -57,6 +58,12 @@ function formatAmount(value: number, unit: ParticipantCompletion['unit']): strin
   return value.toLocaleString('vi-VN', { maximumFractionDigits: unit === 'km' ? 2 : 0 })
 }
 
+function penaltyLabel(c: ParticipantCompletion): string {
+  if (c.tier === 'completed') return '✓ Hoàn thành'
+  if (c.waived) return c.waived.originalPenalty ? 'Miễn phạt' : 'Không phạt'
+  return c.penalty ? `−${formatVnd(c.penalty)}` : 'Không phạt'
+}
+
 function Avatar({ name, avatar }: { name: string; avatar: string }) {
   return (
     <div className="hof-avatar">
@@ -73,6 +80,7 @@ function ChallengeReportView({ report, names }: { report: ChallengeReport; names
   const penalized = rows.filter((r) => r.completion.penalty > 0)
   const paid = penalized.filter((r) => challenge.penaltyPayments?.[r.uid])
   const paidAmount = paid.reduce((sum, r) => sum + r.completion.penalty, 0)
+  const waivedCount = rows.filter((r) => r.completion.waived?.originalPenalty).length
   const ongoing = challenge.status === STATUS_ONGOING
   const tiers = penaltyTiersOf(challenge)
   const sections = [
@@ -137,10 +145,11 @@ function ChallengeReportView({ report, names }: { report: ChallengeReport; names
           <span>Tổng phạt</span>
         </div>
       </div>
-      {challenge.status === STATUS_FINISHED && penalized.length > 0 && (
+      {challenge.status === STATUS_FINISHED && (penalized.length > 0 || waivedCount > 0) && (
         <p className="tiny muted penalty-pay-summary">
           Đã nộp {paid.length}/{penalized.length} người · {formatVnd(paidAmount)} · Còn lại{' '}
           {formatVnd(totalPenalty - paidAmount)}
+          {waivedCount > 0 && ` · Miễn phạt ${waivedCount} người`}
         </p>
       )}
 
@@ -179,19 +188,13 @@ function ChallengeReportView({ report, names }: { report: ChallengeReport; names
                             challenge={challenge}
                             uid={r.uid}
                             name={r.name}
-                            amount={c.penalty}
+                            amount={c.waived?.originalPenalty ?? c.penalty}
                           />
                         )}
                       </div>
                       <span className={`reward-amount ${tier}`}>
                         <strong>{completionPercent(c.ratio)}%</strong>
-                        <small>
-                          {tier === 'completed'
-                            ? '✓ Hoàn thành'
-                            : c.penalty
-                              ? `−${formatVnd(c.penalty)}`
-                              : 'Không phạt'}
-                        </small>
+                        <small>{penaltyLabel(c)}</small>
                       </span>
                     </li>
                   )
@@ -265,17 +268,11 @@ function MemberPenaltyDetail({ member }: { member: MemberSummary }) {
                     challenge={challenge}
                     uid={member.uid}
                     name={member.name}
-                    amount={c.penalty}
+                    amount={c.waived?.originalPenalty ?? c.penalty}
                   />
                 )}
               </div>
-              <span className={`reward-amount ${tier}`}>
-                {tier === 'completed'
-                  ? '✓ Hoàn thành'
-                  : c.penalty
-                    ? `−${formatVnd(c.penalty)}`
-                    : 'Không phạt'}
-              </span>
+              <span className={`reward-amount ${tier}`}>{penaltyLabel(c)}</span>
             </li>
           )
         })}
@@ -450,8 +447,9 @@ export function RewardsPage() {
       )
       const rows: ReportRow[] = []
       for (const [uid, row] of Object.entries(userChallenges)) {
-        const completion = participantCompletion(challenge, row ?? {})
-        if (!completion) continue
+        const raw = participantCompletion(challenge, row ?? {})
+        if (!raw) continue
+        const completion = applyPenaltyWaiver(challenge, uid, raw)
         rows.push({
           uid,
           name: profiles[uid]?.fullName || String(row?.name ?? '') || 'Người dùng ẩn danh',

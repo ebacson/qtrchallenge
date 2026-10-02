@@ -2329,36 +2329,11 @@ code {
   overflow-wrap: anywhere;
 }
 
-.stat-split {
-  display: grid;
-  gap: 4px;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--line);
-  font-size: 0.72rem;
-}
-
-.stat-split > div {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0 4px;
-}
-
-.stat-split em {
-  font-style: normal;
-  color: var(--ink-soft);
-}
-
-.stat-split b {
-  overflow-wrap: anywhere;
-}
-
-.stat-split-paid b {
+.stat strong.stat-paid {
   color: #1f8a4c;
 }
 
-.stat-split-unpaid b {
+.stat strong.stat-unpaid {
   color: #c0392b;
 }
 

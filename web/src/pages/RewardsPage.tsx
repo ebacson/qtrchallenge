@@ -90,18 +90,25 @@ function Avatar({ name, avatar }: { name: string; avatar: string }) {
   )
 }
 
-function PaidSplit({ paid, unpaid }: { paid: number; unpaid: number }) {
+/** Hàng ô Tổng phạt – Đã nộp – Chưa nộp; `paid` null khi chưa thu (thử thách đang diễn ra) */
+function PenaltyStats({ total, paid }: { total: number; paid: number | null }) {
   return (
-    <div className="stat-split">
-      <div className="stat-split-paid">
-        <em>Đã nộp</em>
-        <b>{formatVnd(paid)}</b>
+    <>
+      <div className="stat">
+        <strong className="stat-money">{formatVnd(total)}</strong>
+        <span>Tổng phạt</span>
       </div>
-      <div className="stat-split-unpaid">
-        <em>Chưa nộp</em>
-        <b>{formatVnd(unpaid)}</b>
+      <div className="stat">
+        <strong className="stat-money stat-paid">{paid == null ? '—' : formatVnd(paid)}</strong>
+        <span>Đã nộp</span>
       </div>
-    </div>
+      <div className="stat">
+        <strong className="stat-money stat-unpaid">
+          {paid == null ? '—' : formatVnd(total - paid)}
+        </strong>
+        <span>Chưa nộp</span>
+      </div>
+    </>
   )
 }
 
@@ -182,12 +189,13 @@ function ChallengeReportView({ report, names }: { report: ChallengeReport; names
           <span>Không hoàn thành</span>
         </div>
         <div className="stat">
-          <strong className="stat-money">{formatVnd(totalPenalty)}</strong>
-          <span>Tổng phạt</span>
-          {challenge.status === STATUS_FINISHED && totalPenalty > 0 && (
-            <PaidSplit paid={paidAmount} unpaid={totalPenalty - paidAmount} />
-          )}
+          <strong>{absent.length}</strong>
+          <span>Không tham gia</span>
         </div>
+        <PenaltyStats
+          total={totalPenalty}
+          paid={challenge.status === STATUS_FINISHED ? paidAmount : null}
+        />
       </div>
       {absentPenaltyTotal > 0 && (
         <p className="tiny muted penalty-pay-summary">
@@ -431,6 +439,7 @@ function SummaryView({ reports, year }: { reports: ChallengeReport[]; year: numb
 
   const totalCompleted = members.reduce((sum, m) => sum + m.completed, 0)
   const totalFailed = members.reduce((sum, m) => sum + m.failed, 0)
+  const totalAbsent = members.reduce((sum, m) => sum + m.absentCount, 0)
   const totalPenalty = members.reduce((sum, m) => sum + m.penalty, 0)
   const totalPaid = members.reduce((sum, m) => sum + m.paid, 0)
 
@@ -454,10 +463,10 @@ function SummaryView({ reports, year }: { reports: ChallengeReport[]; year: numb
           <span>Lượt không hoàn thành</span>
         </div>
         <div className="stat">
-          <strong className="stat-money">{formatVnd(totalPenalty)}</strong>
-          <span>Tổng phạt</span>
-          {totalPenalty > 0 && <PaidSplit paid={totalPaid} unpaid={totalPenalty - totalPaid} />}
+          <strong>{totalAbsent}</strong>
+          <span>Lượt không tham gia</span>
         </div>
+        <PenaltyStats total={totalPenalty} paid={totalPaid} />
       </div>
 
       <section className="section panel">

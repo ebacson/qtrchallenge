@@ -20,6 +20,7 @@ import {
 import { useAuth } from '../context/AuthContext'
 import { brandLogoSrc, brandTitle } from '../lib/brand'
 import { reloadApp } from '../lib/pwa'
+import { formatBadgeCount, useUnreadNotificationCount } from '../lib/notifications'
 
 type MenuItem = { to: string; label: string; icon: LucideIcon; end?: boolean }
 type MenuGroup = { key: string; title?: string; items: MenuItem[] }
@@ -73,6 +74,7 @@ export function Layout() {
   const [reloading, setReloading] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const menuId = useId()
+  const unreadNotifications = useUnreadNotificationCount()
 
   const navGroups = profile?.admin ? [...menuGroups, adminGroup] : menuGroups
 
@@ -111,10 +113,17 @@ export function Layout() {
             aria-expanded={menuOpen}
             aria-controls={menuId}
             aria-haspopup="menu"
-            aria-label="Mở menu"
+            aria-label={
+              unreadNotifications > 0
+                ? `Mở menu (${unreadNotifications} thông báo chưa đọc)`
+                : 'Mở menu'
+            }
             onClick={() => setMenuOpen((v) => !v)}
           >
-            <img src={brandLogoSrc} alt="" className="brand-logo" />
+            <span className="brand-logo-wrap">
+              <img src={brandLogoSrc} alt="" className="brand-logo" />
+              {unreadNotifications > 0 && <span className="brand-unread-dot" aria-hidden />}
+            </span>
             <p className="brand-name">{brandTitle}</p>
           </button>
 
@@ -143,6 +152,11 @@ export function Layout() {
                         >
                           <item.icon className="menu-icon" size={18} strokeWidth={2} aria-hidden />
                           <span>{item.label}</span>
+                          {item.to === '/notifications' && unreadNotifications > 0 && (
+                            <span className="count-badge menu-badge">
+                              {formatBadgeCount(unreadNotifications)}
+                            </span>
+                          )}
                         </NavLink>
                       </li>
                     ))}

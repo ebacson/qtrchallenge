@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useSharedValue } from '../lib/sharedValue'
+import { formatBadgeCount, useUnreadNotificationCount } from '../lib/notifications'
 import { parseChallenge, parseChallengeDayStartMs, STATUS_ONGOING } from '../lib/challengeRules'
 import type { Challenge } from '../types'
 import { ChallengeCard } from '../components/ChallengeCard'
@@ -20,6 +21,7 @@ export function HomePage() {
   const challenges = useSharedValue<Record<string, Record<string, unknown>>>(
     user ? 'challenges' : null,
   )
+  const unreadNotifications = useUnreadNotificationCount()
   const activities = useSharedValue<Record<string, unknown>>(
     user ? `users/${user.uid}/strava_activities` : null,
   )
@@ -67,12 +69,26 @@ export function HomePage() {
       <section className="section">
         <h2>Lối tắt</h2>
         <div className="shortcut-grid">
-          {shortcuts.map((s) => (
-            <Link key={s.to} to={s.to} className="shortcut-card">
-              <strong>{s.title}</strong>
-              <span className="tiny muted">{s.desc}</span>
-            </Link>
-          ))}
+          {shortcuts.map((s) => {
+            const unread = s.to === '/notifications' ? unreadNotifications : 0
+            return (
+              <Link
+                key={s.to}
+                to={s.to}
+                className={unread > 0 ? 'shortcut-card has-unread' : 'shortcut-card'}
+              >
+                <strong>{s.title}</strong>
+                <span className={unread > 0 ? 'tiny shortcut-unread' : 'tiny muted'}>
+                  {unread > 0 ? `${unread} thông báo mới` : s.desc}
+                </span>
+                {unread > 0 && (
+                  <span className="count-badge shortcut-badge" aria-hidden>
+                    {formatBadgeCount(unread)}
+                  </span>
+                )}
+              </Link>
+            )
+          })}
         </div>
       </section>
 

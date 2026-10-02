@@ -2,6 +2,9 @@ import type {
   Challenge,
   ChallengeProgressResult,
   DayQuotaOption,
+  PenaltyTier,
+  RewardDraw,
+  RewardTier,
   UserDayQuotaProgress,
 } from '../types'
 
@@ -607,6 +610,61 @@ export function progressOptionsFromDict(
   return Object.keys(opts).length ? opts : undefined
 }
 
+/** RTDB trả mảng (có thể lẫn null) hoặc object khóa số */
+function listValues(raw: unknown): Record<string, unknown>[] {
+  if (raw == null || typeof raw !== 'object') return []
+  const values = Array.isArray(raw) ? raw : Object.values(raw as Record<string, unknown>)
+  return values.filter(
+    (v): v is Record<string, unknown> => v != null && typeof v === 'object',
+  )
+}
+
+function stringList(raw: unknown): string[] {
+  if (raw == null || typeof raw !== 'object') return []
+  const values = Array.isArray(raw) ? raw : Object.values(raw as Record<string, unknown>)
+  return values.filter((v): v is string => typeof v === 'string' && v.length > 0)
+}
+
+export function parsePenaltyTiers(raw: unknown): PenaltyTier[] | undefined {
+  const list = listValues(raw).flatMap((o) => {
+    const minPercent = Number(o.minPercent)
+    const amount = Number(o.amount)
+    if (!Number.isFinite(minPercent) || minPercent < 0 || minPercent >= 100) return []
+    if (!Number.isFinite(amount) || amount < 0) return []
+    return [{ minPercent, amount }]
+  })
+  return list.length ? list.sort((a, b) => b.minPercent - a.minPercent) : undefined
+}
+
+export function parseRewardTiers(raw: unknown): RewardTier[] | undefined {
+  const list = listValues(raw).flatMap((o) => {
+    const target = String(o.target ?? '')
+    const gifts = Number(o.gifts)
+    if (!target || !Number.isInteger(gifts) || gifts < 1) return []
+    return [{ target, gifts, prize: String(o.prize ?? '') }]
+  })
+  return list.length ? list : undefined
+}
+
+export function parseRewardDraws(raw: unknown): RewardDraw[] | undefined {
+  const list = listValues(raw).flatMap((o) => {
+    const target = String(o.target ?? '')
+    if (!target) return []
+    return [
+      {
+        target,
+        gifts: Number(o.gifts) || 0,
+        prize: String(o.prize ?? ''),
+        candidates: stringList(o.candidates),
+        winners: stringList(o.winners),
+        drawnAt: Number(o.drawnAt) || 0,
+        drawnBy: String(o.drawnBy ?? ''),
+      },
+    ]
+  })
+  return list.length ? list : undefined
+}
+
 function parseChallengeMode(
   raw: unknown,
 ): Challenge['challengeMode'] {
@@ -678,6 +736,9 @@ export function parseChallenge(
         : undefined,
     totalDays,
     dayQuotaOptions,
+    penaltyTiers: parsePenaltyTiers(dict.penaltyTiers),
+    rewards: parseRewardTiers(dict.rewards),
+    rewardDraws: parseRewardDraws(dict.rewardDraws),
     userTarget: userData?.userTarget != null ? String(userData.userTarget) : undefined,
     userDaysRequired: userDayQuota.length
       ? userDayQuota.reduce((sum, q) => sum + q.option.daysRequired, 0)

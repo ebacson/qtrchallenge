@@ -55,6 +55,30 @@ export interface UserDayQuotaProgress {
   completedTargets?: number[]
 }
 
+/** Không hoàn thành mà đạt từ `minPercent`% (đến dưới mức kế trên) thì phạt `amount` đồng */
+export interface PenaltyTier {
+  minPercent: number
+  amount: number
+}
+
+/** Phần thưởng quay số cho người hoàn thành mục tiêu `target` (nhãn trong targetDistances) */
+export interface RewardTier {
+  target: string
+  gifts: number
+  prize: string
+}
+
+export interface RewardDraw {
+  target: string
+  gifts: number
+  prize: string
+  /** uid người hoàn thành mục tiêu lúc quay */
+  candidates: string[]
+  winners: string[]
+  drawnAt: number
+  drawnBy: string
+}
+
 export interface Challenge {
   id: string
   name: string
@@ -74,6 +98,10 @@ export interface Challenge {
   minActivityDistanceKm?: number
   totalDays?: number
   dayQuotaOptions?: DayQuotaOption[]
+  /** Sắp xếp giảm dần theo minPercent; không có thì dùng mức phạt mặc định */
+  penaltyTiers?: PenaltyTier[]
+  rewards?: RewardTier[]
+  rewardDraws?: RewardDraw[]
   /** Fields from current user's join row */
   userTarget?: string
   /** Tổng số ngày yêu cầu của các tùy chọn đã chọn */

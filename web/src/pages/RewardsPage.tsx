@@ -12,15 +12,18 @@ import {
 } from '../lib/challengeRules'
 import {
   completionPercent,
+  DEFAULT_PENALTY_TIERS,
   formatVnd,
   isRewardEligible,
   participantCompletion,
-  PENALTY_PARTIAL,
-  PENALTY_UNDER_HALF,
+  penaltySummary,
+  penaltyTiersOf,
   REWARD_START_YEAR,
-  type CompletionTier,
+  tierRangeLabel,
+  tierStyle,
   type ParticipantCompletion,
 } from '../lib/rewardPenalty'
+import { RewardDrawSection } from '../components/RewardDraw'
 import type { Challenge } from '../types'
 
 type Profile = { fullName: string; avatar: string; member: boolean; email: string }
@@ -36,6 +39,7 @@ type AbsentRow = { uid: string; name: string; avatar: string }
 
 type ChallengeReport = {
   challenge: Challenge
+  userChallenges: Record<string, Record<string, unknown> | null>
   rows: ReportRow[]
   /** Thành viên chính thức không đăng ký tham gia (chỉ liệt kê, không phạt) */
   absent: AbsentRow[]
@@ -46,19 +50,7 @@ const SYSTEM_EMAILS = new Set(['echiptime@gmail.com'])
 
 const ALL = 'all'
 
-const TIER_SECTIONS: { tier: CompletionTier; title: string; hint: string }[] = [
-  { tier: 'completed', title: 'Hoàn thành', hint: 'Đạt 100% mục tiêu' },
-  {
-    tier: 'partial',
-    title: 'Không hoàn thành (50% – dưới 100%)',
-    hint: `Phạt ${formatVnd(PENALTY_PARTIAL)}`,
-  },
-  {
-    tier: 'underHalf',
-    title: 'Không hoàn thành (dưới 50%)',
-    hint: `Phạt ${formatVnd(PENALTY_UNDER_HALF)}`,
-  },
-]
+type Names = Record<string, { name: string; avatar: string }>
 
 function formatAmount(value: number, unit: ParticipantCompletion['unit']): string {
   return value.toLocaleString('vi-VN', { maximumFractionDigits: unit === 'km' ? 2 : 0 })
@@ -72,12 +64,22 @@ function Avatar({ name, avatar }: { name: string; avatar: string }) {
   )
 }
 
-function ChallengeReportView({ report }: { report: ChallengeReport }) {
+function ChallengeReportView({ report, names }: { report: ChallengeReport; names: Names }) {
   const { challenge, rows, absent } = report
   const completed = rows.filter((r) => r.completion.tier === 'completed').length
   const failed = rows.length - completed
   const totalPenalty = rows.reduce((sum, r) => sum + r.completion.penalty, 0)
   const ongoing = challenge.status === STATUS_ONGOING
+  const tiers = penaltyTiersOf(challenge)
+  const sections = [
+    { key: 'completed', index: -1, title: 'Hoàn thành', hint: 'Đạt 100% mục tiêu' },
+    ...tiers.map((t, i) => ({
+      key: `tier-${i}`,
+      index: i,
+      title: `Không hoàn thành (${tierRangeLabel(tiers, i).toLowerCase()})`,
+      hint: t.amount ? `Phạt ${formatVnd(t.amount)}` : 'Không phạt',
+    })),
+  ]
 
   return (
     <>
@@ -89,6 +91,7 @@ function ChallengeReportView({ report }: { report: ChallengeReport }) {
         <span className="tiny muted">
           {challenge.startDate} → {challenge.endDate} · {rows.length} người tham gia
         </span>
+        <span className="tiny muted">Mức phạt: {penaltySummary(tiers)}</span>
         {ongoing && (
           <span className="tiny form-info">
             Thử thách đang diễn ra — số liệu tạm tính theo tiến độ hiện tại.
@@ -111,10 +114,17 @@ function ChallengeReportView({ report }: { report: ChallengeReport }) {
         </div>
       </div>
 
-      {TIER_SECTIONS.map(({ tier, title, hint }) => {
-        const list = rows.filter((r) => r.completion.tier === tier)
+      <RewardDrawSection
+        challenge={challenge}
+        userChallenges={report.userChallenges}
+        names={names}
+      />
+
+      {sections.map(({ key, index, title, hint }) => {
+        const list = rows.filter((r) => r.completion.tierIndex === index)
+        const tier = tierStyle(index, tiers.length)
         return (
-          <section key={tier} className={`section panel reward-section reward-${tier}`}>
+          <section key={key} className={`section panel reward-section reward-${tier}`}>
             <h2>
               {title} <span className="tiny muted">· {list.length} người</span>
             </h2>
@@ -138,7 +148,11 @@ function ChallengeReportView({ report }: { report: ChallengeReport }) {
                       <span className={`reward-amount ${tier}`}>
                         <strong>{completionPercent(c.ratio)}%</strong>
                         <small>
-                          {tier === 'completed' ? '✓ Hoàn thành' : `−${formatVnd(c.penalty)}`}
+                          {tier === 'completed'
+                            ? '✓ Hoàn thành'
+                            : c.penalty
+                              ? `−${formatVnd(c.penalty)}`
+                              : 'Không phạt'}
                         </small>
                       </span>
                     </li>
@@ -292,6 +306,12 @@ export function RewardsPage() {
     return map
   }, [rawProfiles])
 
+  const names = useMemo<Names>(() => {
+    const map: Names = {}
+    for (const [uid, p] of Object.entries(profiles)) map[uid] = { name: p.fullName, avatar: p.avatar }
+    return map
+  }, [profiles])
+
   const officialMembers = useMemo(
     () =>
       Object.entries(profiles)
@@ -328,6 +348,7 @@ export function RewardsPage() {
       })
       list.push({
         challenge,
+        userChallenges,
         rows,
         absent: officialMembers.filter((m) => !(m.uid in userChallenges)),
         endMs: parseChallengeDay(challenge.endDate)?.getTime() ?? 0,
@@ -350,10 +371,9 @@ export function RewardsPage() {
         <p className="eyebrow">Thử thách</p>
         <h1>Thưởng - Phạt</h1>
         <p className="lede">
-          Thống kê thành viên hoàn thành và không hoàn thành thử thách. Không hoàn thành dưới 50%
-          mục tiêu phạt {formatVnd(PENALTY_UNDER_HALF)}, từ 50% đến dưới 100% phạt{' '}
-          {formatVnd(PENALTY_PARTIAL)}. Chỉ tính các thử thách bắt đầu từ năm {REWARD_START_YEAR}{' '}
-          trở đi.
+          Thống kê thành viên hoàn thành và không hoàn thành thử thách, kèm quay số trúng thưởng.
+          Mức phạt theo từng thử thách (mặc định: {penaltySummary(DEFAULT_PENALTY_TIERS)}). Chỉ
+          tính các thử thách bắt đầu từ năm {REWARD_START_YEAR} trở đi.
         </p>
       </header>
 
@@ -383,7 +403,7 @@ export function RewardsPage() {
           {selected === ALL ? (
             <SummaryView reports={reports} />
           ) : current ? (
-            <ChallengeReportView report={current} />
+            <ChallengeReportView report={current} names={names} />
           ) : null}
         </>
       )}

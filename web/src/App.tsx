@@ -41,6 +41,10 @@ const CreateChallengePage = lazyPage(
   () => import('./pages/CreateChallengePage'),
   'CreateChallengePage',
 )
+const EditChallengePage = lazyPage(
+  () => import('./pages/CreateChallengePage'),
+  'EditChallengePage',
+)
 const AdminUsersPage = lazyPage(() => import('./pages/AdminUsersPage'), 'AdminUsersPage')
 const AdminRecordsPage = lazyPage(() => import('./pages/AdminRecordsPage'), 'AdminRecordsPage')
 
@@ -84,6 +88,14 @@ function AppRoutes() {
           element={
             <RequireAdmin>
               <CreateChallengePage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="admin/challenges/:id/edit"
+          element={
+            <RequireAdmin>
+              <EditChallengePage />
             </RequireAdmin>
           }
         />

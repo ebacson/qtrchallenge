@@ -4,6 +4,14 @@ import { onValue, ref, remove, update } from 'firebase/database'
 import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
 import { useUserProfiles } from '../lib/userWrites'
+import { Pencil } from 'lucide-react'
+import { RewardDrawSection } from '../components/RewardDraw'
+import {
+  formatVnd,
+  isRewardEligible,
+  penaltyTiersOf,
+  tierRangeLabel,
+} from '../lib/rewardPenalty'
 import {
   canJoin,
   challengeGeneralRules,
@@ -82,7 +90,7 @@ function fillTone(pct: number): string {
 
 export function ChallengeDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const [challenge, setChallenge] = useState<Challenge | null>(null)
   const [rawUserChallenges, setRawUserChallenges] = useState<
     Record<string, Record<string, unknown>>
@@ -133,6 +141,12 @@ export function ChallengeDetailPage() {
     }
     return map
   }, [rawProfiles])
+
+  const drawNames = useMemo(() => {
+    const map: Record<string, { name: string; avatar: string }> = {}
+    for (const [uid, p] of Object.entries(profiles)) map[uid] = { name: p.fullName, avatar: p.avatar }
+    return map
+  }, [profiles])
 
   const participants = useMemo(() => {
     const isDayQuotaChallenge = challenge?.challengeMode === 'day_quota'
@@ -217,6 +231,7 @@ export function ChallengeDetailPage() {
   const isDayQuota =
     challenge.challengeMode === 'day_quota' && Boolean(challenge.dayQuotaOptions?.length)
   const rules = challengeRulesSummary(challenge)
+  const penaltyTiers = penaltyTiersOf(challenge)
   const goals = challengeGoals(challenge)
   const generalRules = challengeGeneralRules(challenge)
   const myGoalIndexes = new Set(
@@ -407,6 +422,11 @@ export function ChallengeDetailPage() {
           </p>
           <p className="tiny muted">{listDisplayText(challenge)}</p>
           {rules && <p className="challenge-rules-tag">{rules}</p>}
+          {profile?.admin && (
+            <Link className="btn ghost compact" to={`/admin/challenges/${challenge.id}/edit`}>
+              <Pencil size={16} aria-hidden /> Sửa thử thách
+            </Link>
+          )}
         </div>
       </div>
 
@@ -451,6 +471,44 @@ export function ChallengeDetailPage() {
           </ul>
         </section>
       )}
+
+      {(isRewardEligible(challenge) || Boolean(challenge.rewards?.length)) && (
+        <section className="section panel">
+          <h2>Thưởng – phạt</h2>
+          {isRewardEligible(challenge) && (
+            <>
+              <h3 className="goal-rules-title">Phạt khi không hoàn thành</h3>
+              <ul className="goal-details">
+                {penaltyTiers.map((t, i) => (
+                  <li key={t.minPercent}>
+                    {tierRangeLabel(penaltyTiers, i)} mục tiêu:{' '}
+                    {t.amount ? formatVnd(t.amount) : 'không phạt'}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          {challenge.rewards?.length ? (
+            <>
+              <h3 className="goal-rules-title">Phần thưởng khi hoàn thành</h3>
+              <ul className="goal-details">
+                {challenge.rewards.map((r) => (
+                  <li key={r.target}>
+                    {r.target}: {r.gifts} phần quà{r.prize ? ` (${r.prize})` : ''}, quay số
+                    trong số người hoàn thành mục tiêu này
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+        </section>
+      )}
+
+      <RewardDrawSection
+        challenge={challenge}
+        userChallenges={rawUserChallenges}
+        names={drawNames}
+      />
 
       {challenge.description && (
         <section className="section panel">

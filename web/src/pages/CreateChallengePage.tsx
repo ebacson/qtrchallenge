@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { push, ref, set } from 'firebase/database'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { get, push, ref, set, update } from 'firebase/database'
 import { useAuth } from '../context/AuthContext'
 import {
   DEFAULT_CHALLENGE_ICON,
@@ -11,16 +11,20 @@ import {
   uploadChallengeIcon,
 } from '../lib/adminOps'
 import {
+  calculateStatus,
   countInclusiveDays,
   formatDay,
   formatDayQuotaLabel,
   formatPaceMinutes,
   joinDeadlineDate,
+  parseChallenge,
   parsePaceInput,
+  STATUS_FINISHED,
   STATUS_UPCOMING,
 } from '../lib/challengeRules'
 import { db } from '../lib/firebase'
-import type { DayQuotaOption } from '../types'
+import { DEFAULT_PENALTY_TIERS, penaltySummary } from '../lib/rewardPenalty'
+import type { DayQuotaOption, PenaltyTier, RewardTier } from '../types'
 
 const PRESET_DISTANCES = ['50 km', '100 km', '150 km', '200 km', '250 km', '300 km']
 type Mode = 'monthly_pace' | 'day_quota'
@@ -32,8 +36,54 @@ type QuotaDraft = {
   dailyKm: string[]
 }
 
+type PenaltyDraft = { minPercent: string; amount: string }
+type RewardDraft = { gifts: string; prize: string }
+
+type FormInitial = {
+  /** 'legacy': loại thử thách cũ form không hỗ trợ — chỉ sửa thông tin chung, thưởng/phạt */
+  mode: Mode | 'legacy'
+  name: string
+  description: string
+  monthValue: string
+  startDate: string
+  endDate: string
+  paceMinInput: string
+  paceMaxInput: string
+  quotaOptions: QuotaDraft[]
+  selected: string[]
+  password: string
+  joinDeadlineInput: string
+  icon: string
+  penaltyRows: PenaltyDraft[]
+  rewardDrafts: Record<string, RewardDraft>
+}
+
+type EditContext = {
+  id: string
+  participantCount: number
+  targetDistances: string[]
+  storedStatus: string
+  initial: FormInitial
+}
+
+const EMPTY_QUOTA: QuotaDraft = { daysRequired: '', kmPerDay: '5', perDay: false, dailyKm: [] }
+
+function toPenaltyDrafts(tiers: PenaltyTier[]): PenaltyDraft[] {
+  return tiers.map((t, i) => ({
+    minPercent: i === tiers.length - 1 ? '0' : String(t.minPercent),
+    amount: String(t.amount),
+  }))
+}
+
 function toKm(value: string): number {
   return Number(value.replace(',', '.'))
+}
+
+/** dd-MM-yyyy → yyyy-MM-dd (HTML date input) */
+function challengeDayToInput(day: string): string {
+  const [d, m, y] = day.split('-')
+  if (!y || !m || !d) return ''
+  return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
 }
 
 /** Số ô km theo ngày = số ngày phải hoàn thành (giới hạn để tránh nhập nhầm số lớn). */
@@ -65,38 +115,150 @@ function draftToOption(o: QuotaDraft): DayQuotaOption | null {
   return { daysRequired, kmPerDay: Math.min(...dailyKm), dailyKm }
 }
 
-export function CreateChallengePage() {
+/** Mức phạt hợp lệ (giảm dần theo %, mức cuối từ 0%) hoặc thông báo lỗi. */
+function parsePenaltyRows(rows: PenaltyDraft[]): PenaltyTier[] | string {
+  const tiers: PenaltyTier[] = []
+  for (const [i, row] of rows.entries()) {
+    const minPercent = i === rows.length - 1 ? 0 : Number(row.minPercent)
+    const amount = Number(row.amount.replace(/[.\s]/g, ''))
+    if (!Number.isInteger(minPercent) || minPercent < 0 || minPercent > 99) {
+      return `Mức phạt ${i + 1}: tỉ lệ phải là số nguyên từ 0 đến 99.`
+    }
+    if (i > 0 && minPercent >= tiers[i - 1].minPercent) {
+      return `Mức phạt ${i + 1}: tỉ lệ phải nhỏ hơn mức phía trên (${tiers[i - 1].minPercent}%).`
+    }
+    if (!Number.isInteger(amount) || amount < 0) {
+      return `Mức phạt ${i + 1}: số tiền phải là số nguyên ≥ 0.`
+    }
+    tiers.push({ minPercent, amount })
+  }
+  return tiers
+}
+
+function parseRewardDrafts(
+  targets: string[],
+  drafts: Record<string, RewardDraft>,
+): RewardTier[] | string {
+  const rewards: RewardTier[] = []
+  for (const target of targets) {
+    const d = drafts[target]
+    const raw = d?.gifts.trim() ?? ''
+    const gifts = raw ? Number(raw) : 0
+    if (!Number.isInteger(gifts) || gifts < 0) {
+      return `Phần thưởng "${target}": số quà phải là số nguyên ≥ 0.`
+    }
+    if (gifts > 0) rewards.push({ target, gifts, prize: d?.prize.trim() ?? '' })
+  }
+  return rewards
+}
+
+function defaultInitial(): FormInitial {
+  const today = todayInputValue()
+  return {
+    mode: 'monthly_pace',
+    name: '',
+    description: '',
+    monthValue: currentMonthInputValue(),
+    startDate: today,
+    endDate: today,
+    paceMinInput: '04:00',
+    paceMaxInput: '08:00',
+    quotaOptions: [EMPTY_QUOTA],
+    selected: [],
+    password: '',
+    joinDeadlineInput: '7',
+    icon: '',
+    penaltyRows: toPenaltyDrafts(DEFAULT_PENALTY_TIERS),
+    rewardDrafts: {},
+  }
+}
+
+function editContextFrom(id: string, raw: Record<string, unknown>): EditContext {
+  const c = parseChallenge(id, raw)
+  const mode: FormInitial['mode'] =
+    c.challengeMode === 'monthly_pace' || c.challengeMode === 'day_quota'
+      ? c.challengeMode
+      : 'legacy'
+  const base = defaultInitial()
+  const start = challengeDayToInput(c.startDate)
+  const end = challengeDayToInput(c.endDate)
+  const participants = raw.user_challenges
+  return {
+    id,
+    participantCount:
+      participants && typeof participants === 'object' ? Object.keys(participants).length : 0,
+    targetDistances: c.targetDistances,
+    storedStatus: String(raw.status ?? ''),
+    initial: {
+      mode,
+      name: c.name,
+      description: c.description,
+      monthValue: start ? start.slice(0, 7) : base.monthValue,
+      startDate: start || base.startDate,
+      endDate: end || base.endDate,
+      paceMinInput:
+        c.paceMinMinutes != null ? formatPaceMinutes(c.paceMinMinutes) : base.paceMinInput,
+      paceMaxInput:
+        c.paceMaxMinutes != null ? formatPaceMinutes(c.paceMaxMinutes) : base.paceMaxInput,
+      quotaOptions: c.dayQuotaOptions?.map((o) => ({
+        daysRequired: String(o.daysRequired),
+        kmPerDay: String(o.kmPerDay),
+        perDay: Boolean(o.dailyKm?.length),
+        dailyKm: o.dailyKm?.map(String) ?? [],
+      })) ?? [EMPTY_QUOTA],
+      selected: mode === 'monthly_pace' ? c.targetDistances : [],
+      password: c.password ?? '',
+      joinDeadlineInput: String(c.joinDeadlineDays),
+      icon: c.icon ?? '',
+      penaltyRows: toPenaltyDrafts(c.penaltyTiers ?? DEFAULT_PENALTY_TIERS),
+      rewardDrafts: Object.fromEntries(
+        (c.rewards ?? []).map((r) => [r.target, { gifts: String(r.gifts), prize: r.prize }]),
+      ),
+    },
+  }
+}
+
+function ChallengeForm({ edit }: { edit?: EditContext }) {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const init = edit?.initial ?? defaultInitial()
+  const legacy = init.mode === 'legacy'
+  const participantCount = edit?.participantCount ?? 0
 
-  const [mode, setMode] = useState<Mode>('monthly_pace')
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [monthValue, setMonthValue] = useState(currentMonthInputValue)
-  const [startDate, setStartDate] = useState(todayInputValue)
-  const [endDate, setEndDate] = useState(todayInputValue)
-  const [paceMinInput, setPaceMinInput] = useState('04:00')
-  const [paceMaxInput, setPaceMaxInput] = useState('08:00')
-  const [quotaOptions, setQuotaOptions] = useState<QuotaDraft[]>([
-    { daysRequired: '', kmPerDay: '5', perDay: false, dailyKm: [] },
-  ])
-  const [selected, setSelected] = useState<string[]>([])
+  const [mode, setMode] = useState<Mode>(init.mode === 'legacy' ? 'monthly_pace' : init.mode)
+  const [name, setName] = useState(init.name)
+  const [description, setDescription] = useState(init.description)
+  const [monthValue, setMonthValue] = useState(init.monthValue)
+  const [startDate, setStartDate] = useState(init.startDate)
+  const [endDate, setEndDate] = useState(init.endDate)
+  const [paceMinInput, setPaceMinInput] = useState(init.paceMinInput)
+  const [paceMaxInput, setPaceMaxInput] = useState(init.paceMaxInput)
+  const [quotaOptions, setQuotaOptions] = useState<QuotaDraft[]>(init.quotaOptions)
+  const [selected, setSelected] = useState<string[]>(init.selected)
   const [customKm, setCustomKm] = useState('')
   const [customOn, setCustomOn] = useState(false)
-  const [password, setPassword] = useState('')
-  const [joinDeadlineInput, setJoinDeadlineInput] = useState('7')
+  const [password, setPassword] = useState(init.password)
+  const [joinDeadlineInput, setJoinDeadlineInput] = useState(init.joinDeadlineInput)
   const [iconFile, setIconFile] = useState<File | null>(null)
-  const [iconPreview, setIconPreview] = useState<string | null>(null)
+  const [iconPreview, setIconPreview] = useState<string | null>(init.icon || null)
+  const [penaltyRows, setPenaltyRows] = useState<PenaltyDraft[]>(init.penaltyRows)
+  const [rewardDrafts, setRewardDrafts] = useState<Record<string, RewardDraft>>(
+    init.rewardDrafts,
+  )
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
+  /** Đã có người tham gia: giữ nguyên loại và mục tiêu để tiến độ/nhãn userTarget còn đúng */
+  const lockTargets = Boolean(edit) && (legacy || participantCount > 0)
+  const lockDates = legacy || (lockTargets && mode === 'day_quota')
+
   useEffect(() => {
-    if (mode !== 'monthly_pace') return
+    if (mode !== 'monthly_pace' || legacy) return
     const bounds = monthInputBounds(monthValue)
     if (!bounds) return
     setStartDate(bounds.start)
     setEndDate(bounds.end)
-  }, [mode, monthValue])
+  }, [mode, monthValue, legacy])
 
   const challengeDays = useMemo(() => {
     if (!startDate || !endDate || endDate < startDate) return 0
@@ -136,6 +298,7 @@ export function CreateChallengePage() {
   }, [quotaOptions, totalDays])
 
   const distances = useMemo(() => {
+    if (lockTargets && edit) return edit.targetDistances
     if (mode === 'day_quota') {
       return parsedQuotaOptions.map((o, i) =>
         formatDayQuotaLabel(o.daysRequired, totalDays, o.kmPerDay, o.dailyKm, i + 1),
@@ -144,14 +307,22 @@ export function CreateChallengePage() {
     const list = [...selected]
     if (customOn && customKm.trim()) {
       const n = Number(customKm.replace(',', '.'))
-      if (n > 0) list.push(`${n} km`)
+      if (n > 0 && !list.includes(`${n} km`)) list.push(`${n} km`)
     }
     return list
-  }, [mode, selected, customOn, customKm, parsedQuotaOptions, totalDays])
+  }, [lockTargets, edit, mode, selected, customOn, customKm, parsedQuotaOptions, totalDays])
+
+  const distanceChips = useMemo(
+    () => [...PRESET_DISTANCES, ...selected.filter((d) => !PRESET_DISTANCES.includes(d))],
+    [selected],
+  )
+
+  const parsedPenalty = useMemo(() => parsePenaltyRows(penaltyRows), [penaltyRows])
 
   const preview = useMemo(() => {
     const startLabel = inputDateToChallengeDay(startDate)
     const endLabel = inputDateToChallengeDay(endDate)
+    if (legacy) return `${startLabel} → ${endLabel} · ${distances.join(', ')}`
     if (mode === 'monthly_pace') {
       const a = parsePaceInput(paceMinInput)
       const b = parsePaceInput(paceMaxInput)
@@ -162,15 +333,7 @@ export function CreateChallengePage() {
       return `${startLabel} → ${endLabel} · ${pace} · mục tiêu ${distances.join(', ') || '…'}`
     }
     return `${startLabel} → ${endLabel} (${totalDays} ngày) · ${distances.join(' | ') || 'chưa có tùy chọn'}`
-  }, [
-    mode,
-    startDate,
-    endDate,
-    paceMinInput,
-    paceMaxInput,
-    distances,
-    totalDays,
-  ])
+  }, [legacy, mode, startDate, endDate, paceMinInput, paceMaxInput, distances, totalDays])
 
   function toggleDistance(d: string) {
     setSelected((prev) =>
@@ -237,6 +400,38 @@ export function CreateChallengePage() {
     )
   }
 
+  function updatePenalty(index: number, patch: Partial<PenaltyDraft>) {
+    setPenaltyRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)))
+  }
+
+  /** Chèn một mức ngay trên mức cuối (0%), tỉ lệ bằng nửa mức kế trên */
+  function addPenaltyRow() {
+    setPenaltyRows((prev) => {
+      const above = prev.length >= 2 ? Number(prev[prev.length - 2].minPercent) || 100 : 100
+      const row = {
+        minPercent: String(Math.max(1, Math.floor(above / 2))),
+        amount: prev[prev.length - 1]?.amount ?? '0',
+      }
+      return [...prev.slice(0, -1), row, ...prev.slice(-1)]
+    })
+  }
+
+  function removePenaltyRow(index: number) {
+    setPenaltyRows((prev) => {
+      if (prev.length <= 1) return prev
+      const next = prev.filter((_, i) => i !== index)
+      next[next.length - 1] = { ...next[next.length - 1], minPercent: '0' }
+      return next
+    })
+  }
+
+  function updateReward(target: string, patch: Partial<RewardDraft>) {
+    setRewardDrafts((prev) => ({
+      ...prev,
+      [target]: { ...(prev[target] ?? { gifts: '', prize: '' }), ...patch },
+    }))
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     if (!user) return
@@ -264,7 +459,7 @@ export function CreateChallengePage() {
     let paceMinMinutes: number | undefined
     let paceMaxMinutes: number | undefined
 
-    if (mode === 'monthly_pace') {
+    if (!legacy && mode === 'monthly_pace') {
       paceMinMinutes = parsePaceInput(paceMinInput) ?? undefined
       paceMaxMinutes = parsePaceInput(paceMaxInput) ?? undefined
       if (paceMinMinutes == null || paceMaxMinutes == null) {
@@ -275,11 +470,11 @@ export function CreateChallengePage() {
         setError('Pace tối thiểu phải nhỏ hơn pace tối đa.')
         return
       }
-      if (distances.length === 0) {
+      if (!lockTargets && distances.length === 0) {
         setError('Chọn ít nhất một cự ly mục tiêu.')
         return
       }
-    } else {
+    } else if (!legacy && !lockTargets) {
       if (totalDays < 1) {
         setError('Khoảng ngày không hợp lệ.')
         return
@@ -304,40 +499,80 @@ export function CreateChallengePage() {
       }
     }
 
-    if (!window.confirm(`Tạo thử thách?\n\n${preview}`)) return
+    if (typeof parsedPenalty === 'string') {
+      setError(parsedPenalty)
+      return
+    }
+    const rewards = parseRewardDrafts(distances, rewardDrafts)
+    if (typeof rewards === 'string') {
+      setError(rewards)
+      return
+    }
+
+    const question = edit ? 'Lưu thay đổi thử thách?' : 'Tạo thử thách?'
+    if (!window.confirm(`${question}\n\n${preview}`)) return
 
     setBusy(true)
     try {
-      let icon = DEFAULT_CHALLENGE_ICON
-      if (iconFile) icon = await uploadChallengeIcon(iconFile)
-
+      const startLabel = inputDateToChallengeDay(startDate)
+      const endLabel = inputDateToChallengeDay(endDate)
       const payload: Record<string, unknown> = {
-        creator: user.uid,
         name: name.trim(),
         description: description.trim(),
-        startDate: inputDateToChallengeDay(startDate),
-        endDate: inputDateToChallengeDay(endDate),
-        targetDistances: distances,
-        status: STATUS_UPCOMING,
-        icon,
         password: password.trim(),
         joinDeadlineDays,
-        challengeMode: mode,
+        penaltyTiers: parsedPenalty,
+        rewards: rewards.length ? rewards : null,
+      }
+      if (iconFile) payload.icon = await uploadChallengeIcon(iconFile)
+
+      if (!legacy) {
+        if (!lockDates) {
+          payload.startDate = startLabel
+          payload.endDate = endLabel
+        }
+        if (!lockTargets) {
+          payload.challengeMode = mode
+          payload.targetDistances = distances
+        }
+        if (mode === 'monthly_pace') {
+          payload.paceMinMinutes = paceMinMinutes
+          payload.paceMaxMinutes = paceMaxMinutes
+          if (!lockTargets) {
+            payload.totalDays = null
+            payload.dayQuotaOptions = null
+          }
+        } else if (!lockTargets) {
+          payload.totalDays = totalDays
+          payload.dayQuotaOptions = parsedQuotaOptions
+          payload.paceMinMinutes = null
+          payload.paceMaxMinutes = null
+        }
       }
 
-      if (mode === 'monthly_pace') {
-        payload.paceMinMinutes = paceMinMinutes
-        payload.paceMaxMinutes = paceMaxMinutes
-      } else {
-        payload.totalDays = totalDays
-        payload.dayQuotaOptions = parsedQuotaOptions
+      if (edit) {
+        // Gia hạn thử thách đã đánh dấu kết thúc: mở lại để được tính tiến độ tiếp
+        const computed = calculateStatus(startLabel, endLabel)
+        if (edit.storedStatus === STATUS_FINISHED && computed !== STATUS_FINISHED) {
+          payload.status = computed
+        }
+        await update(ref(db, `challenges/${edit.id}`), payload)
+        navigate(`/challenges/${edit.id}`, { replace: true })
+        return
       }
 
+      const created: Record<string, unknown> = {
+        ...payload,
+        creator: user.uid,
+        status: STATUS_UPCOMING,
+        icon: payload.icon ?? DEFAULT_CHALLENGE_ICON,
+      }
+      for (const [k, v] of Object.entries(created)) if (v == null) delete created[k]
       const newRef = push(ref(db, 'challenges'))
-      await set(newRef, payload)
+      await set(newRef, created)
       navigate(`/challenges/${newRef.key}`, { replace: true })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không tạo được thử thách')
+      setError(err instanceof Error ? err.message : 'Không lưu được thử thách')
     } finally {
       setBusy(false)
     }
@@ -345,15 +580,23 @@ export function CreateChallengePage() {
 
   return (
     <div className="page">
-      <Link className="back-link" to="/challenges">
+      <Link className="back-link" to={edit ? `/challenges/${edit.id}` : '/challenges'}>
         ← Thử thách
       </Link>
       <header className="page-header">
         <p className="eyebrow">Admin</p>
-        <h1>Tạo thử thách</h1>
+        <h1>{edit ? 'Sửa thử thách' : 'Tạo thử thách'}</h1>
       </header>
 
       <form className="auth-form panel section" onSubmit={onSubmit}>
+        {edit && lockTargets && (
+          <p className="tiny form-info">
+            {legacy
+              ? 'Thử thách loại cũ: chỉ sửa được thông tin chung, mức phạt và phần thưởng.'
+              : `Đã có ${participantCount} người tham gia nên không đổi loại thử thách và mục tiêu${mode === 'day_quota' ? ', khoảng ngày' : ''} (để giữ đúng tiến độ).`}
+          </p>
+        )}
+
         <div className="challenge-icon-picker">
           <img
             src={iconPreview || DEFAULT_CHALLENGE_ICON}
@@ -371,30 +614,32 @@ export function CreateChallengePage() {
           </label>
         </div>
 
-        <fieldset className="distance-fieldset">
-          <legend>Loại thử thách</legend>
-          <div className="distance-chips">
-            <button
-              type="button"
-              className={mode === 'monthly_pace' ? 'chip active' : 'chip'}
-              onClick={() => setMode('monthly_pace')}
-            >
-              Theo tháng + pace
-            </button>
-            <button
-              type="button"
-              className={mode === 'day_quota' ? 'chip active' : 'chip'}
-              onClick={() => setMode('day_quota')}
-            >
-              Khoảng ngày + tùy chọn ngày/km
-            </button>
-          </div>
-          <p className="tiny muted" style={{ marginTop: 8 }}>
-            {mode === 'monthly_pace'
-              ? 'Tự lấy ngày đầu → cuối tháng; chỉ tính hoạt động trong khoảng pace A–B.'
-              : 'Từ ngày → đến ngày; nhiều tùy chọn như 15/15 ngày × 5 km/ngày, 13/15 × 8 km/ngày…'}
-          </p>
-        </fieldset>
+        {!legacy && (
+          <fieldset className="distance-fieldset" disabled={lockTargets}>
+            <legend>Loại thử thách</legend>
+            <div className="distance-chips">
+              <button
+                type="button"
+                className={mode === 'monthly_pace' ? 'chip active' : 'chip'}
+                onClick={() => setMode('monthly_pace')}
+              >
+                Theo tháng + pace
+              </button>
+              <button
+                type="button"
+                className={mode === 'day_quota' ? 'chip active' : 'chip'}
+                onClick={() => setMode('day_quota')}
+              >
+                Khoảng ngày + tùy chọn ngày/km
+              </button>
+            </div>
+            <p className="tiny muted" style={{ marginTop: 8 }}>
+              {mode === 'monthly_pace'
+                ? 'Tự lấy ngày đầu → cuối tháng; chỉ tính hoạt động trong khoảng pace A–B.'
+                : 'Từ ngày → đến ngày; nhiều tùy chọn như 15/15 ngày × 5 km/ngày, 13/15 × 8 km/ngày…'}
+            </p>
+          </fieldset>
+        )}
 
         <label>
           Tên thử thách
@@ -413,7 +658,9 @@ export function CreateChallengePage() {
           />
         </label>
 
-        {mode === 'monthly_pace' ? (
+        {legacy ? (
+          <p className="challenge-preview">{preview}</p>
+        ) : mode === 'monthly_pace' ? (
           <>
             <label>
               Tháng
@@ -455,10 +702,10 @@ export function CreateChallengePage() {
               </label>
             </div>
 
-            <fieldset className="distance-fieldset">
+            <fieldset className="distance-fieldset" disabled={lockTargets}>
               <legend>Cự ly mục tiêu (km tích lũy)</legend>
               <div className="distance-chips">
-                {PRESET_DISTANCES.map((d) => (
+                {distanceChips.map((d) => (
                   <button
                     key={d}
                     type="button"
@@ -469,23 +716,25 @@ export function CreateChallengePage() {
                   </button>
                 ))}
               </div>
-              <label className="custom-distance-row">
-                <input
-                  type="checkbox"
-                  checked={customOn}
-                  onChange={(e) => setCustomOn(e.target.checked)}
-                />
-                <span>Cự ly tùy chọn (km)</span>
-                <input
-                  type="number"
-                  min={1}
-                  step={0.1}
-                  value={customKm}
-                  disabled={!customOn}
-                  onChange={(e) => setCustomKm(e.target.value)}
-                  placeholder="VD: 75"
-                />
-              </label>
+              {!lockTargets && (
+                <label className="custom-distance-row">
+                  <input
+                    type="checkbox"
+                    checked={customOn}
+                    onChange={(e) => setCustomOn(e.target.checked)}
+                  />
+                  <span>Cự ly tùy chọn (km)</span>
+                  <input
+                    type="number"
+                    min={1}
+                    step={0.1}
+                    value={customKm}
+                    disabled={!customOn}
+                    onChange={(e) => setCustomKm(e.target.value)}
+                    placeholder="VD: 75"
+                  />
+                </label>
+              )}
             </fieldset>
           </>
         ) : (
@@ -497,6 +746,7 @@ export function CreateChallengePage() {
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
+                  readOnly={lockDates}
                   required
                 />
               </label>
@@ -506,6 +756,7 @@ export function CreateChallengePage() {
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
+                  readOnly={lockDates}
                   required
                 />
               </label>
@@ -514,110 +765,217 @@ export function CreateChallengePage() {
               Tổng số ngày trong khoảng: <strong>{totalDays || '—'}</strong>
             </p>
 
-            <fieldset className="distance-fieldset">
-              <legend>Các tùy chọn hoàn thành</legend>
-              <p className="tiny muted" style={{ marginBottom: 10 }}>
-                Ví dụ 15 ngày: tùy chọn 1 = 15/15 ngày × 5 km/ngày; tùy chọn 2 =
-                10/15 ngày, mỗi ngày hoạt động một mức km riêng. Mỗi ngày cần một hoạt
-                động có cự ly bằng mức km đã đặt (sai số ±0,1 km).
-              </p>
-              {quotaOptions.map((o, index) => (
-                <div key={index} className="quota-option-row">
-                  <span className="quota-option-label">Tùy chọn {index + 1}</span>
-                  <label>
-                    Số ngày phải hoàn thành
-                    <input
-                      type="number"
-                      min={1}
-                      max={totalDays || undefined}
-                      step={1}
-                      value={o.daysRequired}
-                      onChange={(e) =>
-                        updateQuota(index, { daysRequired: e.target.value })
-                      }
-                      placeholder={totalDays ? String(totalDays) : '15'}
-                      required
-                    />
-                  </label>
-                  <label>
-                    {o.perDay ? 'Km mặc định' : 'Km mỗi ngày'}
-                    <input
-                      type="number"
-                      min={0.1}
-                      step={0.1}
-                      value={o.kmPerDay}
-                      onChange={(e) =>
-                        updateQuota(index, { kmPerDay: e.target.value })
-                      }
-                      placeholder="5"
-                      required
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    className="btn ghost compact danger"
-                    disabled={quotaOptions.length <= 1}
-                    onClick={() => removeQuotaOption(index)}
-                  >
-                    Xóa
-                  </button>
-                  <div className="quota-option-extra">
-                    <label className="custom-distance-row">
+            {lockTargets ? (
+              <fieldset className="distance-fieldset">
+                <legend>Các tùy chọn hoàn thành</legend>
+                <ul className="goal-details">
+                  {distances.map((d) => (
+                    <li key={d}>{d}</li>
+                  ))}
+                </ul>
+              </fieldset>
+            ) : (
+              <fieldset className="distance-fieldset">
+                <legend>Các tùy chọn hoàn thành</legend>
+                <p className="tiny muted" style={{ marginBottom: 10 }}>
+                  Ví dụ 15 ngày: tùy chọn 1 = 15/15 ngày × 5 km/ngày; tùy chọn 2 =
+                  10/15 ngày, mỗi ngày hoạt động một mức km riêng. Mỗi ngày cần một hoạt
+                  động có cự ly bằng mức km đã đặt (sai số ±0,1 km).
+                </p>
+                {quotaOptions.map((o, index) => (
+                  <div key={index} className="quota-option-row">
+                    <span className="quota-option-label">Tùy chọn {index + 1}</span>
+                    <label>
+                      Số ngày phải hoàn thành
                       <input
-                        type="checkbox"
-                        checked={o.perDay}
-                        disabled={totalDays <= 0}
-                        onChange={(e) => togglePerDay(index, e.target.checked)}
+                        type="number"
+                        min={1}
+                        max={totalDays || undefined}
+                        step={1}
+                        value={o.daysRequired}
+                        onChange={(e) =>
+                          updateQuota(index, { daysRequired: e.target.value })
+                        }
+                        placeholder={totalDays ? String(totalDays) : '15'}
+                        required
                       />
-                      <span>Đặt km riêng cho từng ngày hoạt động</span>
                     </label>
-                    {o.perDay && totalDays > 0 && (
-                      <>
-                        <p className="tiny muted">
-                          Nhập km cho {o.dailyKm.length || '…'} ngày hoạt động. Mỗi mức cần một
-                          hoạt động có cự ly bằng mức đó (sai số ±0,1 km), vào ngày nào trong
-                          khoảng cũng được (liên tục hoặc ngắt quãng, không theo thứ tự); mỗi
-                          ngày chỉ tính cho một mức.
-                        </p>
-                        <div className="daily-km-grid">
-                          {o.dailyKm.map((_, day) => (
-                            <label key={day} className="daily-km-cell">
-                              <span>Ngày hoạt động {day + 1}</span>
-                              <input
-                                type="number"
-                                min={0.1}
-                                step={0.1}
-                                value={o.dailyKm[day] ?? ''}
-                                onChange={(e) =>
-                                  updateDailyKm(index, day, e.target.value)
-                                }
-                                required
-                              />
-                            </label>
-                          ))}
-                        </div>
-                        <button
-                          type="button"
-                          className="btn ghost compact"
-                          onClick={() => fillDailyKm(index)}
-                        >
-                          Điền tất cả = {o.kmPerDay || '…'} km
-                        </button>
-                      </>
-                    )}
+                    <label>
+                      {o.perDay ? 'Km mặc định' : 'Km mỗi ngày'}
+                      <input
+                        type="number"
+                        min={0.1}
+                        step={0.1}
+                        value={o.kmPerDay}
+                        onChange={(e) =>
+                          updateQuota(index, { kmPerDay: e.target.value })
+                        }
+                        placeholder="5"
+                        required
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="btn ghost compact danger"
+                      disabled={quotaOptions.length <= 1}
+                      onClick={() => removeQuotaOption(index)}
+                    >
+                      Xóa
+                    </button>
+                    <div className="quota-option-extra">
+                      <label className="custom-distance-row">
+                        <input
+                          type="checkbox"
+                          checked={o.perDay}
+                          disabled={totalDays <= 0}
+                          onChange={(e) => togglePerDay(index, e.target.checked)}
+                        />
+                        <span>Đặt km riêng cho từng ngày hoạt động</span>
+                      </label>
+                      {o.perDay && totalDays > 0 && (
+                        <>
+                          <p className="tiny muted">
+                            Nhập km cho {o.dailyKm.length || '…'} ngày hoạt động. Mỗi mức cần
+                            một hoạt động có cự ly bằng mức đó (sai số ±0,1 km), vào ngày nào
+                            trong khoảng cũng được (liên tục hoặc ngắt quãng, không theo thứ
+                            tự); mỗi ngày chỉ tính cho một mức.
+                          </p>
+                          <div className="daily-km-grid">
+                            {o.dailyKm.map((_, day) => (
+                              <label key={day} className="daily-km-cell">
+                                <span>Ngày hoạt động {day + 1}</span>
+                                <input
+                                  type="number"
+                                  min={0.1}
+                                  step={0.1}
+                                  value={o.dailyKm[day] ?? ''}
+                                  onChange={(e) =>
+                                    updateDailyKm(index, day, e.target.value)
+                                  }
+                                  required
+                                />
+                              </label>
+                            ))}
+                          </div>
+                          <button
+                            type="button"
+                            className="btn ghost compact"
+                            onClick={() => fillDailyKm(index)}
+                          >
+                            Điền tất cả = {o.kmPerDay || '…'} km
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-              <button
-                type="button"
-                className="btn ghost"
-                onClick={addQuotaOption}
-              >
-                + Thêm tùy chọn
-              </button>
-            </fieldset>
+                ))}
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={addQuotaOption}
+                >
+                  + Thêm tùy chọn
+                </button>
+              </fieldset>
+            )}
           </>
         )}
+
+        <fieldset className="distance-fieldset">
+          <legend>Mức phạt khi không hoàn thành</legend>
+          <p className="tiny muted" style={{ marginBottom: 10 }}>
+            Tính theo tỉ lệ hoàn thành mục tiêu; đạt 100% không bị phạt. Đặt số tiền 0 nếu mức đó
+            không phạt.
+          </p>
+          {penaltyRows.map((row, index) => {
+            const last = index === penaltyRows.length - 1
+            const upper = index === 0 ? '100' : penaltyRows[index - 1].minPercent || '…'
+            return (
+              <div key={index} className="penalty-row">
+                <label>
+                  {last ? `Dưới ${upper}%` : `Từ (%) đến dưới ${upper}%`}
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={99}
+                    step={1}
+                    value={last ? '0' : row.minPercent}
+                    disabled={last}
+                    onChange={(e) => updatePenalty(index, { minPercent: e.target.value })}
+                  />
+                </label>
+                <label>
+                  Phạt (đồng)
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    step={1000}
+                    value={row.amount}
+                    onChange={(e) => updatePenalty(index, { amount: e.target.value })}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="btn ghost compact danger"
+                  disabled={penaltyRows.length <= 1}
+                  onClick={() => removePenaltyRow(index)}
+                >
+                  Xóa
+                </button>
+              </div>
+            )
+          })}
+          <button type="button" className="btn ghost" onClick={addPenaltyRow}>
+            + Thêm mức phạt
+          </button>
+          <p className="tiny muted" style={{ marginTop: 8 }}>
+            {typeof parsedPenalty === 'string' ? parsedPenalty : penaltySummary(parsedPenalty)}
+          </p>
+        </fieldset>
+
+        <fieldset className="distance-fieldset">
+          <legend>Phần thưởng khi hoàn thành (quay số)</legend>
+          <p className="tiny muted" style={{ marginBottom: 10 }}>
+            Đặt số phần quà cho từng mục tiêu (0 = không có thưởng). Khi thử thách kết thúc, admin
+            quay số ngẫu nhiên trong những người hoàn thành mục tiêu đó; nếu số người hoàn thành
+            không vượt số quà thì tất cả đều nhận.
+          </p>
+          {distances.length === 0 ? (
+            <p className="empty">Chọn mục tiêu trước.</p>
+          ) : (
+            distances.map((target) => {
+              const d = rewardDrafts[target]
+              return (
+                <div key={target} className="reward-row">
+                  <strong className="reward-row-target">{target}</strong>
+                  <label>
+                    Số quà
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      step={1}
+                      value={d?.gifts ?? ''}
+                      placeholder="0"
+                      onChange={(e) => updateReward(target, { gifts: e.target.value })}
+                    />
+                  </label>
+                  <label>
+                    Phần quà
+                    <input
+                      value={d?.prize ?? ''}
+                      placeholder="VD: Áo QTR, voucher 200.000đ"
+                      maxLength={120}
+                      onChange={(e) => updateReward(target, { prize: e.target.value })}
+                    />
+                  </label>
+                </div>
+              )
+            })
+          )}
+        </fieldset>
 
         <label>
           Hạn tham gia (số ngày sau ngày bắt đầu)
@@ -648,13 +1006,74 @@ export function CreateChallengePage() {
           />
         </label>
 
-        <p className="challenge-preview">{preview}</p>
+        <p className="challenge-preview">
+          {preview}
+          {typeof parsedPenalty !== 'string' && (
+            <>
+              <br />
+              Phạt: {penaltySummary(parsedPenalty)}
+            </>
+          )}
+        </p>
 
         {error && <p className="form-error">{error}</p>}
         <button type="submit" className="btn primary wide" disabled={busy}>
-          {busy ? 'Đang tạo…' : 'Tạo thử thách'}
+          {busy
+            ? edit
+              ? 'Đang lưu…'
+              : 'Đang tạo…'
+            : edit
+              ? 'Lưu thay đổi'
+              : 'Tạo thử thách'}
         </button>
       </form>
     </div>
   )
+}
+
+export function CreateChallengePage() {
+  return <ChallengeForm />
+}
+
+export function EditChallengePage() {
+  const { id } = useParams<{ id: string }>()
+  const [edit, setEdit] = useState<EditContext | null>(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!id) return
+    let cancelled = false
+    void get(ref(db, `challenges/${id}`))
+      .then((snap) => {
+        if (cancelled) return
+        const raw = snap.val() as Record<string, unknown> | null
+        if (!raw) setError('Không tìm thấy thử thách.')
+        else setEdit(editContextFrom(id, raw))
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Không tải được thử thách')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [id])
+
+  if (error) {
+    return (
+      <div className="page">
+        <Link className="back-link" to="/challenges">
+          ← Thử thách
+        </Link>
+        <p className="form-error">{error}</p>
+      </div>
+    )
+  }
+  if (!edit) {
+    return (
+      <div className="page">
+        <p className="empty">Đang tải…</p>
+      </div>
+    )
+  }
+  return <ChallengeForm key={edit.id} edit={edit} />
 }

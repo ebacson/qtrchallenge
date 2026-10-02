@@ -1323,6 +1323,13 @@ select {
   margin: 12px 0 20px;
 }
 
+.detail-hero .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
 .detail-icon {
   width: 112px;
   height: 112px;
@@ -2083,6 +2090,107 @@ code {
 
 .reward-amount.underHalf {
   color: var(--danger);
+}
+
+.penalty-row,
+.reward-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(31, 20, 20, 0.03);
+}
+
+.penalty-row label,
+.reward-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reward-row-target {
+  font-size: 0.95rem;
+}
+
+@media (min-width: 640px) {
+  .penalty-row {
+    grid-template-columns: 1fr 1fr auto;
+    align-items: end;
+  }
+
+  .reward-row {
+    grid-template-columns: minmax(0, 1.2fr) 110px minmax(0, 2fr);
+    align-items: end;
+  }
+
+  .reward-row-target {
+    align-self: center;
+  }
+}
+
+.reward-draw-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.reward-draw-card {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(208, 16, 43, 0.06), rgba(255, 255, 255, 0.9));
+}
+
+.reward-draw-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  color: var(--accent);
+}
+
+.reward-draw-head div {
+  display: flex;
+  flex-direction: column;
+  color: var(--ink);
+}
+
+.reward-draw-spin {
+  margin: 10px 0;
+  padding: 18px 12px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--display);
+  font-size: 1.35rem;
+  font-weight: 700;
+  text-align: center;
+  min-height: 1.4em;
+}
+
+.reward-winners {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.reward-winners li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid rgba(46, 157, 91, 0.35);
+}
+
+.reward-winners li::before {
+  content: '🎁';
 }
 
 .event-list {

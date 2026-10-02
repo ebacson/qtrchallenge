@@ -386,12 +386,6 @@ export function RewardsPage() {
       <header className="page-header">
         <p className="eyebrow">Thử thách</p>
         <h1>Thưởng - Phạt</h1>
-        <p className="lede">
-          Thống kê thành viên chính thức hoàn thành và không hoàn thành thử thách, kèm quay số
-          trúng thưởng. Mức phạt và phần thưởng theo cài đặt lúc tạo từng thử thách; thử thách
-          chưa cài đặt thì không thưởng, không phạt. Chỉ tính các thử thách bắt đầu từ năm{' '}
-          {REWARD_START_YEAR} trở đi.
-        </p>
       </header>
 
       {loading ? (

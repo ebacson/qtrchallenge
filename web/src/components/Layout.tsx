@@ -7,6 +7,7 @@ import {
   CirclePlus,
   Flag,
   House,
+  LifeBuoy,
   LogOut,
   RotateCw,
   ShieldCheck,
@@ -53,6 +54,7 @@ const menuGroups: MenuGroup[] = [
       { to: '/members', label: 'Thành viên', icon: Users },
       { to: '/hall-of-fame', label: 'Bảng vàng', icon: Trophy },
       { to: '/rewards', label: 'Thưởng - Phạt', icon: Wallet },
+      { to: '/support', label: 'Hỗ trợ', icon: LifeBuoy },
     ],
   },
 ]

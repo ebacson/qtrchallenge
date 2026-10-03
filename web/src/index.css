@@ -2546,6 +2546,15 @@ code {
   color: var(--ok);
 }
 
+.support-call {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
 .stats-year-select {
   border: 1px solid var(--line);
   border-radius: 10px;

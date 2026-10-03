@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
 import { syncOngoingChallengeProgress } from '../lib/challengeProgress'
 import { updateUser } from '../lib/userWrites'
+import { StravaMark } from './StravaLogo'
 import {
   ensureFreshAccessToken,
   fetchAthlete,
@@ -186,10 +187,11 @@ export function StravaConnectPanel() {
       <div className="cta-row">
         <button
           type="button"
-          className="btn primary"
+          className="btn strava-connect-btn"
           disabled={busy || isConnected || !config?.configured}
           onClick={() => void onConnect()}
         >
+          <StravaMark size={18} />
           {isConnected ? 'Đã kết nối' : 'Kết nối Strava'}
         </button>
         <button

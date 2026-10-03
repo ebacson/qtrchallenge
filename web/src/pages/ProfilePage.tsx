@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { onValue, ref } from 'firebase/database'
 import { StravaConnectPanel } from '../components/StravaConnectPanel'
+import { StravaBadge } from '../components/StravaLogo'
 import { useAuth } from '../context/AuthContext'
 import { uploadUserAvatar } from '../lib/avatarUpload'
 import { db } from '../lib/firebase'
@@ -254,7 +255,10 @@ export function ProfilePage() {
       </header>
 
       <section className="section panel">
-        <h2>Strava</h2>
+        <h2 className="strava-heading">
+          <StravaBadge size={32} />
+          <span>Strava</span>
+        </h2>
         <StravaConnectPanel />
       </section>
 

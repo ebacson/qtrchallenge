@@ -595,6 +595,30 @@ select {
   background: var(--accent-deep);
 }
 
+.btn.strava-connect-btn {
+  background: #fc4c02;
+  color: #ffffff;
+}
+
+.btn.strava-connect-btn:hover:not(:disabled) {
+  background: #e34402;
+}
+
+.strava-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.strava-badge {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: #fc4c02;
+  color: #ffffff;
+}
+
 .btn.ghost {
   background: transparent;
   color: var(--ink);

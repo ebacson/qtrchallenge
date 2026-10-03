@@ -28,6 +28,8 @@ jobs:
 
       - name: Install & build web
         working-directory: web
+        env:
+          VITE_GOOGLE_API_KEY: ${{ vars.VITE_GOOGLE_API_KEY }}
         run: |
           npm ci
           npm run build

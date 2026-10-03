@@ -51,28 +51,46 @@ function CandidateList({
   winners: Set<string>
   names: Names
 }) {
-  const sorted = [...uids].sort((a, b) =>
-    displayName(names, a).localeCompare(displayName(names, b), 'vi'),
+  // Người trúng → hoàn thành → đã nộp phạt; trong mỗi nhóm theo tên
+  const rank = (uid: string) => (winners.has(uid) ? 0 : paidUids.has(uid) ? 2 : 1)
+  const sorted = [...uids].sort(
+    (a, b) =>
+      rank(a) - rank(b) || displayName(names, a).localeCompare(displayName(names, b), 'vi'),
   )
   return (
-    <ul className="reward-candidates">
-      {sorted.map((uid) => (
-        <li
-          key={uid}
-          className={[
-            'reward-candidate',
-            paidUids.has(uid) ? 'paid' : '',
-            winners.has(uid) ? 'winner' : '',
-          ]
-            .filter(Boolean)
-            .join(' ')}
-        >
-          {winners.has(uid) && '🎁 '}
-          {displayName(names, uid)}
-          {paidUids.has(uid) && <small>Đã nộp phạt</small>}
-        </li>
-      ))}
-    </ul>
+    <ol className="reward-candidates">
+      {sorted.map((uid) => {
+        const name = displayName(names, uid)
+        const avatar = names[uid]?.avatar
+        return (
+          <li
+            key={uid}
+            className={[
+              'reward-candidate',
+              paidUids.has(uid) ? 'paid' : '',
+              winners.has(uid) ? 'winner' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            title={name}
+          >
+            <span className="reward-candidate-avatar" aria-hidden>
+              {avatar ? <img src={avatar} alt="" /> : name.charAt(0).toUpperCase()}
+            </span>
+            <span className="reward-candidate-text">
+              <span className="reward-candidate-name">{name}</span>
+              {winners.has(uid) ? (
+                <small className="tag-winner">🎁 Trúng thưởng</small>
+              ) : paidUids.has(uid) ? (
+                <small className="tag-paid">Đã nộp phạt</small>
+              ) : (
+                <small className="tag-done">Hoàn thành</small>
+              )}
+            </span>
+          </li>
+        )
+      })}
+    </ol>
   )
 }
 

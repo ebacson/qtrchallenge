@@ -138,6 +138,8 @@ function AlbumView({
   album: Album
   onOpen: (images: DriveImage[], index: number) => void
 }) {
+  const { profile } = useAuth()
+  const isAdmin = Boolean(profile?.admin)
   const folderId = parseDriveFolderId(album.url)
   const [state, setState] = useState<AlbumState>({ status: 'loading' })
   const [limit, setLimit] = useState(PAGE_SIZE)
@@ -180,7 +182,12 @@ function AlbumView({
         <p className="empty">Đang tải ảnh…</p>
       ) : state.status === 'error' ? (
         <>
-          <p className="tiny form-error">Không đọc được danh sách ảnh: {state.message}</p>
+          {isAdmin && (
+            <p className="tiny muted" title={state.message}>
+              Đang hiển thị dạng nhúng của Google Drive (API key chưa được phép gọi Google Drive
+              API).
+            </p>
+          )}
           <iframe
             className="gallery-embed"
             src={driveEmbedUrl(folderId)}

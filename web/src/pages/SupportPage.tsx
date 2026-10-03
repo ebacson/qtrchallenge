@@ -131,8 +131,6 @@ export function SupportPage() {
         <h1>☎ Liên hệ hỗ trợ</h1>
       </header>
 
-      <ZaloGroupSection />
-
       {groups.map((g) => (
         <section key={g.title} className="section panel">
           <h2>{g.title}</h2>
@@ -159,6 +157,8 @@ export function SupportPage() {
           </ul>
         </section>
       ))}
+
+      <ZaloGroupSection />
     </div>
   )
 }

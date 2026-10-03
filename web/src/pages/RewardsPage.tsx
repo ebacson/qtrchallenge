@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, X } from 'lucide-react'
+import { ChevronDown, Search, X } from 'lucide-react'
 import { useSharedValue } from '../lib/sharedValue'
 import { useUserProfiles } from '../lib/userWrites'
 import {
@@ -106,6 +106,40 @@ function Avatar({ name, avatar }: { name: string; avatar: string }) {
   )
 }
 
+function sectionId(challengeId: string, key: string): string {
+  return `reward-${challengeId}-${key}`
+}
+
+/** Cuộn tới danh sách, chừa chỗ cho thanh trên cùng và ô chọn thử thách đang cố định */
+function scrollToSection(id: string) {
+  const el = document.getElementById(id)
+  if (!el) return
+  const topbar = document.querySelector<HTMLElement>('.topbar')?.offsetHeight ?? 0
+  const picker = document.querySelector<HTMLElement>('.reward-picker')?.offsetHeight ?? 0
+  const top = el.getBoundingClientRect().top + window.scrollY - topbar - picker - 8
+  window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
+  el.classList.remove('section-flash')
+  void el.offsetWidth
+  el.classList.add('section-flash')
+  window.setTimeout(() => el.classList.remove('section-flash'), 1600)
+}
+
+function StatLink({ value, label, target }: { value: number; label: string; target: string }) {
+  return (
+    <button
+      type="button"
+      className="stat stat-link"
+      onClick={() => scrollToSection(target)}
+      aria-label={`${label}: ${value} — xem danh sách`}
+    >
+      <strong>{value}</strong>
+      <span>
+        {label} <ChevronDown size={12} aria-hidden />
+      </span>
+    </button>
+  )
+}
+
 /** Hàng ô Tổng phạt – Đã nộp – Chưa nộp; `paid` null khi chưa thu (thử thách đang diễn ra) */
 function PenaltyStats({ total, paid }: { total: number; paid: number | null }) {
   return (
@@ -206,18 +240,26 @@ function ChallengeReportView({
       </div>
 
       <div className="stat-row">
-        <div className="stat">
-          <strong>{completed}</strong>
-          <span>Hoàn thành</span>
-        </div>
-        <div className="stat">
-          <strong>{failed}</strong>
-          <span>Không hoàn thành</span>
-        </div>
-        <div className="stat">
-          <strong>{absent.length}</strong>
-          <span>Không tham gia</span>
-        </div>
+        <StatLink
+          value={completed}
+          label="Hoàn thành"
+          target={sectionId(challenge.id, 'completed')}
+        />
+        <StatLink
+          value={failed}
+          label="Không hoàn thành"
+          target={sectionId(
+            challenge.id,
+            sections.find(
+              (s) => s.index >= 0 && rows.some((r) => r.completion.tierIndex === s.index),
+            )?.key ?? 'tier-0',
+          )}
+        />
+        <StatLink
+          value={absent.length}
+          label="Không tham gia"
+          target={sectionId(challenge.id, 'absent')}
+        />
         <PenaltyStats
           total={totalPenalty}
           paid={challenge.status === STATUS_FINISHED ? paidAmount : null}
@@ -253,7 +295,11 @@ function ChallengeReportView({
         const tier = tierStyle(index, tiers.length)
         if (searching && list.length === 0) return null
         return (
-          <section key={key} className={`section panel reward-section reward-${tier}`}>
+          <section
+            key={key}
+            id={sectionId(challenge.id, key)}
+            className={`section panel reward-section reward-${tier}`}
+          >
             <h2>
               {title}{' '}
               <span className="tiny muted">
@@ -299,7 +345,7 @@ function ChallengeReportView({
       })}
 
       {(!searching || visibleAbsent.length > 0) && (
-        <section className="section panel reward-section">
+        <section id={sectionId(challenge.id, 'absent')} className="section panel reward-section">
           <h2>
             Thành viên chính thức không tham gia{' '}
             <span className="tiny muted">

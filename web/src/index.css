@@ -2385,6 +2385,41 @@ code {
   overflow-wrap: anywhere;
 }
 
+.stat-link {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.stat-link:hover {
+  border-color: rgba(208, 16, 43, 0.45);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(31, 20, 20, 0.08);
+}
+
+.stat-link:active {
+  transform: translateY(0);
+}
+
+.stat-link span svg {
+  vertical-align: -1px;
+}
+
+.section-flash {
+  animation: section-flash 1.5s ease;
+}
+
+@keyframes section-flash {
+  0%,
+  60% {
+    box-shadow: 0 0 0 3px rgba(208, 16, 43, 0.45);
+  }
+  100% {
+    box-shadow: 0 0 0 3px rgba(208, 16, 43, 0);
+  }
+}
+
 .stat strong.stat-paid {
   color: #1f8a4c;
 }

@@ -38,6 +38,7 @@ const EventDetailPage = lazyPage(() => import('./pages/EventsPage'), 'EventDetai
 const StatsPage = lazyPage(() => import('./pages/StatsPage'), 'StatsPage')
 const RewardsPage = lazyPage(() => import('./pages/RewardsPage'), 'RewardsPage')
 const SupportPage = lazyPage(() => import('./pages/SupportPage'), 'SupportPage')
+const GalleryPage = lazyPage(() => import('./pages/GalleryPage'), 'GalleryPage')
 const CreateChallengePage = lazyPage(
   () => import('./pages/CreateChallengePage'),
   'CreateChallengePage',
@@ -125,6 +126,14 @@ function AppRoutes() {
         <Route path="stats" element={<StatsPage />} />
         <Route path="rewards" element={<RewardsPage />} />
         <Route path="support" element={<SupportPage />} />
+        <Route
+          path="gallery"
+          element={
+            <RequireAdmin>
+              <GalleryPage />
+            </RequireAdmin>
+          }
+        />
         <Route path="strava" element={<StravaPage />} />
         <Route path="strava/callback" element={<StravaCallbackPage />} />
         <Route path="profile" element={<ProfilePage />} />

@@ -7,6 +7,7 @@ import {
   CirclePlus,
   Flag,
   House,
+  Images,
   LifeBuoy,
   LogOut,
   RotateCw,
@@ -66,6 +67,7 @@ const adminGroup: MenuGroup = {
     { to: '/admin/challenges/new', label: 'Tạo thử thách', icon: CirclePlus },
     { to: '/admin/users', label: 'Quản lý thành viên', icon: UserCog },
     { to: '/admin/records', label: 'Xác thực thành tích', icon: ShieldCheck },
+    { to: '/gallery', label: 'Hình ảnh hoạt động', icon: Images },
   ],
 }
 

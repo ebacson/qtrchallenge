@@ -99,7 +99,7 @@ export function PenaltyPaymentControl({
           </button>
         </>
       ) : finished ? (
-        <span className="penalty-pay-badge">Chưa nộp</span>
+        <span className="penalty-pay-badge unpaid">Chưa nộp</span>
       ) : null}
       {payment && isAdmin && (
         <button type="button" className="btn ghost compact" disabled={busy} onClick={undo}>

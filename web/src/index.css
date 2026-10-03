@@ -2546,6 +2546,11 @@ code {
   color: var(--ok);
 }
 
+.penalty-pay-badge.unpaid {
+  background: rgba(192, 57, 43, 0.12);
+  color: #c0392b;
+}
+
 .penalty-pay-badge.waived {
   background: rgba(217, 142, 4, 0.14);
   color: #8a5a00;

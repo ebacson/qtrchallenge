@@ -1,7 +1,26 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useSharedValue } from '../lib/sharedValue'
 import { timeToSeconds } from '../lib/prRanking'
+import {
+  parseChallenge,
+  parseChallengeDay,
+  STATUS_FINISHED,
+  STATUS_ONGOING,
+  STATUS_UPCOMING,
+} from '../lib/challengeRules'
+import {
+  absentPenaltyFor,
+  applyPenaltyWaiver,
+  completionPercent,
+  formatVnd,
+  isRewardEligible,
+  participantCompletion,
+  REWARD_START_YEAR,
+  type ParticipantCompletion,
+} from '../lib/rewardPenalty'
+import type { Challenge } from '../types'
 
 type Act = {
   type: string
@@ -15,6 +34,220 @@ const STAT_TYPES = new Set(['Run', 'TrailRun', 'Walk'])
 function paceToMinutes(pace: string): number {
   const sec = timeToSeconds(pace.length === 5 ? `0:${pace}` : pace)
   return sec === Number.POSITIVE_INFINITY ? -1 : sec / 60
+}
+
+type ChallengeEntry = {
+  challenge: Challenge
+  year: number
+  endMs: number
+  joined: boolean
+  completion: ParticipantCompletion | null
+  /** Mức phải nộp (sau miễn phạt) */
+  penalty: number
+  /** Mức gốc (trước miễn phạt) */
+  originalPenalty: number
+  paid: boolean
+  waived: boolean
+}
+
+const ALL_YEARS = 'all'
+
+function entryResult(e: ChallengeEntry): { tone: string; main: string; sub: string } {
+  if (!e.joined) return { tone: 'underHalf', main: 'Không tham gia', sub: '' }
+  const c = e.completion
+  if (!c) return { tone: '', main: '—', sub: '' }
+  const pct = `${completionPercent(c.ratio)}%`
+  if (c.tier === 'completed') return { tone: 'completed', main: pct, sub: '✓ Hoàn thành' }
+  if (e.challenge.status === STATUS_ONGOING) return { tone: '', main: pct, sub: 'Đang diễn ra' }
+  return { tone: c.tier, main: pct, sub: 'Không hoàn thành' }
+}
+
+function PenaltyBadge({ entry }: { entry: ChallengeEntry }) {
+  if (!(entry.originalPenalty > 0)) return null
+  if (entry.waived) return <span className="penalty-pay-badge waived">Miễn phạt</span>
+  if (entry.paid) return <span className="penalty-pay-badge paid">✓ Đã nộp</span>
+  return <span className="penalty-pay-badge unpaid">Chưa nộp</span>
+}
+
+function ChallengeStats() {
+  const { user, profile } = useAuth()
+  const raw = useSharedValue<Record<string, Record<string, unknown>>>(user ? 'challenges' : null)
+  const isMember = Boolean(profile?.member)
+  const memberSince = profile?.memberSince
+  const [year, setYear] = useState(ALL_YEARS)
+
+  const entries = useMemo<ChallengeEntry[]>(() => {
+    if (!user || !raw) return []
+    const list: ChallengeEntry[] = []
+    for (const [id, val] of Object.entries(raw)) {
+      const challenge = parseChallenge(id, val)
+      if (challenge.status === STATUS_UPCOMING) continue
+      const row = ((val.user_challenges ?? {}) as Record<string, Record<string, unknown> | null>)[
+        user.uid
+      ]
+      const joined = row != null
+      // Thưởng – phạt: thành viên chính thức, thử thách đã kết thúc từ REWARD_START_YEAR
+      const penalized =
+        isMember && challenge.status === STATUS_FINISHED && isRewardEligible(challenge)
+      const payment = challenge.penaltyPayments?.[user.uid]
+      let completion: ParticipantCompletion | null = null
+      let penalty = 0
+      let originalPenalty = 0
+      let waived = false
+
+      if (joined) {
+        completion = participantCompletion(challenge, row ?? {})
+        if (completion && penalized) {
+          completion = applyPenaltyWaiver(challenge, user.uid, completion)
+          penalty = completion.penalty
+          originalPenalty = completion.waived?.originalPenalty ?? completion.penalty
+          waived = Boolean(completion.waived)
+        }
+      } else {
+        if (!penalized) continue
+        const absent = absentPenaltyFor(challenge, user.uid, memberSince)
+        if (!(absent.originalPenalty > 0)) continue
+        penalty = absent.penalty
+        originalPenalty = absent.originalPenalty
+        waived = Boolean(absent.waived)
+      }
+
+      list.push({
+        challenge,
+        year: parseChallengeDay(challenge.startDate)?.getFullYear() ?? 0,
+        endMs: parseChallengeDay(challenge.endDate)?.getTime() ?? 0,
+        joined,
+        completion,
+        penalty,
+        originalPenalty,
+        paid: Boolean(payment) && !waived,
+        waived,
+      })
+    }
+    return list.sort((a, b) => b.endMs - a.endMs)
+  }, [raw, user, isMember, memberSince])
+
+  const years = useMemo(
+    () => [...new Set(entries.map((e) => e.year).filter(Boolean))].sort((a, b) => b - a),
+    [entries],
+  )
+
+  const visible = year === ALL_YEARS ? entries : entries.filter((e) => String(e.year) === year)
+  const joined = visible.filter((e) => e.joined)
+  const completed = joined.filter((e) => e.completion?.tier === 'completed').length
+  const failed = joined.filter(
+    (e) =>
+      e.challenge.status === STATUS_FINISHED && e.completion && e.completion.tier !== 'completed',
+  ).length
+  const ongoing = joined.filter(
+    (e) => e.challenge.status === STATUS_ONGOING && e.completion?.tier !== 'completed',
+  ).length
+  const absentCount = visible.length - joined.length
+  const totalPenalty = visible.reduce((sum, e) => sum + e.penalty, 0)
+  const paidAmount = visible.reduce((sum, e) => sum + (e.paid ? e.penalty : 0), 0)
+
+  return (
+    <section className="section panel">
+      <div className="section-head">
+        <h2>Thử thách</h2>
+        {years.length > 0 && (
+          <select
+            className="stats-year-select"
+            value={year}
+            aria-label="Lọc theo năm"
+            onChange={(e) => setYear(e.target.value)}
+          >
+            <option value={ALL_YEARS}>Tất cả các năm</option>
+            {years.map((y) => (
+              <option key={y} value={String(y)}>
+                Năm {y}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {raw === undefined ? (
+        <p className="empty">Đang tải…</p>
+      ) : (
+        <>
+          <div className="stat-row">
+            <div className="stat">
+              <strong>{joined.length}</strong>
+              <span>Đã tham gia</span>
+            </div>
+            <div className="stat">
+              <strong>{completed}</strong>
+              <span>Hoàn thành</span>
+            </div>
+            <div className="stat">
+              <strong>{failed}</strong>
+              <span>Không hoàn thành</span>
+            </div>
+            {isMember && (
+              <>
+                <div className="stat">
+                  <strong className="stat-money">{formatVnd(totalPenalty)}</strong>
+                  <span>Tiền phạt</span>
+                </div>
+                <div className="stat">
+                  <strong className="stat-money stat-paid">{formatVnd(paidAmount)}</strong>
+                  <span>Đã nộp</span>
+                </div>
+                <div className="stat">
+                  <strong className="stat-money stat-unpaid">
+                    {formatVnd(totalPenalty - paidAmount)}
+                  </strong>
+                  <span>Chưa nộp</span>
+                </div>
+              </>
+            )}
+          </div>
+          <p className="tiny muted penalty-pay-summary">
+            {[
+              ongoing > 0 && `Đang diễn ra ${ongoing} thử thách`,
+              isMember && absentCount > 0 && `Không tham gia ${absentCount} thử thách (bị phạt)`,
+              isMember
+                ? `Tiền phạt tính các thử thách đã kết thúc từ năm ${REWARD_START_YEAR}.`
+                : 'Thưởng – phạt chỉ áp dụng cho thành viên chính thức.',
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
+
+          {visible.length === 0 ? (
+            <p className="empty">Chưa có thử thách nào.</p>
+          ) : (
+            <ul className="participant-list">
+              {visible.map((e) => {
+                const result = entryResult(e)
+                return (
+                  <li key={e.challenge.id} className="participant-row">
+                    <div className="participant-meta">
+                      <Link to={`/challenges/${e.challenge.id}`}>
+                        <strong>{e.challenge.name || 'Thử thách'}</strong>
+                      </Link>
+                      <span className="tiny muted">
+                        {e.challenge.startDate} → {e.challenge.endDate}
+                        {e.originalPenalty > 0 && ` · Phạt ${formatVnd(e.originalPenalty)}`}
+                      </span>
+                      <span className="penalty-pay">
+                        <PenaltyBadge entry={e} />
+                      </span>
+                    </div>
+                    <span className={`reward-amount ${result.tone}`}>
+                      <strong>{result.main}</strong>
+                      {result.sub && <small>{result.sub}</small>}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </>
+      )}
+    </section>
+  )
 }
 
 export function StatsPage() {
@@ -114,6 +347,8 @@ export function StatsPage() {
               <span>Level</span>
             </div>
           </div>
+
+          <ChallengeStats />
 
           <section className="section panel">
             <h2>Marathon PR (hồ sơ)</h2>

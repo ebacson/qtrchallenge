@@ -2546,6 +2546,15 @@ code {
   color: var(--ok);
 }
 
+.stats-year-select {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 6px 10px;
+  background: #fff;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
 .penalty-pay-badge.unpaid {
   background: rgba(192, 57, 43, 0.12);
   color: #c0392b;

@@ -10,6 +10,7 @@ import {
   pickRandom,
   rewardCandidates,
   rewardItemsSummary,
+  type RewardCandidate,
 } from '../lib/rewardPenalty'
 import type { Challenge, RewardTier } from '../types'
 
@@ -38,17 +39,57 @@ function formatDrawTime(ms: number): string {
   }).format(new Date(ms))
 }
 
+/** Danh sách tên người được quay; người đã nộp phạt (chưa hoàn thành) có nhãn riêng */
+function CandidateList({
+  uids,
+  paidUids,
+  winners,
+  names,
+}: {
+  uids: string[]
+  paidUids: Set<string>
+  winners: Set<string>
+  names: Names
+}) {
+  const sorted = [...uids].sort((a, b) =>
+    displayName(names, a).localeCompare(displayName(names, b), 'vi'),
+  )
+  return (
+    <ul className="reward-candidates">
+      {sorted.map((uid) => (
+        <li
+          key={uid}
+          className={[
+            'reward-candidate',
+            paidUids.has(uid) ? 'paid' : '',
+            winners.has(uid) ? 'winner' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          {winners.has(uid) && '🎁 '}
+          {displayName(names, uid)}
+          {paidUids.has(uid) && <small>Đã nộp phạt</small>}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 function RewardDrawCard({
   challenge,
   reward,
-  candidates,
+  candidateList,
   names,
 }: {
   challenge: Challenge
   reward: RewardTier
-  candidates: string[]
+  candidateList: RewardCandidate[]
   names: Names
 }) {
+  const candidates = candidateList.map((c) => c.uid)
+  const paidUids = new Set(candidateList.filter((c) => c.via === 'paid').map((c) => c.uid))
+  const completedCount = candidates.length - paidUids.size
   const { user, profile } = useAuth()
   const draw = challenge.rewardDraws?.find((d) => d.target === reward.target)
   const [spinName, setSpinName] = useState<string | null>(null)
@@ -147,10 +188,26 @@ function RewardDrawCard({
         <div>
           <strong>{reward.target}</strong>
           <span className="tiny muted">
-            {rewardItemsSummary(reward.items)} · {candidates.length} người hoàn thành
+            {rewardItemsSummary(reward.items)} · {candidates.length} người được quay
+            {candidates.length > 0 &&
+              ` (${completedCount} hoàn thành${paidUids.size ? ` · ${paidUids.size} đã nộp phạt` : ''})`}
           </span>
         </div>
       </div>
+
+      {spinName == null && (draw ? draw.candidates.length > 0 : candidates.length > 0) && (
+        <div className="reward-candidates-wrap">
+          <p className="tiny muted">
+            {draw ? 'Danh sách đã quay:' : 'Danh sách được quay:'}
+          </p>
+          <CandidateList
+            uids={draw ? draw.candidates : candidates}
+            paidUids={paidUids}
+            winners={new Set(draw?.winners ?? [])}
+            names={names}
+          />
+        </div>
+      )}
 
       {spinName != null ? (
         <div className="reward-draw-spin" aria-live="polite">
@@ -179,13 +236,13 @@ function RewardDrawCard({
           </ol>
           {isAdmin && listChanged && (
             <p className="tiny form-error">
-              Danh sách hoàn thành đã thay đổi so với lúc quay ({candidates.length} người hiện
+              Danh sách được quay đã thay đổi so với lúc quay ({candidates.length} người hiện
               tại).
             </p>
           )}
         </>
       ) : candidates.length === 0 ? (
-        <p className="tiny muted">Chưa có ai hoàn thành mục tiêu này.</p>
+        <p className="tiny muted">Chưa có ai đủ điều kiện quay số mục tiêu này.</p>
       ) : (
         <p className="tiny muted">
           {finished
@@ -251,9 +308,9 @@ export function RewardDrawSection({
         <h2>Quay số trúng thưởng</h2>
       )}
       <p className="tiny muted">
-        Mỗi mục tiêu quay ngẫu nhiên trong số thành viên chính thức hoàn thành mục tiêu đó và
-        trao lần lượt từng món theo thứ tự quà đã đặt; số người hoàn thành không vượt số quà
-        thì tất cả đều nhận.
+        Mỗi mục tiêu quay ngẫu nhiên trong số thành viên chính thức hoàn thành mục tiêu đó hoặc
+        chưa hoàn thành nhưng đã nộp phạt, trao lần lượt từng món theo thứ tự quà đã đặt; số
+        người được quay không vượt số quà thì tất cả đều nhận.
       </p>
       <div className="reward-draw-list">
         {rewards.map((r) => (
@@ -261,7 +318,7 @@ export function RewardDrawSection({
             key={r.target}
             challenge={challenge}
             reward={r}
-            candidates={rewardCandidates(challenge, userChallenges, r.target)}
+            candidateList={rewardCandidates(challenge, userChallenges, r.target)}
             names={names}
           />
         ))}

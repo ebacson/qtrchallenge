@@ -3030,6 +3030,52 @@ code {
   }
 }
 
+.reward-candidates-wrap {
+  margin: 8px 0;
+}
+
+.reward-candidates-wrap > p {
+  margin: 0 0 6px;
+}
+
+.reward-candidates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.reward-candidate {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #fff;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.reward-candidate small {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(217, 142, 4, 0.16);
+  color: #8a5a00;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.reward-candidate.winner {
+  border-color: rgba(27, 127, 78, 0.5);
+  background: rgba(27, 127, 78, 0.1);
+  color: var(--ok);
+}
+
 .reward-winners {
   list-style: none;
   margin: 8px 0 0;

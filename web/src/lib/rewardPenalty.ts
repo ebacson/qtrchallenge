@@ -181,33 +181,45 @@ export function participantCompletion(
   }
 }
 
+export type RewardCandidate = { uid: string; via: 'completed' | 'paid' }
+
 /**
- * Người hoàn thành mục tiêu `target`. Thử thách khoảng ngày: đủ số ngày của đúng tùy chọn đó
- * (người chọn nhiều tùy chọn có thể vào nhiều lượt quay); loại khác: chọn mục tiêu này và đạt 100%.
+ * Người được quay thưởng mục tiêu `target`: hoàn thành, hoặc chưa hoàn thành nhưng đã nộp phạt
+ * (được miễn phạt không tính). Thử thách khoảng ngày: theo đúng tùy chọn đó (người chọn nhiều
+ * tùy chọn có thể vào nhiều lượt quay); loại khác: người chọn mục tiêu này.
  */
 export function rewardCandidates(
   challenge: Challenge,
   userChallenges: Record<string, Record<string, unknown> | null>,
   target: string,
-): string[] {
+): RewardCandidate[] {
   const targetIndex = challenge.targetDistances.indexOf(target)
-  const out: string[] = []
+  const hasPaid = (uid: string) => {
+    const payment = challenge.penaltyPayments?.[uid]
+    return Boolean(payment && !payment.waived)
+  }
+  const out: RewardCandidate[] = []
   for (const [uid, row] of Object.entries(userChallenges)) {
     if (!row) continue
+    let completed: boolean
     if (challenge.challengeMode === 'day_quota' && challenge.dayQuotaOptions?.length) {
       const q = userDayQuotaProgress(
         challenge.dayQuotaOptions,
         challenge.targetDistances,
         row,
       ).find((p) => p.optionIndex === targetIndex)
-      if (q && q.daysCompleted >= q.option.daysRequired) out.push(uid)
-      continue
+      if (!q) continue
+      completed = q.daysCompleted >= q.option.daysRequired
+    } else {
+      if (String(row.userTarget ?? '') !== target) continue
+      const c = participantCompletion(challenge, row)
+      if (!c) continue
+      completed = c.ratio >= 1
     }
-    if (String(row.userTarget ?? '') !== target) continue
-    const c = participantCompletion(challenge, row)
-    if (c && c.ratio >= 1) out.push(uid)
+    if (completed) out.push({ uid, via: 'completed' })
+    else if (hasPaid(uid)) out.push({ uid, via: 'paid' })
   }
-  return out.sort()
+  return out.sort((a, b) => (a.uid < b.uid ? -1 : a.uid > b.uid ? 1 : 0))
 }
 
 function randomIndex(maxExclusive: number): number {

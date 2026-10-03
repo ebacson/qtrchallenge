@@ -3045,7 +3045,7 @@ code {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 6px;
-  max-height: 260px;
+  max-height: 380px;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -3089,9 +3089,11 @@ code {
 }
 
 .reward-candidate-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-size: 0.82rem;
   font-weight: 600;
 }

@@ -2555,6 +2555,17 @@ code {
   text-decoration: none;
 }
 
+.support-zalo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
+
+.support-zalo-admin {
+  margin-top: 10px;
+}
+
 .stats-year-select {
   border: 1px solid var(--line);
   border-radius: 10px;

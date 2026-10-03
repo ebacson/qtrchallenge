@@ -34,6 +34,12 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+/** Chuỗi thời gian của Firebase Auth ("Fri, 03 Oct 2026 10:15:00 GMT") → ms */
+function msFromAuthTime(value: string | undefined): number | null {
+  const ms = value ? Date.parse(value) : NaN
+  return Number.isFinite(ms) ? ms : null
+}
+
 function mapProfile(id: string, data: Record<string, unknown>): UserProfile {
   return {
     id,
@@ -60,11 +66,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
+  const healedFor = useRef<string | null>(null)
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (next) => {
       setUser(next)
       if (!next) {
+        healedFor.current = null
         resetSharedValues()
         setProfile(null)
         setLoading(false)
@@ -72,8 +80,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
     return unsub
   }, [])
-
-  const healedFor = useRef<string | null>(null)
 
   useEffect(() => {
     if (!user) return
@@ -106,6 +112,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           for (const [field, value] of pairs) {
             if (JSON.stringify(current[field] ?? null) !== JSON.stringify(value ?? null)) {
               updates[`${USER_PROFILES_PATH}/${uid}/${field}`] = value ?? null
+            }
+          }
+          const authTimes = {
+            creationTime: msFromAuthTime(user.metadata.creationTime),
+            lastSignInTime: msFromAuthTime(user.metadata.lastSignInTime),
+          }
+          for (const [field, ms] of Object.entries(authTimes)) {
+            if (ms && source[field] !== ms) {
+              updates[`users/${uid}/${field}`] = ms
+              updates[`${USER_PROFILES_PATH}/${uid}/${field}`] = ms
             }
           }
           if (Object.keys(updates).length > 0) await update(ref(db), updates)

@@ -24,6 +24,8 @@ export const PROFILE_FIELDS = [
   'isFullMarathonVerified',
   'isHalfMarathonVerified',
   'history',
+  'creationTime',
+  'lastSignInTime',
 ] as const
 
 const PROFILE_FIELD_SET: ReadonlySet<string> = new Set(PROFILE_FIELDS)

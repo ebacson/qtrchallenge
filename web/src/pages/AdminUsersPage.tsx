@@ -29,6 +29,8 @@ type AdminUser = {
   dob: string
   idStrava: string
   userStrava: string
+  creationTime: number
+  lastSignInTime: number
   raw: Record<string, unknown>
 }
 
@@ -67,6 +69,21 @@ function msFromInputDate(value: string): number | null {
   return Number.isFinite(ms) ? ms : null
 }
 
+const DATE_TIME = new Intl.DateTimeFormat('vi-VN', {
+  timeZone: 'Asia/Ho_Chi_Minh',
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+})
+
+/** ms → giờ Việt Nam kèm ngày; '' nếu chưa có */
+function formatDateTime(ms: number): string {
+  return ms > 0 ? DATE_TIME.format(new Date(ms)) : ''
+}
+
 export function AdminUsersPage() {
   const { user, profile } = useAuth()
   const profiles = useUserProfiles()
@@ -80,7 +97,6 @@ export function AdminUsersPage() {
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<FullSyncSummary | null>(null)
   const [editingSince, setEditingSince] = useState<{ uid: string; value: string } | null>(null)
-
   const users = useMemo<AdminUser[]>(
     () =>
       Object.entries(profiles ?? {})
@@ -98,6 +114,8 @@ export function AdminUsersPage() {
           dob: String(row.dob ?? ''),
           idStrava: String(row.id_strava ?? ''),
           userStrava: String(row.user_strava ?? ''),
+          creationTime: Number(row.creationTime) || 0,
+          lastSignInTime: Number(row.lastSignInTime) || 0,
           raw: row ?? {},
         }))
         .sort((a, b) => {
@@ -358,7 +376,6 @@ export function AdminUsersPage() {
 
       {error && <p className="form-error">{error}</p>}
       {message && <p className="form-info">{message}</p>}
-
       {loading ? (
         <p className="empty">Đang tải…</p>
       ) : filtered.length === 0 ? (
@@ -456,6 +473,18 @@ export function AdminUsersPage() {
                       ) : (
                         <span className="muted">Chưa kết nối</span>
                       )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Ngày đăng ký</dt>
+                    <dd>
+                      {formatDateTime(u.creationTime) || <span className="muted">Chưa có</span>}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Đăng nhập</dt>
+                    <dd>
+                      {formatDateTime(u.lastSignInTime) || <span className="muted">Chưa có</span>}
                     </dd>
                   </div>
                   <div>

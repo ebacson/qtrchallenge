@@ -7,6 +7,7 @@ import { onMessagePublished } from 'firebase-functions/v2/pubsub'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { setGlobalOptions } from 'firebase-functions/v2'
 import * as logger from 'firebase-functions/logger'
+import { deleteUserCompletely, DeleteUserError } from './adminDeleteUser'
 import { handleStravaRoute } from './stravaCore'
 import {
   handleStravaEvent,
@@ -148,6 +149,64 @@ export const adminSync = onRequest(
       }
       logger.error('adminSync failed', err)
       res.status(500).json({ error: err instanceof Error ? err.message : 'Đồng bộ thất bại' })
+    }
+  },
+)
+
+/** Admin bấm "Xóa hoàn toàn": ngắt Strava, xóa dữ liệu RTDB và tài khoản Firebase Auth. */
+export const adminDeleteUser = onRequest(
+  {
+    cors: false,
+    timeoutSeconds: 120,
+    memory: '512MiB',
+    maxInstances: 1,
+    concurrency: 1,
+  },
+  async (req, res) => {
+    const origin = corsOrigin(req.get('origin') || undefined)
+    res.set('Vary', 'Origin')
+    if (origin) {
+      res.set('Access-Control-Allow-Origin', origin)
+      res.set('Access-Control-Allow-Methods', 'POST,OPTIONS')
+      res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    }
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('')
+      return
+    }
+    if (req.method !== 'POST') {
+      res.status(405).json({ error: 'Method not allowed' })
+      return
+    }
+
+    const match = /^Bearer (.+)$/.exec(req.get('authorization') ?? '')
+    if (!match) {
+      res.status(401).json({ error: 'Chưa đăng nhập.' })
+      return
+    }
+    let uid: string
+    try {
+      uid = (await getAuth().verifyIdToken(match[1])).uid
+    } catch {
+      res.status(401).json({ error: 'Phiên đăng nhập không hợp lệ, hãy đăng nhập lại.' })
+      return
+    }
+    const isAdmin = (await getDatabase().ref(`users/${uid}/admin`).get()).val() === true
+    if (!isAdmin) {
+      res.status(403).json({ error: 'Chỉ Admin mới được xóa thành viên.' })
+      return
+    }
+
+    const body = typeof req.body === 'object' && req.body ? (req.body as Record<string, unknown>) : {}
+    try {
+      res.json(await deleteUserCompletely(uid, String(body.uid ?? '').trim()))
+    } catch (err) {
+      if (err instanceof DeleteUserError) {
+        res.status(err.status).json({ error: err.message })
+        return
+      }
+      logger.error('adminDeleteUser failed', err)
+      res.status(500).json({ error: err instanceof Error ? err.message : 'Xóa thất bại' })
     }
   },
 )

@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { get, ref, remove } from 'firebase/database'
 import { AdminUserAchievements } from '../components/AdminUserAchievements'
 import {
   matchesMemberType,
@@ -9,11 +8,10 @@ import {
 } from '../components/MemberTypeFilter'
 import { useAuth } from '../context/AuthContext'
 import { deleteUserAvatar } from '../lib/adminOps'
-import { runAdminFullSync, type FullSyncSummary } from '../lib/adminSync'
-import { db } from '../lib/firebase'
+import { runAdminDeleteUser, runAdminFullSync, type FullSyncSummary } from '../lib/adminSync'
 import { useSharedValue } from '../lib/sharedValue'
 import { formatMemberSince } from '../lib/userProfile'
-import { removeUser, updateUser, useUserProfiles } from '../lib/userWrites'
+import { updateUser, useUserProfiles } from '../lib/userWrites'
 
 type AdminUser = {
   id: string
@@ -270,8 +268,11 @@ export function AdminUsersPage() {
     }
     const ok = window.confirm(
       `Xóa hoàn toàn "${target.fullName || target.email}"?\n\n` +
-        'Sẽ xóa hồ sơ RTDB, avatar, và dữ liệu tham gia thử thách.\n' +
-        'Tài khoản đăng nhập Firebase Auth có thể vẫn tồn tại (cần xóa trên Firebase Console).',
+        '1. Ngắt kết nối Strava (thu hồi quyền truy cập).\n' +
+        '2. Xóa dữ liệu tham gia, nộp phạt, quay thưởng ở mọi thử thách và dấu đã đọc thông báo.\n' +
+        '3. Xóa hồ sơ, hoạt động Strava đã đồng bộ và avatar.\n' +
+        '4. Xóa tài khoản đăng nhập Firebase Auth.\n\n' +
+        'Không thể hoàn tác.',
     )
     if (!ok) return
     const typed = window.prompt(`Gõ email "${target.email}" để xác nhận xóa:`)
@@ -284,18 +285,19 @@ export function AdminUsersPage() {
     setError('')
     setMessage('')
     try {
-      const latest = ((await get(ref(db, 'challenges'))).val() ?? {}) as Record<
-        string,
-        Record<string, unknown>
-      >
-      await Promise.all(
-        Object.keys(latest).map((challengeId) =>
-          remove(ref(db, `challenges/${challengeId}/user_challenges/${target.id}`)),
-        ),
-      )
+      const summary = await runAdminDeleteUser(await user.getIdToken(), target.id)
       await deleteUserAvatar(target.id)
-      await removeUser(target.id)
-      setMessage(`Đã xóa thành viên ${target.fullName || target.email}.`)
+      const strava = {
+        revoked: 'đã ngắt Strava',
+        already_revoked: 'Strava đã ngắt từ trước',
+        not_connected: 'chưa kết nối Strava',
+      }[summary.strava]
+      setMessage(
+        `Đã xóa hoàn toàn ${target.fullName || target.email}: ${strava}, ` +
+          `${summary.challenges} thử thách, ${summary.penaltyPayments} nộp phạt, ` +
+          `${summary.rewardDraws} kết quả quay thưởng, ${summary.notifications} thông báo, ` +
+          (summary.authDeleted ? 'đã xóa tài khoản đăng nhập.' : 'không có tài khoản đăng nhập.'),
+      )
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không xóa được')
     } finally {

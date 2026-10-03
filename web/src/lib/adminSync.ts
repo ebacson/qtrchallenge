@@ -13,15 +13,29 @@ export type FullSyncSummary = {
   levelsUpdated: number
 }
 
-/** Cloud Function `adminSync` nằm cạnh `stravaApi` (cùng project/region). */
-function adminSyncUrl(): string | null {
-  const base = (import.meta.env.VITE_STRAVA_API_BASE as string | undefined)?.replace(/\/$/, '')
-  if (!base || !/\/stravaApi$/.test(base)) return null
-  return base.replace(/\/stravaApi$/, '/adminSync')
+export type DeleteUserSummary = {
+  strava: 'revoked' | 'not_connected' | 'already_revoked'
+  challenges: number
+  penaltyPayments: number
+  rewardDraws: number
+  notifications: number
+  authDeleted: boolean
 }
 
-export async function runAdminFullSync(idToken: string): Promise<FullSyncSummary> {
-  const url = adminSyncUrl()
+/** Cloud Function admin nằm cạnh `stravaApi` (cùng project/region). */
+function adminFunctionUrl(name: string): string | null {
+  const base = (import.meta.env.VITE_STRAVA_API_BASE as string | undefined)?.replace(/\/$/, '')
+  if (!base || !/\/stravaApi$/.test(base)) return null
+  return base.replace(/\/stravaApi$/, `/${name}`)
+}
+
+async function callAdminFunction(
+  name: string,
+  idToken: string,
+  body: Record<string, unknown>,
+  failure: string,
+): Promise<unknown> {
+  const url = adminFunctionUrl(name)
   if (!url) {
     throw new Error('Chưa cấu hình Cloud Function (VITE_STRAVA_API_BASE) — chỉ chạy được trên bản production.')
   }
@@ -30,10 +44,10 @@ export async function runAdminFullSync(idToken: string): Promise<FullSyncSummary
     res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-      body: '{}',
+      body: JSON.stringify(body),
     })
   } catch {
-    throw new Error('Không gọi được máy chủ đồng bộ. Kiểm tra kết nối mạng.')
+    throw new Error('Không gọi được máy chủ. Kiểm tra kết nối mạng.')
   }
   const text = await res.text()
   let data: unknown = {}
@@ -44,7 +58,20 @@ export async function runAdminFullSync(idToken: string): Promise<FullSyncSummary
   }
   if (!res.ok) {
     const message = (data as { error?: string }).error
-    throw new Error(message || `Đồng bộ thất bại (${res.status}).`)
+    throw new Error(message || `${failure} (${res.status}).`)
   }
-  return data as FullSyncSummary
+  return data
+}
+
+export async function runAdminFullSync(idToken: string): Promise<FullSyncSummary> {
+  return (await callAdminFunction('adminSync', idToken, {}, 'Đồng bộ thất bại')) as FullSyncSummary
+}
+
+export async function runAdminDeleteUser(idToken: string, uid: string): Promise<DeleteUserSummary> {
+  return (await callAdminFunction(
+    'adminDeleteUser',
+    idToken,
+    { uid },
+    'Xóa thất bại',
+  )) as DeleteUserSummary
 }

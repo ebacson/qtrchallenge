@@ -30,6 +30,11 @@ export function driveThumbUrl(id: string, width: number): string {
   return `https://drive.google.com/thumbnail?id=${id}&sz=w${width}`
 }
 
+/** Ảnh lớn: lh3 trả ảnh trực tiếp (không redirect, cho phép nhúng khác domain) */
+export function driveImageUrl(id: string, width: number): string {
+  return `https://lh3.googleusercontent.com/d/${id}=w${width}`
+}
+
 export function driveFileUrl(id: string): string {
   return `https://drive.google.com/file/d/${id}/view`
 }

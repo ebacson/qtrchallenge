@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { ref, set } from 'firebase/database'
 import { ChevronLeft, ChevronRight, ExternalLink, Plus, Trash2, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
@@ -8,6 +9,7 @@ import {
   driveEmbedUrl,
   driveFileUrl,
   driveFolderUrl,
+  driveImageUrl,
   driveThumbUrl,
   listDriveImages,
   parseDriveFolderId,
@@ -233,6 +235,42 @@ function AlbumView({
   )
 }
 
+/** Ảnh lớn: hiện ảnh nhỏ (đã có trong cache từ lưới) trong lúc tải, thử lần lượt các link */
+function LightboxImage({ img }: { img: DriveImage }) {
+  const sources = [driveImageUrl(img.id, 1600), driveThumbUrl(img.id, 1600)]
+  const [srcIndex, setSrcIndex] = useState(0)
+  const [loaded, setLoaded] = useState(false)
+  const failed = srcIndex >= sources.length
+
+  return (
+    <div className="lightbox-stage" onClick={(e) => e.stopPropagation()}>
+      {!loaded && (
+        <img
+          className="lightbox-img placeholder"
+          src={driveThumbUrl(img.id, 400)}
+          alt=""
+          referrerPolicy="no-referrer"
+        />
+      )}
+      {!failed && (
+        <img
+          className={loaded ? 'lightbox-img' : 'lightbox-img loading'}
+          src={sources[srcIndex]}
+          alt={img.name}
+          referrerPolicy="no-referrer"
+          onLoad={() => setLoaded(true)}
+          onError={() => setSrcIndex((i) => i + 1)}
+        />
+      )}
+      {!loaded && (
+        <span className="lightbox-status tiny">
+          {failed ? 'Không tải được ảnh lớn — bấm “Ảnh gốc” để xem trên Drive.' : 'Đang tải ảnh…'}
+        </span>
+      )}
+    </div>
+  )
+}
+
 function Lightbox({
   images,
   index,
@@ -272,7 +310,7 @@ function Lightbox({
 
   if (!img) return null
 
-  return (
+  return createPortal(
     <div
       className="lightbox"
       role="dialog"
@@ -291,14 +329,7 @@ function Lightbox({
         else prev()
       }}
     >
-      <img
-        key={img.id}
-        className="lightbox-img"
-        src={driveThumbUrl(img.id, 2000)}
-        alt={img.name}
-        referrerPolicy="no-referrer"
-        onClick={(e) => e.stopPropagation()}
-      />
+      <LightboxImage key={img.id} img={img} />
       <div className="lightbox-bar" onClick={(e) => e.stopPropagation()}>
         <span className="tiny">
           {index + 1}/{images.length}
@@ -336,7 +367,8 @@ function Lightbox({
           </button>
         </>
       )}
-    </div>
+    </div>,
+    document.body,
   )
 }
 

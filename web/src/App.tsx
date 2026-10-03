@@ -126,14 +126,7 @@ function AppRoutes() {
         <Route path="stats" element={<StatsPage />} />
         <Route path="rewards" element={<RewardsPage />} />
         <Route path="support" element={<SupportPage />} />
-        <Route
-          path="gallery"
-          element={
-            <RequireAdmin>
-              <GalleryPage />
-            </RequireAdmin>
-          }
-        />
+        <Route path="gallery" element={<GalleryPage />} />
         <Route path="strava" element={<StravaPage />} />
         <Route path="strava/callback" element={<StravaCallbackPage />} />
         <Route path="profile" element={<ProfilePage />} />

@@ -52,6 +52,7 @@ const menuGroups: MenuGroup[] = [
       { to: '/notifications', label: 'Thông báo', icon: Bell },
       { to: '/challenges', label: 'Thử thách', icon: Flag },
       { to: '/events', label: 'Sự kiện', icon: CalendarDays },
+      { to: '/gallery', label: 'Hình ảnh', icon: Images },
       { to: '/members', label: 'Thành viên', icon: Users },
       { to: '/hall-of-fame', label: 'Bảng vàng', icon: Trophy },
       { to: '/rewards', label: 'Thưởng - Phạt', icon: Wallet },
@@ -67,7 +68,6 @@ const adminGroup: MenuGroup = {
     { to: '/admin/challenges/new', label: 'Tạo thử thách', icon: CirclePlus },
     { to: '/admin/users', label: 'Quản lý thành viên', icon: UserCog },
     { to: '/admin/records', label: 'Xác thực thành tích', icon: ShieldCheck },
-    { to: '/gallery', label: 'Hình ảnh hoạt động', icon: Images },
   ],
 }
 

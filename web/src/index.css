@@ -2960,6 +2960,31 @@ code {
   transform: translateY(-50%);
 }
 
+.stats-rewards {
+  margin: 4px 0 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stats-rewards p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.stats-rewards.has-prizes {
+  border-color: rgba(46, 157, 91, 0.35);
+  background: rgba(46, 157, 91, 0.06);
+}
+
+.penalty-pay .reward-winner-prize {
+  margin-left: 0;
+}
+
 .stats-year-select {
   border: 1px solid var(--line);
   border-radius: 10px;

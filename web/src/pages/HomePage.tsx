@@ -2,7 +2,9 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useSharedValue } from '../lib/sharedValue'
+import { useMyUnpaidPenalty } from '../lib/myChallengeStats'
 import { formatBadgeCount, useUnreadNotificationCount } from '../lib/notifications'
+import { formatVnd } from '../lib/rewardPenalty'
 import { parseChallenge, parseChallengeDayStartMs, STATUS_ONGOING } from '../lib/challengeRules'
 import type { Challenge } from '../types'
 import { ChallengeCard } from '../components/ChallengeCard'
@@ -11,7 +13,7 @@ const shortcuts = [
   { to: '/hall-of-fame', title: 'Bảng vàng', desc: 'PR Full / Half' },
   { to: '/notifications', title: 'Thông báo', desc: 'Tin club' },
   { to: '/members', title: 'Thành viên', desc: 'Danh sách runners' },
-  { to: '/stats', title: 'Thống kê', desc: 'Km & pace' },
+  { to: '/stats', title: 'Thống kê', desc: 'Km, pace & thưởng/phạt' },
   { to: '/events', title: 'Events', desc: 'Giải & kết quả' },
   { to: '/profile', title: 'Strava', desc: 'Kết nối & sync trong Profile' },
 ]
@@ -22,6 +24,7 @@ export function HomePage() {
     user ? 'challenges' : null,
   )
   const unreadNotifications = useUnreadNotificationCount()
+  const unpaidPenalty = useMyUnpaidPenalty()
   const activities = useSharedValue<Record<string, unknown>>(
     user ? `users/${user.uid}/strava_activities` : null,
   )
@@ -70,7 +73,16 @@ export function HomePage() {
         <h2>Lối tắt</h2>
         <div className="shortcut-grid">
           {shortcuts.map((s) => {
-            const unread = s.to === '/notifications' ? unreadNotifications : 0
+            const unread =
+              s.to === '/notifications'
+                ? unreadNotifications
+                : s.to === '/stats'
+                  ? unpaidPenalty.count
+                  : 0
+            const alert =
+              s.to === '/stats'
+                ? `Chưa nộp phạt ${formatVnd(unpaidPenalty.amount)}`
+                : `${unread} thông báo mới`
             return (
               <Link
                 key={s.to}
@@ -79,7 +91,7 @@ export function HomePage() {
               >
                 <strong>{s.title}</strong>
                 <span className={unread > 0 ? 'tiny shortcut-unread' : 'tiny muted'}>
-                  {unread > 0 ? `${unread} thông báo mới` : s.desc}
+                  {unread > 0 ? alert : s.desc}
                 </span>
                 {unread > 0 && (
                   <span className="count-badge shortcut-badge" aria-hidden>

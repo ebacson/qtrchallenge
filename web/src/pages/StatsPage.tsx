@@ -3,24 +3,9 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useSharedValue } from '../lib/sharedValue'
 import { timeToSeconds } from '../lib/prRanking'
-import {
-  parseChallenge,
-  parseChallengeDay,
-  STATUS_FINISHED,
-  STATUS_ONGOING,
-  STATUS_UPCOMING,
-} from '../lib/challengeRules'
-import {
-  absentPenaltyFor,
-  applyPenaltyWaiver,
-  completionPercent,
-  formatVnd,
-  isRewardEligible,
-  participantCompletion,
-  REWARD_START_YEAR,
-  type ParticipantCompletion,
-} from '../lib/rewardPenalty'
-import type { Challenge } from '../types'
+import { STATUS_FINISHED, STATUS_ONGOING } from '../lib/challengeRules'
+import { useMyChallengeEntries, type MyChallengeEntry } from '../lib/myChallengeStats'
+import { completionPercent, formatVnd, REWARD_START_YEAR } from '../lib/rewardPenalty'
 
 type Act = {
   type: string
@@ -36,19 +21,7 @@ function paceToMinutes(pace: string): number {
   return sec === Number.POSITIVE_INFINITY ? -1 : sec / 60
 }
 
-type ChallengeEntry = {
-  challenge: Challenge
-  year: number
-  endMs: number
-  joined: boolean
-  completion: ParticipantCompletion | null
-  /** Mức phải nộp (sau miễn phạt) */
-  penalty: number
-  /** Mức gốc (trước miễn phạt) */
-  originalPenalty: number
-  paid: boolean
-  waived: boolean
-}
+type ChallengeEntry = MyChallengeEntry
 
 const ALL_YEARS = 'all'
 
@@ -70,62 +43,11 @@ function PenaltyBadge({ entry }: { entry: ChallengeEntry }) {
 }
 
 function ChallengeStats() {
-  const { user, profile } = useAuth()
-  const raw = useSharedValue<Record<string, Record<string, unknown>>>(user ? 'challenges' : null)
+  const { profile } = useAuth()
   const isMember = Boolean(profile?.member)
-  const memberSince = profile?.memberSince
   const [year, setYear] = useState(ALL_YEARS)
-
-  const entries = useMemo<ChallengeEntry[]>(() => {
-    if (!user || !raw) return []
-    const list: ChallengeEntry[] = []
-    for (const [id, val] of Object.entries(raw)) {
-      const challenge = parseChallenge(id, val)
-      if (challenge.status === STATUS_UPCOMING) continue
-      const row = ((val.user_challenges ?? {}) as Record<string, Record<string, unknown> | null>)[
-        user.uid
-      ]
-      const joined = row != null
-      // Thưởng – phạt: thành viên chính thức, thử thách đã kết thúc từ REWARD_START_YEAR
-      const penalized =
-        isMember && challenge.status === STATUS_FINISHED && isRewardEligible(challenge)
-      const payment = challenge.penaltyPayments?.[user.uid]
-      let completion: ParticipantCompletion | null = null
-      let penalty = 0
-      let originalPenalty = 0
-      let waived = false
-
-      if (joined) {
-        completion = participantCompletion(challenge, row ?? {})
-        if (completion && penalized) {
-          completion = applyPenaltyWaiver(challenge, user.uid, completion)
-          penalty = completion.penalty
-          originalPenalty = completion.waived?.originalPenalty ?? completion.penalty
-          waived = Boolean(completion.waived)
-        }
-      } else {
-        if (!penalized) continue
-        const absent = absentPenaltyFor(challenge, user.uid, memberSince)
-        if (!(absent.originalPenalty > 0)) continue
-        penalty = absent.penalty
-        originalPenalty = absent.originalPenalty
-        waived = Boolean(absent.waived)
-      }
-
-      list.push({
-        challenge,
-        year: parseChallengeDay(challenge.startDate)?.getFullYear() ?? 0,
-        endMs: parseChallengeDay(challenge.endDate)?.getTime() ?? 0,
-        joined,
-        completion,
-        penalty,
-        originalPenalty,
-        paid: Boolean(payment) && !waived,
-        waived,
-      })
-    }
-    return list.sort((a, b) => b.endMs - a.endMs)
-  }, [raw, user, isMember, memberSince])
+  const loaded = useMyChallengeEntries()
+  const entries = useMemo(() => loaded ?? [], [loaded])
 
   const years = useMemo(
     () => [...new Set(entries.map((e) => e.year).filter(Boolean))].sort((a, b) => b - a),
@@ -145,6 +67,7 @@ function ChallengeStats() {
   const absentCount = visible.length - joined.length
   const totalPenalty = visible.reduce((sum, e) => sum + e.penalty, 0)
   const paidAmount = visible.reduce((sum, e) => sum + (e.paid ? e.penalty : 0), 0)
+  const won = visible.flatMap((e) => e.prizes.map((p) => ({ ...p, challenge: e.challenge })))
 
   return (
     <section className="section panel">
@@ -167,7 +90,7 @@ function ChallengeStats() {
         )}
       </div>
 
-      {raw === undefined ? (
+      {loaded === null ? (
         <p className="empty">Đang tải…</p>
       ) : (
         <>
@@ -215,6 +138,28 @@ function ChallengeStats() {
               .join(' · ')}
           </p>
 
+          <div className={`stats-rewards${won.length ? ' has-prizes' : ''}`}>
+            <p>
+              🎁 <strong>Nhận thưởng: {won.length}</strong>{' '}
+              {won.length ? 'phần quà' : '— chưa trúng thưởng lần nào'}
+            </p>
+            {won.length > 0 && (
+              <ul className="reward-recipient-prizes">
+                {won.map((p, i) => (
+                  <li key={`${p.challenge.id}-${p.target}-${i}`}>
+                    <span className="tiny">
+                      <Link to={`/challenges/${p.challenge.id}`}>
+                        {p.challenge.name || 'Thử thách'}
+                      </Link>{' '}
+                      <span className="muted">· {p.target}</span>
+                    </span>
+                    {p.prize && <span className="reward-winner-prize">{p.prize}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           {visible.length === 0 ? (
             <p className="empty">Chưa có thử thách nào.</p>
           ) : (
@@ -233,6 +178,11 @@ function ChallengeStats() {
                       </span>
                       <span className="penalty-pay">
                         <PenaltyBadge entry={e} />
+                        {e.prizes.map((p, i) => (
+                          <span key={i} className="reward-winner-prize">
+                            🎁 {p.prize || 'Trúng thưởng'}
+                          </span>
+                        ))}
                       </span>
                     </div>
                     <span className={`reward-amount ${result.tone}`}>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ref, set } from 'firebase/database'
+import { get, ref, set, update } from 'firebase/database'
 import { Gift } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { STATUS_FINISHED } from '../lib/challengeRules'
@@ -149,13 +149,24 @@ function RewardDrawCard({
   const isAdmin = Boolean(profile?.admin)
   const finished = challenge.status === STATUS_FINISHED
   const targetIndex = challenge.targetDistances.indexOf(reward.target)
+  const confirmed = Boolean(draw?.confirmedAt)
+  const drawPath = `challenges/${challenge.id}/rewardDraws/${targetIndex}`
   const listChanged =
     draw != null &&
     (draw.candidates.length !== candidates.length ||
       draw.candidates.some((uid) => !candidates.includes(uid)))
 
+  /** Đọc lại từ RTDB phòng Admin khác vừa xác nhận */
+  async function lockedNow(): Promise<boolean> {
+    const snap = await get(ref(db, `${drawPath}/confirmedAt`))
+    if (!(Number(snap.val()) > 0)) return false
+    setError('Kết quả đã được xác nhận — không thể quay lại hoặc xóa.')
+    return true
+  }
+
   async function runDraw() {
-    if (!user || targetIndex < 0 || !candidates.length) return
+    if (!user || targetIndex < 0 || !candidates.length || confirmed) return
+    if (await lockedNow()) return
     if (
       draw &&
       !window.confirm('Đã có kết quả quay số. Quay lại sẽ thay kết quả cũ, tiếp tục?')
@@ -168,7 +179,7 @@ function RewardDrawCard({
     const prizes = assignPrizes(winners, reward.items)
     try {
       if (candidates.length > reward.gifts && winners.length) await spin(winners[0])
-      await set(ref(db, `challenges/${challenge.id}/rewardDraws/${targetIndex}`), {
+      await set(ref(db, drawPath), {
         target: reward.target,
         gifts: reward.gifts,
         prize: reward.prize,
@@ -187,13 +198,36 @@ function RewardDrawCard({
   }
 
   async function clearDraw() {
-    if (targetIndex < 0 || !window.confirm('Xóa kết quả quay số của mục tiêu này?')) return
+    if (targetIndex < 0 || confirmed) return
+    if (!window.confirm('Xóa kết quả quay số của mục tiêu này?')) return
     setBusy(true)
     setError('')
     try {
-      await set(ref(db, `challenges/${challenge.id}/rewardDraws/${targetIndex}`), null)
+      if (await lockedNow()) return
+      await set(ref(db, drawPath), null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không xóa được')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function confirmDraw() {
+    if (!user || targetIndex < 0 || !draw || confirmed) return
+    if (
+      !window.confirm(
+        `Xác nhận kết quả quay thưởng mục tiêu "${reward.target}"?\n\n` +
+          'Sau khi xác nhận sẽ không thể quay lại hoặc xóa kết quả nữa.',
+      )
+    ) {
+      return
+    }
+    setBusy(true)
+    setError('')
+    try {
+      await update(ref(db, drawPath), { confirmedAt: Date.now(), confirmedBy: user.uid })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không xác nhận được')
     } finally {
       setBusy(false)
     }
@@ -252,7 +286,19 @@ function RewardDrawCard({
               </li>
             ))}
           </ol>
-          {isAdmin && listChanged && (
+          {confirmed ? (
+            <p className="reward-draw-confirmed">
+              ✓ Kết quả đã xác nhận lúc {formatDrawTime(draw.confirmedAt ?? 0)}
+              {draw.confirmedBy && names[draw.confirmedBy]?.name
+                ? ` bởi ${names[draw.confirmedBy].name}`
+                : ''}
+            </p>
+          ) : (
+            isAdmin && (
+              <p className="tiny muted">Chưa xác nhận — Admin có thể quay lại hoặc xóa kết quả.</p>
+            )
+          )}
+          {isAdmin && !confirmed && listChanged && (
             <p className="tiny form-error">
               Danh sách được quay đã thay đổi so với lúc quay ({candidates.length} người hiện
               tại).
@@ -269,22 +315,34 @@ function RewardDrawCard({
         </p>
       )}
 
-      {isAdmin && finished && candidates.length > 0 && (
+      {isAdmin && finished && !confirmed && (candidates.length > 0 || draw) && (
         <div className="btn-row">
-          <button
-            type="button"
-            className="btn primary compact"
-            disabled={busy}
-            onClick={() => void runDraw()}
-          >
-            {busy
-              ? 'Đang quay…'
-              : candidates.length <= reward.gifts
-                ? 'Trao thưởng cho tất cả'
-                : draw
-                  ? 'Quay lại'
-                  : 'Quay số'}
-          </button>
+          {draw && (
+            <button
+              type="button"
+              className="btn primary compact"
+              disabled={busy}
+              onClick={() => void confirmDraw()}
+            >
+              Xác nhận kết quả
+            </button>
+          )}
+          {candidates.length > 0 && (
+            <button
+              type="button"
+              className={`btn compact ${draw ? 'ghost' : 'primary'}`}
+              disabled={busy}
+              onClick={() => void runDraw()}
+            >
+              {busy
+                ? 'Đang xử lý…'
+                : candidates.length <= reward.gifts
+                  ? 'Trao thưởng cho tất cả'
+                  : draw
+                    ? 'Quay lại'
+                    : 'Quay số'}
+            </button>
+          )}
           {draw && (
             <button
               type="button"

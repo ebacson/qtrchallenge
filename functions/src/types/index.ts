@@ -89,6 +89,9 @@ export interface RewardDraw {
   prizes: string[]
   drawnAt: number
   drawnBy: string
+  /** Admin xác nhận kết quả: từ đó không được quay lại hay xóa */
+  confirmedAt?: number
+  confirmedBy?: string
 }
 
 /** Admin xác nhận thành viên đã nộp tiền phạt của thử thách */

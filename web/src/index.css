@@ -3109,6 +3109,16 @@ code {
   color: var(--ink);
 }
 
+.reward-draw-confirmed {
+  margin: 8px 0 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(46, 157, 91, 0.12);
+  color: #1f7a45;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
 .reward-draw-spin {
   margin: 10px 0;
   padding: 18px 12px;

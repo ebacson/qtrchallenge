@@ -682,6 +682,9 @@ export function parseRewardDraws(raw: unknown): RewardDraw[] | undefined {
         prizes: Array.isArray(o.prizes) ? o.prizes.map((p) => String(p ?? '')) : [],
         drawnAt: Number(o.drawnAt) || 0,
         drawnBy: String(o.drawnBy ?? ''),
+        ...(Number(o.confirmedAt) > 0
+          ? { confirmedAt: Number(o.confirmedAt), confirmedBy: String(o.confirmedBy ?? '') }
+          : {}),
       },
     ]
   })

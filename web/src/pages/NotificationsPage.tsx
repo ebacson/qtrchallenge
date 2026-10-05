@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { get, onValue, push, ref, remove, set, update } from 'firebase/database'
 import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
+import { Heart } from 'lucide-react'
 import { normalizeText, plainText, RichText } from '../components/RichText'
+import { useUserProfiles } from '../lib/userWrites'
 
 type Noti = {
   id: string
@@ -12,6 +14,8 @@ type Noti = {
   createdAt: string
   updatedAt: string
   read: boolean
+  /** uid những người đã thả tim (`notifications/{id}/likes/{uid}`) */
+  likers: string[]
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -125,6 +129,7 @@ export function NotificationsPage() {
   const [items, setItems] = useState<Noti[]>([])
   const [loading, setLoading] = useState(true)
   const [creatorNames, setCreatorNames] = useState<Record<string, string>>({})
+  const profiles = useUserProfiles()
 
   const [formOpen, setFormOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -144,6 +149,9 @@ export function NotificationsPage() {
           createdAt: readCreatedAt(row.createdAt),
           updatedAt: row.updatedAt == null ? '' : readCreatedAt(row.updatedAt),
           read: Boolean(readBy[user.uid]),
+          likers: Object.entries((row.likes ?? {}) as Record<string, unknown>)
+            .filter(([, v]) => Boolean(v))
+            .map(([uid]) => uid),
         }
       })
       list.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -171,6 +179,20 @@ export function NotificationsPage() {
   async function markRead(id: string) {
     if (!user) return
     await update(ref(db, `notifications/${id}/readBy`), { [user.uid]: true })
+  }
+
+  /** Mỗi người một tim: lưu theo uid, bấm lần nữa để bỏ tim */
+  async function toggleLike(n: Noti) {
+    if (!user) return
+    const liked = n.likers.includes(user.uid)
+    try {
+      await update(ref(db, `notifications/${n.id}`), {
+        [`likes/${user.uid}`]: liked ? null : true,
+        [`readBy/${user.uid}`]: true,
+      })
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Không thả tim được')
+    }
   }
 
   async function onCreate(draft: NotiDraft) {
@@ -245,6 +267,13 @@ export function NotificationsPage() {
         <ul className="noti-list">
           {items.map((n) => {
             const isCreator = Boolean(user && n.creatorUserID === user.uid)
+            const liked = Boolean(user && n.likers.includes(user.uid))
+            const likerNames = n.likers.map(
+              (uid) => (uid === user?.uid ? 'Bạn' : String(profiles?.[uid]?.fullName ?? '')) || 'Runner',
+            )
+            const likerTitle = likerNames.length
+              ? `${likerNames.slice(0, 15).join(', ')}${likerNames.length > 15 ? ` và ${likerNames.length - 15} người khác` : ''}`
+              : ''
             if (editingId === n.id) {
               return (
                 <li key={n.id}>
@@ -280,34 +309,45 @@ export function NotificationsPage() {
                       .join(' · ')}
                   </p>
                   <RichText text={n.content} />
-                  {(isCreator || isAdmin) && (
-                    <div className="noti-actions">
-                      {isCreator && (
-                        <button
-                          type="button"
-                          className="btn ghost compact"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setEditingId(n.id)
-                          }}
-                        >
-                          Sửa
-                        </button>
-                      )}
-                      {isAdmin && (
-                        <button
-                          type="button"
-                          className="btn ghost compact danger"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            void onDelete(n)
-                          }}
-                        >
-                          Xóa
-                        </button>
-                      )}
-                    </div>
-                  )}
+                  <div className="noti-actions">
+                    <button
+                      type="button"
+                      className={liked ? 'noti-like liked' : 'noti-like'}
+                      aria-pressed={liked}
+                      title={likerTitle || 'Thả tim'}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        void toggleLike(n)
+                      }}
+                    >
+                      <Heart size={18} fill={liked ? 'currentColor' : 'none'} aria-hidden />
+                      {n.likers.length > 0 && <span>{n.likers.length}</span>}
+                    </button>
+                    {isCreator && (
+                      <button
+                        type="button"
+                        className="btn ghost compact"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setEditingId(n.id)
+                        }}
+                      >
+                        Sửa
+                      </button>
+                    )}
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        className="btn ghost compact danger"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          void onDelete(n)
+                        }}
+                      >
+                        Xóa
+                      </button>
+                    )}
+                  </div>
                 </article>
               </li>
             )

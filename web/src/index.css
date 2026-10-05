@@ -3233,6 +3233,29 @@ code {
   background: rgba(27, 127, 78, 0.08);
 }
 
+.reward-recipient {
+  border-color: rgba(46, 157, 91, 0.35);
+}
+
+.reward-recipient-prizes {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.reward-recipient-prizes li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.reward-recipient-prizes .reward-winner-prize {
+  margin-left: 0;
+}
+
 .reward-winners {
   list-style: none;
   margin: 8px 0 0;

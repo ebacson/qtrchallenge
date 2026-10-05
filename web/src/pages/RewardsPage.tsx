@@ -415,6 +415,13 @@ type MemberSummary = {
   entries: MemberEntry[]
 }
 
+type RewardRecipient = {
+  uid: string
+  name: string
+  avatar: string
+  prizes: { challenge: Challenge; target: string; prize: string }[]
+}
+
 function MemberPenaltyDetail({ member }: { member: MemberSummary }) {
   return (
     <div className="penalty-detail">
@@ -532,6 +539,36 @@ function SummaryView({
     })
   }, [finished])
 
+  const recipients = useMemo(() => {
+    const people = new Map<string, { name: string; avatar: string }>()
+    for (const report of finished) {
+      for (const r of [...report.rows, ...report.absent]) {
+        people.set(r.uid, { name: r.name, avatar: r.avatar })
+      }
+    }
+    const map = new Map<string, RewardRecipient>()
+    for (const report of finished) {
+      for (const draw of report.challenge.rewardDraws ?? []) {
+        draw.winners.forEach((uid, i) => {
+          const person = people.get(uid)
+          const entry = map.get(uid) ?? {
+            uid,
+            name: person?.name || 'Người dùng ẩn danh',
+            avatar: person?.avatar || '',
+            prizes: [],
+          }
+          entry.prizes.push({ challenge: report.challenge, target: draw.target, prize: draw.prizes[i] ?? '' })
+          map.set(uid, entry)
+        })
+      }
+    }
+    return [...map.values()].sort(
+      (a, b) => b.prizes.length - a.prizes.length || a.name.localeCompare(b.name, 'vi'),
+    )
+  }, [finished])
+  const totalPrizes = recipients.reduce((sum, r) => sum + r.prizes.length, 0)
+  const visibleRecipients = recipients.filter((r) => matchesQuery(r.name, query))
+
   const totalCompleted = members.reduce((sum, m) => sum + m.completed, 0)
   const totalFailed = members.reduce((sum, m) => sum + m.failed, 0)
   const totalAbsent = members.reduce((sum, m) => sum + m.absentCount, 0)
@@ -564,6 +601,50 @@ function SummaryView({
         </div>
         <PenaltyStats total={totalPenalty} paid={totalPaid} />
       </div>
+
+      <section className="section panel">
+        <h2>
+          Nhận thưởng{' '}
+          {recipients.length > 0 && (
+            <span className="tiny muted">
+              · {query ? `${visibleRecipients.length}/` : ''}
+              {recipients.length} người · {totalPrizes} phần quà
+            </span>
+          )}
+        </h2>
+        {recipients.length === 0 ? (
+          <p className="empty">Chưa có kết quả quay thưởng nào trong năm {year}.</p>
+        ) : visibleRecipients.length === 0 ? (
+          <p className="empty">Không tìm thấy thành viên phù hợp.</p>
+        ) : (
+          <ul className="participant-list">
+            {visibleRecipients.map((r) => (
+              <li key={r.uid} className="participant-row reward-recipient">
+                <Avatar name={r.name} avatar={r.avatar} />
+                <div className="participant-meta">
+                  <strong>{r.name}</strong>
+                  <ul className="reward-recipient-prizes">
+                    {r.prizes.map((p, i) => (
+                      <li key={`${p.challenge.id}-${p.target}-${i}`}>
+                        <span className="tiny">
+                          <Link to={`/challenges/${p.challenge.id}`}>
+                            {p.challenge.name || 'Thử thách'}
+                          </Link>{' '}
+                          <span className="muted">· {p.target}</span>
+                        </span>
+                        {p.prize && <span className="reward-winner-prize">{p.prize}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <span className="reward-amount completed">
+                  <strong>🎁 {r.prizes.length}</strong>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <section className="section panel">
         <h2>

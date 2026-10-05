@@ -27,6 +27,7 @@ import {
   parseChallenge,
   parseDayQuotaLabel,
   progressPercent,
+  STATUS_FINISHED,
   STATUS_UPCOMING,
   statusClass,
   userDayQuotaProgress,
@@ -408,6 +409,7 @@ export function ChallengeDetailPage() {
   }
 
   const isAdmin = Boolean(profile?.admin)
+  const canManageParticipants = isAdmin && challenge.status !== STATUS_FINISHED
   const leaderboard = (
     <section className="section panel">
       <h2>Bảng xếp hạng</h2>
@@ -474,7 +476,7 @@ export function ChallengeDetailPage() {
                     `${p.progressKm.toFixed(1)} km`
                   )}
                 </span>
-                {isAdmin && (
+                {canManageParticipants && (
                   <button
                     type="button"
                     className={`participant-admin-btn${editingParticipant === p.id ? ' active' : ''}`}
@@ -486,7 +488,7 @@ export function ChallengeDetailPage() {
                   </button>
                 )}
               </li>
-              {isAdmin && editingParticipant === p.id && rawUserChallenges[p.id] && (
+              {canManageParticipants && editingParticipant === p.id && rawUserChallenges[p.id] && (
                 <li className="participant-admin-item">
                   <AdminParticipantEditor
                     challenge={challenge}

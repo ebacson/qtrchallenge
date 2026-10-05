@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { ref, remove, update } from 'firebase/database'
 import {
+  calculateStatus,
   challengeGoals,
   parseDayQuotaLabel,
+  STATUS_FINISHED,
   STATUS_UPCOMING,
   userDayQuotaProgress,
 } from '../lib/challengeRules'
@@ -50,6 +52,12 @@ export function AdminParticipantEditor({
 
   const started = challenge.status !== STATUS_UPCOMING
   const path = `challenges/${challenge.id}/user_challenges/${uid}`
+
+  function finishedNow(): boolean {
+    if (calculateStatus(challenge.startDate, challenge.endDate) !== STATUS_FINISHED) return false
+    setError('Thử thách đã kết thúc — không thể thay đổi thành viên nữa.')
+    return true
+  }
   const changed = isDayQuota
     ? indexes.join(',') !== initialIndexes.join(',')
     : target !== initialTarget
@@ -61,6 +69,7 @@ export function AdminParticipantEditor({
   }
 
   async function save() {
+    if (finishedNow()) return
     if (isDayQuota ? !indexes.length : !target) {
       setError(isDayQuota ? 'Chọn ít nhất một tùy chọn.' : 'Chọn mục tiêu.')
       return
@@ -68,7 +77,7 @@ export function AdminParticipantEditor({
     if (
       started &&
       !window.confirm(
-        `Thử thách ${challenge.status.toLowerCase()}. Đổi mục tiêu của "${name}" sẽ tính lại tiến độ theo mục tiêu mới, tiếp tục?`,
+        `Thử thách đang diễn ra. Đổi mục tiêu của "${name}" sẽ tính lại tiến độ theo mục tiêu mới, tiếp tục?`,
       )
     ) {
       return
@@ -102,8 +111,9 @@ export function AdminParticipantEditor({
   }
 
   async function removeParticipant() {
+    if (finishedNow()) return
     const warning = started
-      ? `\n\nThử thách ${challenge.status.toLowerCase()}: tiến độ của người này trong thử thách sẽ mất và không khôi phục được.`
+      ? '\n\nThử thách đang diễn ra: tiến độ của người này trong thử thách sẽ mất và không khôi phục được.'
       : ''
     if (!window.confirm(`Xóa "${name}" khỏi thử thách "${challenge.name}"?${warning}`)) return
     setBusy(true)

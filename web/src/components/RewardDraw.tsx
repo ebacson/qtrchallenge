@@ -99,11 +99,13 @@ function RewardDrawCard({
   reward,
   candidateList,
   names,
+  winnersOnlyWhenConfirmed,
 }: {
   challenge: Challenge
   reward: RewardTier
   candidateList: RewardCandidate[]
   names: Names
+  winnersOnlyWhenConfirmed: boolean
 }) {
   const candidates = candidateList.map((c) => c.uid)
   const paidUids = new Set(candidateList.filter((c) => c.via === 'paid').map((c) => c.uid))
@@ -247,7 +249,9 @@ function RewardDrawCard({
         </div>
       </div>
 
-      {spinName == null && (draw ? draw.candidates.length > 0 : candidates.length > 0) && (
+      {spinName == null &&
+        !(confirmed && winnersOnlyWhenConfirmed) &&
+        (draw ? draw.candidates.length > 0 : candidates.length > 0) && (
         <div className="reward-candidates-wrap">
           <p className="tiny muted">
             {draw ? 'Danh sách đã quay:' : 'Danh sách được quay:'}
@@ -366,12 +370,15 @@ export function RewardDrawSection({
   userChallenges,
   names,
   embedded = false,
+  winnersOnlyWhenConfirmed = false,
 }: {
   challenge: Challenge
   userChallenges: Record<string, Record<string, unknown> | null>
   names: Names
   /** Hiển thị như một mục con trong khung khác thay vì một section riêng */
   embedded?: boolean
+  /** Kết quả đã xác nhận: chỉ hiện người trúng thưởng, ẩn danh sách được quay */
+  winnersOnlyWhenConfirmed?: boolean
 }) {
   const rewards = challenge.rewards ?? []
   if (!rewards.length) return null
@@ -396,6 +403,7 @@ export function RewardDrawSection({
             reward={r}
             candidateList={rewardCandidates(challenge, userChallenges, r.target)}
             names={names}
+            winnersOnlyWhenConfirmed={winnersOnlyWhenConfirmed}
           />
         ))}
       </div>

@@ -281,6 +281,7 @@ function ChallengeReportView({
         challenge={challenge}
         userChallenges={report.userChallenges}
         names={names}
+        winnersOnlyWhenConfirmed
       />
 
       {searching &&

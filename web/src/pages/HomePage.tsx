@@ -31,10 +31,7 @@ function useActivityCount(user: User | null): number {
   useEffect(() => {
     if (!user) return
     const hit = activityCountCache.get(user.uid)
-    if (hit && Date.now() - hit.at < ACTIVITY_COUNT_TTL_MS) {
-      setCounted({ uid: user.uid, count: hit.count })
-      return
-    }
+    if (hit && Date.now() - hit.at < ACTIVITY_COUNT_TTL_MS) return
     let cancelled = false
     void (async () => {
       try {
@@ -56,8 +53,7 @@ function useActivityCount(user: User | null): number {
   }, [user])
 
   if (!uid) return 0
-  if (counted?.uid === uid) return counted.count
-  return activityCountCache.get(uid)?.count ?? 0
+  return activityCountCache.get(uid)?.count ?? (counted?.uid === uid ? counted.count : 0)
 }
 
 export function HomePage() {

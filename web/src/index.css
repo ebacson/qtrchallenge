@@ -858,6 +858,55 @@ select {
   text-align: right;
 }
 
+.participant-admin-btn {
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #ffffff;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.participant-admin-btn:hover,
+.participant-admin-btn.active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.participant-admin-editor {
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px dashed var(--accent);
+  background: rgba(255, 244, 245, 0.7);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.participant-admin-editor .btn-row {
+  margin: 0;
+}
+
+.participant-admin-target {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.participant-admin-target select {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  font: inherit;
+  background: #ffffff;
+}
+
 .participant-km small {
   display: block;
   font-family: inherit;

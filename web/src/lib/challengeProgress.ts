@@ -4,6 +4,7 @@ import { calculateStatus, STATUS_FINISHED } from './challengeRules'
 import { calculateLevelFromChallenges } from './levelCalculator'
 import { computeUserChallengeUpdate } from './progressCompute'
 import { updateUser } from './userWrites'
+import type { Challenge } from '../types'
 
 const THROTTLE_MS = 300_000
 
@@ -50,6 +51,48 @@ export async function refreshUserLevel(
     await updateUser(uid, { level })
   }
   return level
+}
+
+/** Dữ liệu ghi vào user_challenges khi chọn/đổi các tùy chọn khoảng ngày */
+export function dayQuotaJoinFields(c: Challenge, indexes: number[]): Record<string, unknown> {
+  const options = indexes.map((i) => c.dayQuotaOptions![i])
+  const required = options.reduce((sum, o) => sum + o.daysRequired, 0)
+  return {
+    userTarget: indexes.map((i) => c.targetDistances[i]).join(' + '),
+    optionIndexes: indexes,
+    optionIndex: indexes[0],
+    daysRequired: options[0].daysRequired,
+    kmPerDay: options[0].kmPerDay,
+    progress: `0/${required} ngày`,
+    totalactiviti: '0',
+    optionResults: null,
+    completedTargets: null,
+  }
+}
+
+/**
+ * Tính lại tiến độ một thành viên trong một thử thách (mọi trạng thái, kể cả đã kết thúc)
+ * từ hoạt động Strava đã đồng bộ, rồi cập nhật level.
+ */
+export async function recomputeUserChallenge(challengeId: string, uid: string): Promise<void> {
+  const [challengeSnap, activitiesSnap] = await Promise.all([
+    get(ref(db, `challenges/${challengeId}`)),
+    get(ref(db, `users/${uid}/strava_activities`)),
+  ])
+  const challenge = challengeSnap.val() as Record<string, unknown> | null
+  const userRow = (challenge?.user_challenges as Record<string, Record<string, unknown>> | undefined)?.[
+    uid
+  ]
+  if (challenge && userRow) {
+    const activities = Object.values(
+      (activitiesSnap.val() ?? {}) as Record<string, Record<string, unknown>>,
+    )
+    const updates = computeUserChallengeUpdate(challenge, userRow, activities)
+    if (updates) {
+      await update(ref(db, `challenges/${challengeId}/user_challenges/${uid}`), updates)
+    }
+  }
+  await refreshUserLevel(uid)
 }
 
 export async function syncOngoingChallengeProgress(

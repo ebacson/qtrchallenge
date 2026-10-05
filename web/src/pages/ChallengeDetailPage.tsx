@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { Fragment, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { onValue, ref, remove, update } from 'firebase/database'
 import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
 import { useUserProfiles } from '../lib/userWrites'
 import { Pencil } from 'lucide-react'
+import { AdminParticipantEditor } from '../components/AdminParticipantEditor'
 import { RewardDrawSection } from '../components/RewardDraw'
+import { dayQuotaJoinFields } from '../lib/challengeProgress'
 import {
   formatVnd,
   isRewardEligible,
@@ -106,6 +108,8 @@ export function ChallengeDetailPage() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [editingParticipant, setEditingParticipant] = useState<string | null>(null)
+  const [participantNotice, setParticipantNotice] = useState('')
 
   useEffect(() => {
     setShowDescription(false)
@@ -272,23 +276,6 @@ export function ChallengeDetailPage() {
     )
   }
 
-  /** Dữ liệu ghi vào user_challenges khi chọn/đổi các tùy chọn khoảng ngày */
-  function dayQuotaJoinFields(c: Challenge, indexes: number[]) {
-    const options = indexes.map((i) => c.dayQuotaOptions![i])
-    const required = options.reduce((sum, o) => sum + o.daysRequired, 0)
-    return {
-      userTarget: indexes.map((i) => c.targetDistances[i]).join(' + '),
-      optionIndexes: indexes,
-      optionIndex: indexes[0],
-      daysRequired: options[0].daysRequired,
-      kmPerDay: options[0].kmPerDay,
-      progress: `0/${required} ngày`,
-      totalactiviti: '0',
-      optionResults: null,
-      completedTargets: null,
-    }
-  }
-
   function startEditingOptions() {
     setSelectedOptions(
       challenge?.userDayQuota?.map((q) => q.optionIndex).filter((i) => i >= 0) ?? [0],
@@ -419,6 +406,107 @@ export function ChallengeDetailPage() {
       setBusy(false)
     }
   }
+
+  const isAdmin = Boolean(profile?.admin)
+  const leaderboard = (
+    <section className="section panel">
+      <h2>Bảng xếp hạng</h2>
+      <p className="lede tiny">
+        {participants.length} thành viên ·{' '}
+        {challenge.challengeMode === 'day_quota'
+          ? 'sắp xếp theo tỉ lệ ngày hoàn thành'
+          : 'sắp xếp theo km hoàn thành'}
+      </p>
+      {participantNotice && <p className="form-info">{participantNotice}</p>}
+      {participants.length === 0 ? (
+        <p className="muted">Chưa có ai tham gia.</p>
+      ) : (
+        <ol className="participant-list">
+          {participants.map((p) => (
+            <Fragment key={p.id}>
+              <li className={`participant-row${p.id === user?.uid ? ' me' : ''}`}>
+                <span className="participant-rank">{p.rank}</span>
+                <div className="hof-avatar">
+                  {p.avatar ? (
+                    <img src={p.avatar} alt="" />
+                  ) : (
+                    <span>{(p.fullName || '?').charAt(0).toUpperCase()}</span>
+                  )}
+                </div>
+                <div className="participant-meta">
+                  <strong>
+                    {p.fullName}
+                    {p.id === user?.uid ? ' (bạn)' : ''}
+                  </strong>
+                  {p.options.length > 0 ? (
+                    <ul className="participant-options">
+                      {p.options.map((o) => (
+                        <li key={o.key}>
+                          <span>{o.title}</span>
+                          <strong>
+                            {o.daysCompleted}/{o.daysRequired} ngày
+                          </strong>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <span className="tiny muted">
+                      Hoàn thành: {p.progress} / {p.userTarget || '—'}
+                      {p.totalactiviti ? ` · ${p.totalactiviti} hoạt động` : ''}
+                    </span>
+                  )}
+                  <div className="progress-track">
+                    <div
+                      className={`progress-fill ${fillTone(p.pct)}`}
+                      style={{ width: `${p.pct}%` }}
+                    />
+                  </div>
+                </div>
+                <span className="participant-km">
+                  {p.isDays ? (
+                    <>
+                      {p.pct}%
+                      <small>
+                        {p.progressKm}/{p.targetKm} ngày
+                      </small>
+                    </>
+                  ) : (
+                    `${p.progressKm.toFixed(1)} km`
+                  )}
+                </span>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    className={`participant-admin-btn${editingParticipant === p.id ? ' active' : ''}`}
+                    title="Admin: đổi mục tiêu / xóa khỏi thử thách"
+                    aria-label={`Quản lý ${p.fullName}`}
+                    onClick={() => setEditingParticipant((cur) => (cur === p.id ? null : p.id))}
+                  >
+                    <Pencil size={15} aria-hidden />
+                  </button>
+                )}
+              </li>
+              {isAdmin && editingParticipant === p.id && rawUserChallenges[p.id] && (
+                <li className="participant-admin-item">
+                  <AdminParticipantEditor
+                    challenge={challenge}
+                    uid={p.id}
+                    name={p.fullName}
+                    row={rawUserChallenges[p.id]}
+                    onClose={() => setEditingParticipant(null)}
+                    onDone={(text) => {
+                      setEditingParticipant(null)
+                      setParticipantNotice(text)
+                    }}
+                  />
+                </li>
+              )}
+            </Fragment>
+          ))}
+        </ol>
+      )}
+    </section>
+  )
 
   return (
     <div className="page detail-page">
@@ -688,120 +776,51 @@ export function ChallengeDetailPage() {
             )}
           </section>
 
-          <section className="section panel">
-            <h2>Bảng xếp hạng</h2>
-            <p className="lede tiny">
-              {participants.length} thành viên ·{' '}
-              {challenge.challengeMode === 'day_quota'
-                ? 'sắp xếp theo tỉ lệ ngày hoàn thành'
-                : 'sắp xếp theo km hoàn thành'}
-            </p>
-            {participants.length === 0 ? (
-              <p className="muted">Chưa có ai tham gia.</p>
-            ) : (
-              <ol className="participant-list">
-                {participants.map((p) => (
-                  <li
-                    key={p.id}
-                    className={`participant-row${p.id === user?.uid ? ' me' : ''}`}
-                  >
-                    <span className="participant-rank">{p.rank}</span>
-                    <div className="hof-avatar">
-                      {p.avatar ? (
-                        <img src={p.avatar} alt="" />
-                      ) : (
-                        <span>{(p.fullName || '?').charAt(0).toUpperCase()}</span>
-                      )}
-                    </div>
-                    <div className="participant-meta">
-                      <strong>
-                        {p.fullName}
-                        {p.id === user?.uid ? ' (bạn)' : ''}
-                      </strong>
-                      {p.options.length > 0 ? (
-                        <ul className="participant-options">
-                          {p.options.map((o) => (
-                            <li key={o.key}>
-                              <span>{o.title}</span>
-                              <strong>
-                                {o.daysCompleted}/{o.daysRequired} ngày
-                              </strong>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <span className="tiny muted">
-                          Hoàn thành: {p.progress} / {p.userTarget || '—'}
-                          {p.totalactiviti
-                            ? ` · ${p.totalactiviti} hoạt động`
-                            : ''}
-                        </span>
-                      )}
-                      <div className="progress-track">
-                        <div
-                          className={`progress-fill ${fillTone(p.pct)}`}
-                          style={{ width: `${p.pct}%` }}
-                        />
-                      </div>
-                    </div>
-                    <span className="participant-km">
-                      {p.isDays ? (
-                        <>
-                          {p.pct}%
-                          <small>
-                            {p.progressKm}/{p.targetKm} ngày
-                          </small>
-                        </>
-                      ) : (
-                        `${p.progressKm.toFixed(1)} km`
-                      )}
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </section>
+          {leaderboard}
         </>
       ) : (
-        <section className="section panel">
-          <h2>Tham gia</h2>
-          {!canJoin(challenge) ? (
-            <p className="form-error">{joinBlockedMessage(challenge)}</p>
-          ) : (
-            <form className="auth-form" onSubmit={onJoin}>
-              {isDayQuota ? (
-                optionPicker
-              ) : (
-                <label>
-                  Mục tiêu
-                  <select
-                    value={selectedTarget}
-                    onChange={(e) => setSelectedTarget(e.target.value)}
-                  >
-                    {challenge.targetDistances.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-              {needsPassword && (
-                <label>
-                  Mật khẩu thử thách
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                </label>
-              )}
-              <button type="submit" className="btn primary" disabled={busy}>
-                {busy ? 'Đang xử lý…' : 'Tham gia'}
-              </button>
-            </form>
-          )}
-        </section>
+        <>
+          <section className="section panel">
+            <h2>Tham gia</h2>
+            {!canJoin(challenge) ? (
+              <p className="form-error">{joinBlockedMessage(challenge)}</p>
+            ) : (
+              <form className="auth-form" onSubmit={onJoin}>
+                {isDayQuota ? (
+                  optionPicker
+                ) : (
+                  <label>
+                    Mục tiêu
+                    <select
+                      value={selectedTarget}
+                      onChange={(e) => setSelectedTarget(e.target.value)}
+                    >
+                      {challenge.targetDistances.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                {needsPassword && (
+                  <label>
+                    Mật khẩu thử thách
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                  </label>
+                )}
+                <button type="submit" className="btn primary" disabled={busy}>
+                  {busy ? 'Đang xử lý…' : 'Tham gia'}
+                </button>
+              </form>
+            )}
+          </section>
+          {isAdmin && leaderboard}
+        </>
       )}
 
       {error && <p className="form-error">{error}</p>}

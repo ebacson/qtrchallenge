@@ -7,8 +7,10 @@ import {
   type StravaEnv,
 } from './stravaCore'
 import {
+  activityDayMs,
   calculateStatus,
   parseChallengeDayEndInclusiveMs,
+  parseChallengeDayStartMs,
   STATUS_FINISHED,
   STATUS_ONGOING,
 } from './shared/challengeRules'
@@ -280,16 +282,72 @@ export type UserSyncResult = {
   levelChanged: boolean
 }
 
+/**
+ * `challenges` giữ trong instance bằng một listener: tải đủ một lần khi khởi động, sau đó RTDB
+ * chỉ gửi phần thay đổi (mỗi sự kiện Strava khỏi tải lại cả nhánh).
+ */
+let challengesCache: Record<string, Dict> = {}
+let challengesReady: Promise<void> | null = null
+
+function cachedChallenges(): Promise<Record<string, Dict>> {
+  if (!challengesReady) {
+    challengesReady = new Promise<void>((resolve, reject) => {
+      getDatabase()
+        .ref('challenges')
+        .on(
+          'value',
+          (snap) => {
+            challengesCache = (asDict(snap.val()) ?? {}) as Record<string, Dict>
+            resolve()
+          },
+          (err) => {
+            challengesReady = null
+            reject(err)
+          },
+        )
+    })
+  }
+  return challengesReady.then(() => challengesCache)
+}
+
+const USER_SYNC_FIELDS = ['access_token', 'refresh_token', 'expires_at', 'fullName', 'email', 'level']
+
 /** Đồng bộ Strava (nếu `fetchStrava`) rồi tính lại tiến độ thử thách + level cho một user. */
 export async function syncSingleUser(uid: string, fetchStrava: boolean): Promise<UserSyncResult> {
   const db = getDatabase()
-  const row = asDict((await db.ref(`users/${uid}`).get()).val())
-  if (!row) throw new Error(`Không tìm thấy user ${uid}`)
+  const values = await Promise.all(
+    USER_SYNC_FIELDS.map(async (field) => (await db.ref(`users/${uid}/${field}`).get()).val()),
+  )
+  const row: Dict = Object.fromEntries(
+    USER_SYNC_FIELDS.map((field, i) => [field, values[i]]).filter(([, v]) => v != null),
+  )
+  if (!Object.keys(row).length) throw new Error(`Không tìm thấy user ${uid}`)
 
-  const activitiesByUid = new Map<string, Dict>([
-    [uid, { ...(asDict(row.strava_activities) ?? {}) }],
-  ])
-  const summary = emptySummary(`user:${uid}`, Date.now())
+  // Dòng tiến độ của user này đọc mới từ RTDB; phần còn lại của thử thách lấy từ bộ nhớ đệm
+  const now = Date.now()
+  const cached = await cachedChallenges()
+  const challenges: Record<string, Dict> = { ...cached }
+  let windowStartMs = Number.POSITIVE_INFINITY
+  await Promise.all(
+    Object.entries(cached).map(async ([challengeId, challenge]) => {
+      if (!asDict(challenge) || !shouldRecalculate(challenge, now)) return
+      const fresh = asDict(
+        (await db.ref(`challenges/${challengeId}/user_challenges/${uid}`).get()).val(),
+      )
+      const rows = { ...(asDict(challenge.user_challenges) ?? {}) }
+      if (fresh) rows[uid] = fresh
+      else delete rows[uid]
+      challenges[challengeId] = { ...challenge, user_challenges: rows }
+      if (fresh) {
+        const start = parseChallengeDayStartMs(String(challenge.startDate ?? ''))
+        if (start != null) windowStartMs = Math.min(windowStartMs, start)
+      }
+    }),
+  )
+  const needsActivities = Number.isFinite(windowStartMs)
+
+  const activitiesByUid = new Map<string, Dict>()
+  const summary = emptySummary(`user:${uid}`, now)
   let stravaError: string | null = null
   if (fetchStrava) {
     const env = readStravaEnv(process.env)
@@ -303,11 +361,23 @@ export async function syncSingleUser(uid: string, fetchStrava: boolean): Promise
     }
   }
 
-  const challenges = (asDict((await db.ref('challenges').get()).val()) ?? {}) as Record<
-    string,
-    Dict
-  >
-  const progress = collectProgressUpdates(challenges, activitiesByUid, Date.now(), uid)
+  // Các hoạt động mới nhất vừa lấy từ Strava đã phủ hết khoảng ngày cần tính thì khỏi đọc
+  // `strava_activities` (phần lớn dung lượng của `users`) từ RTDB
+  if (needsActivities) {
+    const fetched = Object.values(activitiesByUid.get(uid) ?? {}).map(asDict)
+    const oldestMs = Math.min(
+      ...fetched.map((a) => activityDayMs(String(a?.startDate ?? '')) ?? Number.POSITIVE_INFINITY),
+    )
+    const covered =
+      summary.stravaSynced > 0 &&
+      (fetched.length < ACTIVITY_PAGE_SIZE || oldestMs < windowStartMs)
+    if (!covered) {
+      const stored = asDict((await db.ref(`users/${uid}/strava_activities`).get()).val()) ?? {}
+      activitiesByUid.set(uid, { ...stored, ...(activitiesByUid.get(uid) ?? {}) })
+    }
+  }
+
+  const progress = collectProgressUpdates(challenges, activitiesByUid, now, uid)
   await applyRootUpdates(progress.updates)
 
   let levelChanged = false

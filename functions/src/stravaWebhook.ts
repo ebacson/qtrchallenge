@@ -97,7 +97,7 @@ export async function handleStravaEvent(event: StravaWebhookEvent): Promise<void
   if (event.aspect_type === 'delete') {
     await getDatabase().ref(`users/${uid}/strava_activities/${event.object_id}`).remove()
   }
-  const result = await syncSingleUser(uid, event.aspect_type !== 'delete')
+  const result = await syncSingleUser(uid, true)
   const log = result.stravaError ? logger.warn : logger.info
   log('Strava event processed', {
     aspect: event.aspect_type,

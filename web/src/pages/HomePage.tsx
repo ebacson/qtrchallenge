@@ -1,6 +1,8 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import type { User } from 'firebase/auth'
 import { useAuth } from '../context/AuthContext'
+import { db } from '../lib/firebase'
 import { useSharedValue } from '../lib/sharedValue'
 import { useMyUnpaidPenalty } from '../lib/myChallengeStats'
 import { formatBadgeCount, useUnreadNotificationCount } from '../lib/notifications'
@@ -18,6 +20,46 @@ const shortcuts = [
   { to: '/profile', title: 'Strava', desc: 'Kết nối & sync trong Profile' },
 ]
 
+const ACTIVITY_COUNT_TTL_MS = 5 * 60_000
+const activityCountCache = new Map<string, { count: number; at: number }>()
+
+/** Chỉ đếm khóa (REST `shallow`), không tải nội dung từng hoạt động. */
+function useActivityCount(user: User | null): number {
+  const uid = user?.uid ?? null
+  const [counted, setCounted] = useState<{ uid: string; count: number } | null>(null)
+
+  useEffect(() => {
+    if (!user) return
+    const hit = activityCountCache.get(user.uid)
+    if (hit && Date.now() - hit.at < ACTIVITY_COUNT_TTL_MS) {
+      setCounted({ uid: user.uid, count: hit.count })
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      try {
+        const token = await user.getIdToken()
+        const url = `${db.app.options.databaseURL}/users/${user.uid}/strava_activities.json?shallow=true&auth=${encodeURIComponent(token)}`
+        const res = await fetch(url)
+        if (!res.ok) return
+        const keys = (await res.json()) as Record<string, unknown> | null
+        const count = keys && typeof keys === 'object' ? Object.keys(keys).length : 0
+        activityCountCache.set(user.uid, { count, at: Date.now() })
+        if (!cancelled) setCounted({ uid: user.uid, count })
+      } catch {
+        // giữ số cũ
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [user])
+
+  if (!uid) return 0
+  if (counted?.uid === uid) return counted.count
+  return activityCountCache.get(uid)?.count ?? 0
+}
+
 export function HomePage() {
   const { profile, user } = useAuth()
   const challenges = useSharedValue<Record<string, Record<string, unknown>>>(
@@ -25,9 +67,7 @@ export function HomePage() {
   )
   const unreadNotifications = useUnreadNotificationCount()
   const unpaidPenalty = useMyUnpaidPenalty()
-  const activities = useSharedValue<Record<string, unknown>>(
-    user ? `users/${user.uid}/strava_activities` : null,
-  )
+  const activityCount = useActivityCount(user)
 
   const ongoing = useMemo<Challenge[]>(() => {
     if (!user) return []
@@ -41,9 +81,6 @@ export function HomePage() {
       )
       .slice(0, 3)
   }, [challenges, user])
-
-  const activityCount =
-    activities && typeof activities === 'object' ? Object.keys(activities).length : 0
 
   return (
     <div className="page">

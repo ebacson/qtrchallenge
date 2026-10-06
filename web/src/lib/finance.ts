@@ -50,8 +50,8 @@ export type FinanceEntry = {
   updatedBy?: string
   /** Năm lưu trong `finance/transactions/{year}`; không có với khoản tự động */
   storedYear?: number
-  /** Khoản tự động (tiền phạt đã nộp), chỉ đọc */
-  auto?: boolean
+  /** Khoản tự động (tiền phạt, hội phí đã đóng), chỉ đọc */
+  auto?: 'penalty' | 'dues'
 }
 
 export type FinanceSettings = { openingBalance: number; openingDate: string }
@@ -149,7 +149,64 @@ export function penaltyIncomeEntries(
         challengeId,
         createdAt: payment.confirmedAt,
         createdBy: payment.confirmedBy,
-        auto: true,
+        auto: 'penalty',
+      })
+    }
+  }
+  return out
+}
+
+export type DuesPayment = { amount: number; paidAt: number; confirmedBy: string }
+
+export type DuesYear = { amount: number; members: Record<string, DuesPayment> }
+
+export function duesPaymentFields(amount: number, confirmedBy: string): DuesPayment {
+  return { amount, paidAt: Date.now(), confirmedBy }
+}
+
+/** `finance/dues/{year}`: `settings/amount` và `members/{uid}` (ai đã đóng). */
+export function parseDues(value: unknown): Record<number, DuesYear> {
+  const out: Record<number, DuesYear> = {}
+  for (const [yearKey, raw] of Object.entries(asDict(value) ?? {})) {
+    const year = Number(yearKey)
+    const dict = asDict(raw)
+    if (!year || !dict) continue
+    const members: Record<string, DuesPayment> = {}
+    for (const [uid, p] of Object.entries(asDict(dict.members) ?? {})) {
+      const row = asDict(p)
+      if (!row || !(Number(row.amount) > 0)) continue
+      members[uid] = {
+        amount: Number(row.amount),
+        paidAt: Number(row.paidAt) || 0,
+        confirmedBy: String(row.confirmedBy ?? ''),
+      }
+    }
+    out[year] = { amount: Number(asDict(dict.settings)?.amount) || 0, members }
+  }
+  return out
+}
+
+/** Hội phí đã đóng, ghi nhận vào ngày xác nhận. */
+export function duesIncomeEntries(
+  dues: Record<number, DuesYear>,
+  nameOf: (uid: string) => string,
+): FinanceEntry[] {
+  const out: FinanceEntry[] = []
+  for (const [year, info] of Object.entries(dues)) {
+    for (const [uid, p] of Object.entries(info.members)) {
+      const date = msToDay(p.paidAt)
+      out.push({
+        id: `dues-${year}-${uid}`,
+        type: 'income',
+        amount: p.amount,
+        category: 'dues',
+        date,
+        dateMs: parseChallengeDayStartMs(date) ?? 0,
+        note: `Hội phí ${year} — ${nameOf(uid)}`,
+        memberUid: uid,
+        createdAt: p.paidAt,
+        createdBy: p.confirmedBy,
+        auto: 'dues',
       })
     }
   }

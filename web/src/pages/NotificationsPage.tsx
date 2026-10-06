@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { get, onValue, push, ref, remove, set, update } from 'firebase/database'
+import { onValue, push, ref, remove, set, update } from 'firebase/database'
 import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
 import { Heart } from 'lucide-react'
@@ -128,7 +128,6 @@ export function NotificationsPage() {
   const isAdmin = Boolean(profile?.admin)
   const [items, setItems] = useState<Noti[]>([])
   const [loading, setLoading] = useState(true)
-  const [creatorNames, setCreatorNames] = useState<Record<string, string>>({})
   const profiles = useUserProfiles()
 
   const [formOpen, setFormOpen] = useState(false)
@@ -160,19 +159,6 @@ export function NotificationsPage() {
     })
     return unsub
   }, [user])
-
-  useEffect(() => {
-    const missing = [...new Set(items.map((n) => n.creatorUserID))].filter(
-      (id) => id && !(id in creatorNames),
-    )
-    if (!missing.length) return
-    void Promise.all(
-      missing.map(async (id) => {
-        const snap = await get(ref(db, `users/${id}/fullName`)).catch(() => null)
-        return [id, String(snap?.val() ?? '')] as const
-      }),
-    ).then((pairs) => setCreatorNames((prev) => ({ ...prev, ...Object.fromEntries(pairs) })))
-  }, [items, creatorNames])
 
   const unread = useMemo(() => items.filter((n) => !n.read).length, [items])
 
@@ -301,7 +287,7 @@ export function NotificationsPage() {
                   </div>
                   <p className="tiny muted noti-meta">
                     {[
-                      creatorNames[n.creatorUserID],
+                      String(profiles?.[n.creatorUserID]?.fullName ?? ''),
                       formatCreatedAt(n.createdAt),
                       n.updatedAt && `đã sửa ${formatCreatedAt(n.updatedAt)}`,
                     ]

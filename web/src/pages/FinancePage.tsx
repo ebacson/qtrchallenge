@@ -14,10 +14,12 @@ import {
   dayToInputDate,
   dayYear,
   downloadFinanceCsv,
+  duesIncomeEntries,
   FINANCE_CATEGORIES,
   FINANCE_PATH,
   inputDateToDay,
   msToDay,
+  parseDues,
   parseFinanceSettings,
   parseTransactions,
   penaltyIncomeEntries,
@@ -26,8 +28,9 @@ import {
   type FinanceEntry,
   type FinanceType,
 } from '../lib/finance'
+import { FinanceDues } from '../components/FinanceDues'
 
-type Tab = 'overview' | 'ledger'
+type Tab = 'overview' | 'ledger' | 'dues'
 type TypeFilter = 'all' | FinanceType
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1)
@@ -337,27 +340,35 @@ export function FinancePage() {
     () =>
       Object.entries(profiles ?? {})
         .filter(([, p]) => String(p.email ?? '').toLowerCase() !== 'echiptime@gmail.com')
-        .map(([uid, p]) => ({ uid, name: String(p.fullName ?? '') || String(p.email ?? uid) }))
+        .map(([uid, p]) => ({
+          uid,
+          name: String(p.fullName ?? '') || String(p.email ?? uid),
+          avatar: String(p.avatar ?? ''),
+          member: p.member === true,
+        }))
         .sort((a, b) => a.name.localeCompare(b.name, 'vi')),
     [profiles],
   )
 
   const settings = useMemo(() => parseFinanceSettings(financeValue?.settings), [financeValue])
+  const dues = useMemo(() => parseDues(financeValue?.dues), [financeValue])
 
   const entries = useMemo(
     () =>
       [
         ...parseTransactions(financeValue?.transactions),
         ...penaltyIncomeEntries(challengesValue, nameOf),
+        ...duesIncomeEntries(dues, nameOf),
       ].sort(compareEntriesDesc),
-    [financeValue, challengesValue, nameOf],
+    [financeValue, challengesValue, dues, nameOf],
   )
 
   const years = useMemo(() => {
     const set = new Set(entries.map((e) => dayYear(e.date)).filter(Boolean))
+    for (const y of Object.keys(dues)) set.add(Number(y))
     set.add(thisYear)
     return [...set].sort((a, b) => b - a)
-  }, [entries, thisYear])
+  }, [entries, dues, thisYear])
 
   const yearEntries = useMemo(() => entries.filter((e) => dayYear(e.date) === year), [entries, year])
 
@@ -468,7 +479,9 @@ export function FinancePage() {
       <header className="page-header">
         <p className="eyebrow">Admin</p>
         <h1>Tài chính</h1>
-        <p className="lede">Thu chi quỹ CLB. Tiền phạt đã xác nhận nộp được cộng tự động.</p>
+        <p className="lede">
+          Thu chi quỹ CLB. Tiền phạt và hội phí đã xác nhận được cộng tự động.
+        </p>
       </header>
 
       {loading ? (
@@ -566,9 +579,18 @@ export function FinancePage() {
             >
               Sổ thu chi ({yearEntries.length})
             </button>
+            <button
+              type="button"
+              className={tab === 'dues' ? 'chip active' : 'chip'}
+              onClick={() => setTab('dues')}
+            >
+              Hội phí
+            </button>
           </div>
 
-          {tab === 'overview' ? (
+          {tab === 'dues' ? (
+            <FinanceDues year={year} dues={dues[year]} members={memberList} nameOf={nameOf} />
+          ) : tab === 'overview' ? (
             <>
               <section className="section panel">
                 <h2>Theo tháng</h2>
@@ -700,7 +722,13 @@ export function FinancePage() {
                             <>
                               <span className="penalty-pay-badge paid">Tự động</span> xác nhận bởi{' '}
                               {nameOf(e.createdBy)} ·{' '}
-                              <Link to="/rewards">Thưởng - Phạt</Link>
+                              {e.auto === 'penalty' ? (
+                                <Link to="/rewards">Thưởng - Phạt</Link>
+                              ) : (
+                                <button type="button" className="link-btn" onClick={() => setTab('dues')}>
+                                  Hội phí
+                                </button>
+                              )}
                             </>
                           ) : (
                             <>

@@ -3786,6 +3786,14 @@ code {
   align-items: flex-start;
 }
 
+.finance-dues-amount {
+  margin-bottom: 4px;
+}
+
+.finance-dues-search {
+  margin-bottom: 12px;
+}
+
 .finance-row-actions {
   display: flex;
   gap: 6px;

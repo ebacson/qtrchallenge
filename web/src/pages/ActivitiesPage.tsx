@@ -4,6 +4,7 @@ import { get, ref } from 'firebase/database'
 import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
 import { canViewOthersActivities } from '../lib/permissions'
+import { USER_PROFILES_PATH } from '../lib/userProfile'
 import { useSharedValue } from '../lib/sharedValue'
 import type { Activity } from '../types'
 
@@ -157,8 +158,8 @@ export function ActivitiesPage() {
     }
     let cancelled = false
     void Promise.all([
-      get(ref(db, `users/${targetUid}/fullName`)),
-      get(ref(db, `users/${targetUid}/avatar`)),
+      get(ref(db, `${USER_PROFILES_PATH}/${targetUid}/fullName`)),
+      get(ref(db, `${USER_PROFILES_PATH}/${targetUid}/avatar`)),
     ]).then(([nameSnap, avatarSnap]) => {
       if (cancelled) return
       setOwner({

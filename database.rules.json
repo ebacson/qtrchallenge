@@ -1,0 +1,89 @@
+{
+  "rules": {
+    "users": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('admin').val() === true",
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('admin').val() === true)",
+        "admin": {
+          ".validate": "root.child('users').child(auth.uid).child('admin').val() === true || newData.val() === data.val() || newData.val() === false"
+        },
+        "member": {
+          ".validate": "root.child('users').child(auth.uid).child('admin').val() === true || newData.val() === data.val() || newData.val() === false"
+        },
+        "memberSince": {
+          ".validate": "root.child('users').child(auth.uid).child('admin').val() === true || newData.val() === data.val()"
+        },
+        "isFullMarathonVerified": {
+          ".validate": "root.child('users').child(auth.uid).child('admin').val() === true || newData.val() === data.val() || newData.val() === false"
+        },
+        "isHalfMarathonVerified": {
+          ".validate": "root.child('users').child(auth.uid).child('admin').val() === true || newData.val() === data.val() || newData.val() === false"
+        },
+        "strava_activities": {
+          ".read": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('member').val() === true)"
+        }
+      }
+    },
+    "user_profiles": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('admin').val() === true)",
+        "admin": {
+          ".validate": "root.child('users').child(auth.uid).child('admin').val() === true || newData.val() === newData.parent().parent().parent().child('users').child($uid).child('admin').val()"
+        },
+        "member": {
+          ".validate": "root.child('users').child(auth.uid).child('admin').val() === true || newData.val() === newData.parent().parent().parent().child('users').child($uid).child('member').val()"
+        },
+        "memberSince": {
+          ".validate": "root.child('users').child(auth.uid).child('admin').val() === true || newData.val() === newData.parent().parent().parent().child('users').child($uid).child('memberSince').val()"
+        },
+        "isFullMarathonVerified": {
+          ".validate": "root.child('users').child(auth.uid).child('admin').val() === true || newData.val() === newData.parent().parent().parent().child('users').child($uid).child('isFullMarathonVerified').val()"
+        },
+        "isHalfMarathonVerified": {
+          ".validate": "root.child('users').child(auth.uid).child('admin').val() === true || newData.val() === newData.parent().parent().parent().child('users').child($uid).child('isHalfMarathonVerified').val()"
+        }
+      }
+    },
+    "challenges": {
+      ".read": "auth != null",
+      "$challengeId": {
+        ".write": "auth != null && root.child('users').child(auth.uid).child('admin').val() === true",
+        "user_challenges": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid"
+          }
+        }
+      }
+    },
+    "notifications": {
+      ".read": "auth != null",
+      "$notificationId": {
+        ".write": "auth != null && root.child('users').child(auth.uid).child('admin').val() === true",
+        "readBy": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid"
+          }
+        },
+        "likes": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid"
+          }
+        }
+      }
+    },
+    "settings": {
+      ".read": "auth != null",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('admin').val() === true"
+    },
+    "finance": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('admin').val() === true",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('admin').val() === true"
+    },
+    "EVENT": {
+      ".read": "auth != null",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('admin').val() === true"
+    }
+  }
+}

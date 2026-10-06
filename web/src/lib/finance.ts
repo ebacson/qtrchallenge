@@ -156,6 +156,11 @@ export function penaltyIncomeEntries(
   return out
 }
 
+/** Xóa mềm: giữ lại bản ghi để đối soát */
+export function softDeleteFields(uid: string): { deletedAt: number; deletedBy: string } {
+  return { deletedAt: Date.now(), deletedBy: uid }
+}
+
 export function signedAmount(entry: FinanceEntry): number {
   return entry.type === 'income' ? entry.amount : -entry.amount
 }

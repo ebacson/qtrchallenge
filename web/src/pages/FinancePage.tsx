@@ -22,6 +22,7 @@ import {
   parseTransactions,
   penaltyIncomeEntries,
   signedAmount,
+  softDeleteFields,
   type FinanceEntry,
   type FinanceType,
 } from '../lib/finance'
@@ -62,7 +63,7 @@ function FinanceForm({
   const [type, setType] = useState<FinanceType>(entry?.type ?? 'expense')
   const [amount, setAmount] = useState(entry ? String(entry.amount) : '')
   const [category, setCategory] = useState(entry?.category ?? FINANCE_CATEGORIES.expense[0].value)
-  const [date, setDate] = useState(dayToInputDate(entry?.date ?? msToDay(Date.now())))
+  const [date, setDate] = useState(() => dayToInputDate(entry?.date ?? msToDay(Date.now())))
   const [note, setNote] = useState(entry?.note ?? '')
   const [memberUid, setMemberUid] = useState(entry?.memberUid ?? '')
   const [challengeId, setChallengeId] = useState(entry?.challengeId ?? '')
@@ -306,7 +307,8 @@ export function FinancePage() {
   const loading = financeValue === undefined || challengesValue === undefined
 
   const [tab, setTab] = useState<Tab>('overview')
-  const [year, setYear] = useState(() => dayYear(msToDay(Date.now())))
+  const [thisYear] = useState(() => dayYear(msToDay(Date.now())))
+  const [year, setYear] = useState(thisYear)
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [search, setSearch] = useState('')
@@ -353,9 +355,9 @@ export function FinancePage() {
 
   const years = useMemo(() => {
     const set = new Set(entries.map((e) => dayYear(e.date)).filter(Boolean))
-    set.add(dayYear(msToDay(Date.now())))
+    set.add(thisYear)
     return [...set].sort((a, b) => b - a)
-  }, [entries])
+  }, [entries, thisYear])
 
   const yearEntries = useMemo(() => entries.filter((e) => dayYear(e.date) === year), [entries, year])
 
@@ -375,14 +377,18 @@ export function FinancePage() {
   }, [entries, yearEntries, year, settings.openingBalance])
 
   const months = useMemo(() => {
-    let running = totals.openingOfYear
-    return MONTHS.map((month) => {
-      const rows = yearEntries.filter((e) => dayMonth(e.date) === month)
-      const income = rows.filter((e) => e.type === 'income').reduce((s, e) => s + e.amount, 0)
-      const expense = rows.filter((e) => e.type === 'expense').reduce((s, e) => s + e.amount, 0)
-      running += income - expense
-      return { month, income, expense, closing: running, count: rows.length }
+    const rows = MONTHS.map((month) => {
+      const list = yearEntries.filter((e) => dayMonth(e.date) === month)
+      const income = list.filter((e) => e.type === 'income').reduce((s, e) => s + e.amount, 0)
+      const expense = list.filter((e) => e.type === 'expense').reduce((s, e) => s + e.amount, 0)
+      return { month, income, expense, count: list.length }
     })
+    return rows.map((m, i) => ({
+      ...m,
+      closing:
+        totals.openingOfYear +
+        rows.slice(0, i + 1).reduce((s, r) => s + r.income - r.expense, 0),
+    }))
   }, [yearEntries, totals.openingOfYear])
 
   const byCategory = useMemo(() => {
@@ -438,11 +444,10 @@ export function FinancePage() {
     setMessage('')
     setError('')
     try {
-      // Xóa mềm: giữ lại bản ghi để đối soát
-      await update(ref(db, `${FINANCE_PATH}/transactions/${entry.storedYear}/${entry.id}`), {
-        deletedAt: Date.now(),
-        deletedBy: user.uid,
-      })
+      await update(
+        ref(db, `${FINANCE_PATH}/transactions/${entry.storedYear}/${entry.id}`),
+        softDeleteFields(user.uid),
+      )
       setMessage('Đã xóa khoản thu chi.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không xóa được')

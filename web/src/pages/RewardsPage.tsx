@@ -416,6 +416,20 @@ type MemberSummary = {
   entries: MemberEntry[]
 }
 
+type PaymentFilter = 'all' | 'owing' | 'settled'
+
+const PAYMENT_FILTERS: { value: PaymentFilter; label: string }[] = [
+  { value: 'all', label: 'Tất cả' },
+  { value: 'owing', label: 'Chưa nộp' },
+  { value: 'settled', label: 'Đã nộp đủ' },
+]
+
+/** Không bị phạt thì không thuộc "Chưa nộp" hay "Đã nộp đủ". */
+function paymentStatusOf(m: MemberSummary): 'owing' | 'settled' | 'none' {
+  if (!(m.penalty > 0)) return 'none'
+  return m.penalty - m.paid > 0 ? 'owing' : 'settled'
+}
+
 type RewardRecipient = {
   uid: string
   name: string
@@ -494,6 +508,7 @@ function SummaryView({
     [reports, year],
   )
   const [openUid, setOpenUid] = useState<string | null>(null)
+  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all')
 
   const members = useMemo(() => {
     const map = new Map<string, MemberSummary>()
@@ -575,7 +590,17 @@ function SummaryView({
   const totalAbsent = members.reduce((sum, m) => sum + m.absentCount, 0)
   const totalPenalty = members.reduce((sum, m) => sum + m.penalty, 0)
   const totalPaid = members.reduce((sum, m) => sum + m.paid, 0)
-  const visibleMembers = members.filter((m) => matchesQuery(m.name, query))
+  const paymentCounts = {
+    all: members.length,
+    owing: members.filter((m) => paymentStatusOf(m) === 'owing').length,
+    settled: members.filter((m) => paymentStatusOf(m) === 'settled').length,
+  }
+  const visibleMembers = members.filter(
+    (m) =>
+      matchesQuery(m.name, query) &&
+      (paymentFilter === 'all' || paymentStatusOf(m) === paymentFilter),
+  )
+  const membersFiltered = query !== '' || paymentFilter !== 'all'
 
   if (finished.length === 0) {
     return <p className="empty">Chưa có thử thách nào kết thúc.</p>
@@ -650,16 +675,28 @@ function SummaryView({
       <section className="section panel">
         <h2>
           Theo thành viên{' '}
-          {query && (
+          {membersFiltered && (
             <span className="tiny muted">
               · {visibleMembers.length}/{members.length} người
             </span>
           )}
         </h2>
+        <div className="filter-row">
+          {PAYMENT_FILTERS.map((f) => (
+            <button
+              key={f.value}
+              type="button"
+              className={paymentFilter === f.value ? 'chip active' : 'chip'}
+              onClick={() => setPaymentFilter(f.value)}
+            >
+              {f.label} ({paymentCounts[f.value]})
+            </button>
+          ))}
+        </div>
         {visibleMembers.length === 0 && <p className="empty">Không tìm thấy thành viên phù hợp.</p>}
         <ul className="participant-list">
           {visibleMembers.map((m) => {
-            const open = openUid === m.uid || (query !== '' && visibleMembers.length === 1)
+            const open = openUid === m.uid || (membersFiltered && visibleMembers.length === 1)
             const owed = m.penalty - m.paid
             return (
               <li key={m.uid} className="summary-member">

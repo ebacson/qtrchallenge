@@ -237,6 +237,7 @@ export function downloadFinanceCsv(
   entries: FinanceEntry[],
   nameOf: (uid: string) => string,
   challengeName: (id: string) => string,
+  counted: (entry: FinanceEntry) => boolean,
 ): void {
   const header = [
     'Ngày',
@@ -248,6 +249,7 @@ export function downloadFinanceCsv(
     'Thử thách',
     'Nguồn',
     'Người nhập',
+    'Tính vào số dư',
   ]
   const lines = entries.map((e) =>
     [
@@ -260,6 +262,7 @@ export function downloadFinanceCsv(
       e.challengeId ? challengeName(e.challengeId) : '',
       e.auto ? 'Tự động' : 'Nhập tay',
       e.createdBy ? nameOf(e.createdBy) : '',
+      counted(e) ? 'Có' : 'Không (trước kỳ)',
     ]
       .map(csvCell)
       .join(','),

@@ -3794,6 +3794,10 @@ code {
   margin-bottom: 12px;
 }
 
+.finance-before {
+  opacity: 0.65;
+}
+
 .finance-row-actions {
   display: flex;
   gap: 6px;

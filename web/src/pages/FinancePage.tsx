@@ -7,6 +7,7 @@ import { db } from '../lib/firebase'
 import { useSharedValue } from '../lib/sharedValue'
 import { useUserProfiles } from '../lib/userWrites'
 import { formatVnd } from '../lib/rewardPenalty'
+import { parseChallengeDayStartMs } from '../lib/challengeRules'
 import {
   categoryLabel,
   compareEntriesDesc,
@@ -372,24 +373,42 @@ export function FinancePage() {
 
   const yearEntries = useMemo(() => entries.filter((e) => dayYear(e.date) === year), [entries, year])
 
+  // Số dư đầu kỳ là tiền quỹ tại ngày bắt đầu: các khoản trước ngày đó đã nằm trong số dư này
+  const openingMs = parseChallengeDayStartMs(settings.openingDate)
+  const openingYear = settings.openingDate ? dayYear(settings.openingDate) : null
+  const openingMonth = settings.openingDate ? dayMonth(settings.openingDate) : null
+  const inPeriod = useMemo(
+    () => (e: FinanceEntry) => openingMs == null || e.dateMs >= openingMs,
+    [openingMs],
+  )
+  const countedYearEntries = useMemo(() => yearEntries.filter(inPeriod), [yearEntries, inPeriod])
+
   const totals = useMemo(() => {
-    const income = yearEntries.filter((e) => e.type === 'income').reduce((s, e) => s + e.amount, 0)
-    const expense = yearEntries.filter((e) => e.type === 'expense').reduce((s, e) => s + e.amount, 0)
-    const beforeYear = entries
+    const counted = entries.filter(inPeriod)
+    const income = countedYearEntries
+      .filter((e) => e.type === 'income')
+      .reduce((s, e) => s + e.amount, 0)
+    const expense = countedYearEntries
+      .filter((e) => e.type === 'expense')
+      .reduce((s, e) => s + e.amount, 0)
+    const beforeYear = counted
       .filter((e) => dayYear(e.date) < year)
       .reduce((s, e) => s + signedAmount(e), 0)
-    const balance = settings.openingBalance + entries.reduce((s, e) => s + signedAmount(e), 0)
     return {
       income,
       expense,
       openingOfYear: settings.openingBalance + beforeYear,
-      balance,
+      balance: settings.openingBalance + counted.reduce((s, e) => s + signedAmount(e), 0),
     }
-  }, [entries, yearEntries, year, settings.openingBalance])
+  }, [entries, countedYearEntries, inPeriod, year, settings.openingBalance])
+
+  /** Năm đang xem nằm trước kỳ ghi sổ: chỉ xem tham khảo, không có số dư */
+  const beforeOpening = openingYear != null && year < openingYear
+  const isOpeningYear = openingYear != null && year === openingYear
 
   const months = useMemo(() => {
     const rows = MONTHS.map((month) => {
-      const list = yearEntries.filter((e) => dayMonth(e.date) === month)
+      const list = countedYearEntries.filter((e) => dayMonth(e.date) === month)
       const income = list.filter((e) => e.type === 'income').reduce((s, e) => s + e.amount, 0)
       const expense = list.filter((e) => e.type === 'expense').reduce((s, e) => s + e.amount, 0)
       return { month, income, expense, count: list.length }
@@ -397,14 +416,16 @@ export function FinancePage() {
     return rows.map((m, i) => ({
       ...m,
       closing:
-        totals.openingOfYear +
-        rows.slice(0, i + 1).reduce((s, r) => s + r.income - r.expense, 0),
+        beforeOpening || (isOpeningYear && openingMonth != null && m.month < openingMonth)
+          ? null
+          : totals.openingOfYear +
+            rows.slice(0, i + 1).reduce((s, r) => s + r.income - r.expense, 0),
     }))
-  }, [yearEntries, totals.openingOfYear])
+  }, [countedYearEntries, totals.openingOfYear, beforeOpening, isOpeningYear, openingMonth])
 
   const byCategory = useMemo(() => {
     const map = new Map<string, { type: FinanceType; amount: number; count: number }>()
-    for (const e of yearEntries) {
+    for (const e of countedYearEntries) {
       const key = `${e.type}:${e.category}`
       const item = map.get(key) ?? { type: e.type, amount: 0, count: 0 }
       item.amount += e.amount
@@ -414,7 +435,7 @@ export function FinancePage() {
     return [...map.entries()]
       .map(([key, v]) => ({ category: key.split(':')[1], ...v }))
       .sort((a, b) => (a.type === b.type ? b.amount - a.amount : a.type === 'income' ? -1 : 1))
-  }, [yearEntries])
+  }, [countedYearEntries])
 
   const query = foldText(search)
   const filtered = useMemo(
@@ -430,7 +451,8 @@ export function FinancePage() {
       ),
     [yearEntries, typeFilter, categoryFilter, query, nameOf],
   )
-  const filteredTotal = filtered.reduce((s, e) => s + signedAmount(e), 0)
+  const filteredTotal = filtered.filter(inPeriod).reduce((s, e) => s + signedAmount(e), 0)
+  const filteredBefore = filtered.filter((e) => !inPeriod(e)).length
   const categoryOptions = useMemo(
     () => [...new Set(yearEntries.map((e) => e.category))].sort(),
     [yearEntries],
@@ -471,6 +493,7 @@ export function FinancePage() {
       [...filtered].reverse(),
       nameOf,
       challengeName,
+      inPeriod,
     )
   }
 
@@ -519,17 +542,32 @@ export function FinancePage() {
             </div>
             <div className="stat">
               <strong className="stat-money stat-paid">{formatVnd(totals.income)}</strong>
-              <span>Thu {year}</span>
+              <span>{isOpeningYear ? `Thu từ ${settings.openingDate}` : `Thu ${year}`}</span>
             </div>
             <div className="stat">
               <strong className="stat-money stat-unpaid">{formatVnd(totals.expense)}</strong>
-              <span>Chi {year}</span>
+              <span>{isOpeningYear ? `Chi từ ${settings.openingDate}` : `Chi ${year}`}</span>
             </div>
           </div>
           <p className="tiny muted finance-opening">
-            Số dư đầu năm {year}: <strong>{formatVnd(totals.openingOfYear)}</strong> · Số dư đầu
-            kỳ {formatVnd(settings.openingBalance)}
-            {settings.openingDate ? ` (từ ${settings.openingDate})` : ''}{' '}
+            {beforeOpening ? (
+              <>
+                Năm {year} trước kỳ ghi sổ ({settings.openingDate}): các khoản chỉ để tham khảo,
+                không tính vào số dư.
+              </>
+            ) : isOpeningYear ? (
+              <>
+                Số dư đầu kỳ <strong>{formatVnd(settings.openingBalance)}</strong> tại ngày{' '}
+                {settings.openingDate}. Các khoản trước ngày này đã nằm trong số dư đầu kỳ nên
+                không cộng thêm.
+              </>
+            ) : (
+              <>
+                Số dư đầu năm {year}: <strong>{formatVnd(totals.openingOfYear)}</strong> · Số dư
+                đầu kỳ {formatVnd(settings.openingBalance)}
+                {settings.openingDate ? ` (từ ${settings.openingDate})` : ''}
+              </>
+            )}{' '}
             <button
               type="button"
               className="link-btn"
@@ -610,7 +648,7 @@ export function FinancePage() {
                           <td>{m.month}</td>
                           <td className="finance-in">{m.income ? formatVnd(m.income) : '—'}</td>
                           <td className="finance-out">{m.expense ? formatVnd(m.expense) : '—'}</td>
-                          <td>{formatVnd(m.closing)}</td>
+                          <td>{m.closing == null ? '—' : formatVnd(m.closing)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -694,6 +732,8 @@ export function FinancePage() {
               <div className="finance-ledger-summary">
                 <span className="tiny muted">
                   {filtered.length} khoản · Chênh lệch <strong>{signedVnd(filteredTotal)}</strong>
+                  {filteredBefore > 0 &&
+                    ` (không tính ${filteredBefore} khoản trước ngày ${settings.openingDate})`}
                 </span>
                 <button
                   type="button"
@@ -709,9 +749,18 @@ export function FinancePage() {
               ) : (
                 <ul className="participant-list">
                   {filtered.map((e) => (
-                    <li key={e.id} className="participant-row finance-row">
+                    <li
+                      key={e.id}
+                      className={`participant-row finance-row${inPeriod(e) ? '' : ' finance-before'}`}
+                    >
                       <div className="participant-meta">
                         <strong>{e.note || categoryLabel(e.category)}</strong>
+                        {!inPeriod(e) && (
+                          <span className="tiny">
+                            <span className="penalty-pay-badge">Trước kỳ</span> đã nằm trong số dư
+                            đầu kỳ, không cộng thêm
+                          </span>
+                        )}
                         <span className="tiny muted">
                           {e.date} · {categoryLabel(e.category)}
                           {e.memberUid && !e.auto ? ` · ${nameOf(e.memberUid)}` : ''}

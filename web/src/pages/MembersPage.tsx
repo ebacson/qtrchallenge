@@ -5,6 +5,8 @@ import {
   MemberTypeFilter,
   type MemberType,
 } from '../components/MemberTypeFilter'
+import { useAuth } from '../context/AuthContext'
+import { canViewOthersActivities } from '../lib/permissions'
 import { formatMemberSince } from '../lib/userProfile'
 import { useUserProfiles } from '../lib/userWrites'
 
@@ -19,6 +21,8 @@ type Member = {
 }
 
 export function MembersPage() {
+  const { user, profile } = useAuth()
+  const canViewOthers = canViewOthersActivities(profile)
   const profiles = useUserProfiles()
   const loading = profiles === null
   const [q, setQ] = useState('')
@@ -60,7 +64,11 @@ export function MembersPage() {
     <div className="page">
       <header className="page-header">
         <h1>Thành viên</h1>
-        <p className="lede">Danh sách runners trong club (theo level). Chạm vào một thành viên để xem hoạt động.</p>
+        <p className="lede">
+          {canViewOthers
+            ? 'Danh sách runners trong club (theo level). Chạm vào một thành viên để xem hoạt động.'
+            : 'Danh sách runners trong club (theo level). Chỉ thành viên chính thức mới xem được hoạt động của người khác.'}
+        </p>
       </header>
 
       <MemberTypeFilter value={memberType} onChange={setMemberType} items={members} />
@@ -80,9 +88,9 @@ export function MembersPage() {
         <p className="empty">Không có thành viên phù hợp.</p>
       ) : (
         <ul className="member-list">
-          {filtered.map((m) => (
-            <li key={m.id}>
-              <Link to={`/activities/${m.id}`} className="member-row" title="Xem hoạt động">
+          {filtered.map((m) => {
+            const content = (
+              <>
                 <div className="hof-avatar">
                   {m.avatar ? (
                     <img src={m.avatar} alt="" />
@@ -103,9 +111,20 @@ export function MembersPage() {
                     {m.member ? 'Chính thức' : 'Tự do'}
                   </span>
                 </div>
-              </Link>
-            </li>
-          ))}
+              </>
+            )
+            return (
+              <li key={m.id}>
+                {canViewOthers || m.id === user?.uid ? (
+                  <Link to={`/activities/${m.id}`} className="member-row" title="Xem hoạt động">
+                    {content}
+                  </Link>
+                ) : (
+                  <div className="member-row">{content}</div>
+                )}
+              </li>
+            )
+          })}
         </ul>
       )}
     </div>

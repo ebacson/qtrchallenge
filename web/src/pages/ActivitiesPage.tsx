@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { get, ref } from 'firebase/database'
 import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
+import { canViewOthersActivities } from '../lib/permissions'
 import { useSharedValue } from '../lib/sharedValue'
 import type { Activity } from '../types'
 
@@ -123,15 +124,16 @@ function ActivityMetrics({ a }: { a: Activity }) {
 }
 
 export function ActivitiesPage() {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const { uid: paramUid } = useParams()
   const targetUid = paramUid || user?.uid || ''
   const isSelf = !paramUid || paramUid === user?.uid
+  const allowed = isSelf || canViewOthersActivities(profile)
 
   const [typeFilter, setTypeFilter] = useState('all')
   const [owner, setOwner] = useState<{ fullName: string; avatar: string } | null>(null)
   const raw = useSharedValue<Record<string, Record<string, unknown>>>(
-    targetUid ? `users/${targetUid}/strava_activities` : null,
+    targetUid && allowed ? `users/${targetUid}/strava_activities` : null,
     isSelf ? undefined : 60_000,
   )
   const loading = raw === undefined
@@ -149,7 +151,7 @@ export function ActivitiesPage() {
   }, [targetUid])
 
   useEffect(() => {
-    if (isSelf || !targetUid) {
+    if (isSelf || !targetUid || !allowed) {
       setOwner(null)
       return
     }
@@ -167,7 +169,7 @@ export function ActivitiesPage() {
     return () => {
       cancelled = true
     }
-  }, [isSelf, targetUid])
+  }, [isSelf, targetUid, allowed])
 
   const types = useMemo(() => {
     const set = new Set(activities.map((a) => a.type).filter(Boolean))
@@ -201,6 +203,22 @@ export function ActivitiesPage() {
       pace: runKm > 0 ? formatPaceSeconds(runMoving / runKm) : '—',
     }
   }, [filtered])
+
+  if (!allowed) {
+    return (
+      <div className="page">
+        <header className="page-header">
+          <p className="eyebrow">
+            <Link to="/members">← Thành viên</Link>
+          </p>
+          <h1>Hoạt động</h1>
+        </header>
+        <p className="empty">
+          Chỉ thành viên chính thức và admin mới xem được hoạt động của thành viên khác.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="page">

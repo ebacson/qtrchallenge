@@ -8,6 +8,7 @@ import {
   Flag,
   House,
   Images,
+  Landmark,
   LifeBuoy,
   LogOut,
   RotateCw,
@@ -68,6 +69,7 @@ const adminGroup: MenuGroup = {
     { to: '/admin/challenges/new', label: 'Tạo thử thách', icon: CirclePlus },
     { to: '/admin/users', label: 'Quản lý thành viên', icon: UserCog },
     { to: '/admin/records', label: 'Xác thực thành tích', icon: ShieldCheck },
+    { to: '/finance', label: 'Tài chính', icon: Landmark },
   ],
 }
 

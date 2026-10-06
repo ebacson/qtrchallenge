@@ -3657,3 +3657,138 @@ code {
   }
 }
 
+.finance-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.finance-toolbar .search-field {
+  flex: 1;
+  min-width: 140px;
+  margin-bottom: 0;
+}
+
+.finance-toolbar .btn,
+.finance-ledger-summary .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.finance-stats {
+  margin-bottom: 8px;
+}
+
+.finance-opening {
+  margin: 0 0 16px;
+}
+
+.link-btn {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent, #d0102b);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.finance-form {
+  margin-bottom: 16px;
+}
+
+.finance-form h2 {
+  margin: 0;
+}
+
+.finance-form .filter-row {
+  margin-bottom: 0;
+}
+
+.finance-form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 640px) {
+  .finance-form-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.finance-table-wrap {
+  overflow-x: auto;
+}
+
+.finance-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+}
+
+.finance-table th,
+.finance-table td {
+  padding: 8px 6px;
+  text-align: right;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.finance-table th:first-child,
+.finance-table td:first-child {
+  text-align: left;
+}
+
+.finance-table tr.muted td {
+  color: var(--ink-soft);
+}
+
+.finance-table .finance-in {
+  color: var(--ok);
+}
+
+.finance-table .finance-out {
+  color: var(--danger);
+}
+
+.finance-ledger-tools {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.finance-ledger-tools .search-field {
+  margin-bottom: 0;
+}
+
+@media (min-width: 640px) {
+  .finance-ledger-tools {
+    grid-template-columns: 2fr 3fr;
+  }
+}
+
+.finance-ledger-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.finance-row {
+  align-items: flex-start;
+}
+
+.finance-row-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+

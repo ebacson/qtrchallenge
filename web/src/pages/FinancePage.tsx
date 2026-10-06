@@ -503,7 +503,7 @@ export function FinancePage() {
         <p className="eyebrow">Admin</p>
         <h1>Tài chính</h1>
         <p className="lede">
-          Thu chi quỹ CLB. Tiền phạt và hội phí đã xác nhận được cộng tự động.
+          Thu chi quỹ CLB. Tiền phạt và tiền quỹ đã xác nhận được cộng tự động.
         </p>
       </header>
 
@@ -622,7 +622,7 @@ export function FinancePage() {
               className={tab === 'dues' ? 'chip active' : 'chip'}
               onClick={() => setTab('dues')}
             >
-              Hội phí
+              Quỹ
             </button>
           </div>
 
@@ -775,7 +775,7 @@ export function FinancePage() {
                                 <Link to="/rewards">Thưởng - Phạt</Link>
                               ) : (
                                 <button type="button" className="link-btn" onClick={() => setTab('dues')}>
-                                  Hội phí
+                                  Quỹ
                                 </button>
                               )}
                             </>

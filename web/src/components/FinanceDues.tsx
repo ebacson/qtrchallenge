@@ -19,7 +19,7 @@ function foldText(value: string): string {
     .trim()
 }
 
-/** Hội phí năm: admin đặt mức, xác nhận từng thành viên chính thức đã đóng. */
+/** Quỹ năm: admin đặt mức (có thể 0đ), xác nhận từng thành viên chính thức đã đóng. */
 export function FinanceDues({
   year,
   dues,
@@ -32,7 +32,7 @@ export function FinanceDues({
   nameOf: (uid: string) => string
 }) {
   const { user } = useAuth()
-  const amount = dues?.amount ?? 0
+  const amount = dues?.amount ?? null
   const paidMap = dues?.members ?? {}
   const [amountDraft, setAmountDraft] = useState('')
   const [editingAmount, setEditingAmount] = useState(false)
@@ -63,9 +63,10 @@ export function FinanceDues({
   async function saveAmount(e: FormEvent) {
     e.preventDefault()
     if (!user) return
-    const value = Math.round(Number(amountDraft.replace(/[.,\s]/g, '')))
-    if (!(value > 0)) {
-      setError('Nhập mức hội phí lớn hơn 0.')
+    const digits = amountDraft.replace(/[.,\s]/g, '')
+    const value = Math.round(Number(digits))
+    if (!digits || !(value >= 0)) {
+      setError('Nhập mức quỹ (có thể là 0).')
       return
     }
     setError('')
@@ -82,8 +83,8 @@ export function FinanceDues({
   }
 
   async function markPaid(m: Member) {
-    if (!user || !(amount > 0)) return
-    if (!window.confirm(`Xác nhận ${m.name} đã đóng hội phí ${year}: ${formatVnd(amount)}?`)) return
+    if (!user || amount == null) return
+    if (!window.confirm(`Xác nhận ${m.name} đã đóng quỹ ${year}: ${formatVnd(amount)}?`)) return
     setBusyUid(m.uid)
     setError('')
     try {
@@ -96,7 +97,7 @@ export function FinanceDues({
   }
 
   async function undo(m: Member) {
-    if (!window.confirm(`Hủy xác nhận hội phí ${year} của ${m.name}?`)) return
+    if (!window.confirm(`Hủy xác nhận quỹ ${year} của ${m.name}?`)) return
     setBusyUid(m.uid)
     setError('')
     try {
@@ -110,11 +111,11 @@ export function FinanceDues({
 
   return (
     <section className="section panel">
-      <h2>Hội phí {year}</h2>
-      {editingAmount || !(amount > 0) ? (
+      <h2>Quỹ {year}</h2>
+      {editingAmount || amount == null ? (
         <form className="auth-form finance-dues-amount" onSubmit={(e) => void saveAmount(e)}>
           <label>
-            Mức hội phí năm {year} (đ / người)
+            Mức quỹ năm {year} (đ / người, có thể 0)
             <input
               inputMode="numeric"
               value={amountDraft}
@@ -124,9 +125,9 @@ export function FinanceDues({
           </label>
           <div className="btn-row">
             <button type="submit" className="btn primary compact">
-              Lưu mức hội phí
+              Lưu mức quỹ
             </button>
-            {amount > 0 && (
+            {amount != null && (
               <button
                 type="button"
                 className="btn ghost compact"
@@ -139,7 +140,7 @@ export function FinanceDues({
         </form>
       ) : (
         <p className="tiny muted">
-          Mức hội phí: <strong>{formatVnd(amount)}</strong> / người{' '}
+          Mức quỹ: <strong>{formatVnd(amount)}</strong> / người{' '}
           <button
             type="button"
             className="link-btn"
@@ -248,7 +249,7 @@ export function FinanceDues({
                         <button
                           type="button"
                           className="btn primary compact"
-                          disabled={busyUid === m.uid || !(amount > 0)}
+                          disabled={busyUid === m.uid || amount == null}
                           onClick={() => void markPaid(m)}
                         >
                           {busyUid === m.uid ? 'Đang lưu…' : 'Xác nhận đã đóng'}

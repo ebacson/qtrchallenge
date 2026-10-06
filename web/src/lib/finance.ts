@@ -6,7 +6,7 @@ export type FinanceType = 'income' | 'expense'
 
 export const FINANCE_CATEGORIES: Record<FinanceType, { value: string; label: string }[]> = {
   income: [
-    { value: 'dues', label: 'Hội phí' },
+    { value: 'dues', label: 'Quỹ' },
     { value: 'sponsor', label: 'Tài trợ' },
     { value: 'other_income', label: 'Thu khác' },
   ],
@@ -50,7 +50,7 @@ export type FinanceEntry = {
   updatedBy?: string
   /** Năm lưu trong `finance/transactions/{year}`; không có với khoản tự động */
   storedYear?: number
-  /** Khoản tự động (tiền phạt, hội phí đã đóng), chỉ đọc */
+  /** Khoản tự động (tiền phạt, quỹ đã đóng), chỉ đọc */
   auto?: 'penalty' | 'dues'
 }
 
@@ -158,7 +158,8 @@ export function penaltyIncomeEntries(
 
 export type DuesPayment = { amount: number; paidAt: number; confirmedBy: string }
 
-export type DuesYear = { amount: number; members: Record<string, DuesPayment> }
+/** `amount` null khi năm đó chưa đặt mức quỹ (0đ là mức hợp lệ) */
+export type DuesYear = { amount: number | null; members: Record<string, DuesPayment> }
 
 export function duesPaymentFields(amount: number, confirmedBy: string): DuesPayment {
   return { amount, paidAt: Date.now(), confirmedBy }
@@ -174,19 +175,21 @@ export function parseDues(value: unknown): Record<number, DuesYear> {
     const members: Record<string, DuesPayment> = {}
     for (const [uid, p] of Object.entries(asDict(dict.members) ?? {})) {
       const row = asDict(p)
-      if (!row || !(Number(row.amount) > 0)) continue
+      const amount = Number(row?.amount)
+      if (!row || !(amount >= 0)) continue
       members[uid] = {
-        amount: Number(row.amount),
+        amount,
         paidAt: Number(row.paidAt) || 0,
         confirmedBy: String(row.confirmedBy ?? ''),
       }
     }
-    out[year] = { amount: Number(asDict(dict.settings)?.amount) || 0, members }
+    const setting = Number(asDict(dict.settings)?.amount)
+    out[year] = { amount: setting >= 0 ? setting : null, members }
   }
   return out
 }
 
-/** Hội phí đã đóng, ghi nhận vào ngày xác nhận. */
+/** Quỹ đã đóng (khác 0đ), ghi nhận vào ngày xác nhận. */
 export function duesIncomeEntries(
   dues: Record<number, DuesYear>,
   nameOf: (uid: string) => string,
@@ -194,6 +197,7 @@ export function duesIncomeEntries(
   const out: FinanceEntry[] = []
   for (const [year, info] of Object.entries(dues)) {
     for (const [uid, p] of Object.entries(info.members)) {
+      if (!(p.amount > 0)) continue
       const date = msToDay(p.paidAt)
       out.push({
         id: `dues-${year}-${uid}`,
@@ -202,7 +206,7 @@ export function duesIncomeEntries(
         category: 'dues',
         date,
         dateMs: parseChallengeDayStartMs(date) ?? 0,
-        note: `Hội phí ${year} — ${nameOf(uid)}`,
+        note: `Quỹ ${year} — ${nameOf(uid)}`,
         memberUid: uid,
         createdAt: p.paidAt,
         createdBy: p.confirmedBy,

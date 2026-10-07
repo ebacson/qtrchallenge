@@ -2,8 +2,13 @@ import { Navigate } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { brandLogoSrc, brandTitle } from '../lib/brand'
+import type { UserProfile } from '../types'
 
-export function RequireAdmin({ children }: { children: ReactNode }) {
+type Allow = (profile: UserProfile | null) => boolean
+
+const isAdmin: Allow = (profile) => Boolean(profile?.admin)
+
+export function RequireAdmin({ children, allow = isAdmin }: { children: ReactNode; allow?: Allow }) {
   const { profile, loading } = useAuth()
 
   if (loading) {
@@ -16,7 +21,7 @@ export function RequireAdmin({ children }: { children: ReactNode }) {
     )
   }
 
-  if (!profile?.admin) {
+  if (!allow(profile)) {
     return <Navigate to="/" replace />
   }
 

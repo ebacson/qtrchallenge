@@ -78,7 +78,7 @@
       ".write": "auth != null && root.child('users').child(auth.uid).child('admin').val() === true"
     },
     "finance": {
-      ".read": "auth != null && root.child('users').child(auth.uid).child('admin').val() === true",
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('admin').val() === true || root.child('users').child(auth.uid).child('member').val() === true)",
       ".write": "auth != null && root.child('users').child(auth.uid).child('admin').val() === true"
     },
     "EVENT": {

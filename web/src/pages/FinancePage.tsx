@@ -304,7 +304,8 @@ function OpeningBalanceEditor({
 }
 
 export function FinancePage() {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
+  const canEdit = profile?.admin === true
   const financeValue = useSharedValue<Record<string, unknown>>(FINANCE_PATH)
   const challengesValue = useSharedValue<Record<string, Record<string, unknown>>>('challenges')
   const profiles = useUserProfiles()
@@ -314,6 +315,7 @@ export function FinancePage() {
   const [thisYear] = useState(() => dayYear(msToDay(Date.now())))
   const [year, setYear] = useState(thisYear)
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
+  const [categoryTypeFilter, setCategoryTypeFilter] = useState<TypeFilter>('all')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<FinanceEntry | 'new' | null>(null)
@@ -422,6 +424,7 @@ export function FinancePage() {
             rows.slice(0, i + 1).reduce((s, r) => s + r.income - r.expense, 0),
     }))
   }, [countedYearEntries, totals.openingOfYear, beforeOpening, isOpeningYear, openingMonth])
+  const activeMonths = months.filter((m) => m.count > 0)
 
   const byCategory = useMemo(() => {
     const map = new Map<string, { type: FinanceType; amount: number; count: number }>()
@@ -436,6 +439,13 @@ export function FinancePage() {
       .map(([key, v]) => ({ category: key.split(':')[1], ...v }))
       .sort((a, b) => (a.type === b.type ? b.amount - a.amount : a.type === 'income' ? -1 : 1))
   }, [countedYearEntries])
+  const visibleCategories = byCategory.filter(
+    (c) => categoryTypeFilter === 'all' || c.type === categoryTypeFilter,
+  )
+  const visibleCategoryTotal = visibleCategories.reduce(
+    (s, c) => s + (c.type === 'income' ? c.amount : -c.amount),
+    0,
+  )
 
   const query = foldText(search)
   const filtered = useMemo(
@@ -500,7 +510,7 @@ export function FinancePage() {
   return (
     <div className="page">
       <header className="page-header">
-        <p className="eyebrow">Admin</p>
+        <p className="eyebrow">Câu lạc bộ</p>
         <h1>Tài chính</h1>
         <p className="lede">
           Thu chi quỹ CLB. Tiền phạt và tiền quỹ đã xác nhận được cộng tự động.
@@ -522,17 +532,19 @@ export function FinancePage() {
                 ))}
               </select>
             </label>
-            <button
-              type="button"
-              className="btn primary"
-              onClick={() => {
-                setMessage('')
-                setEditingOpening(false)
-                setEditing('new')
-              }}
-            >
-              <Plus size={16} aria-hidden /> Thêm thu chi
-            </button>
+            {canEdit && (
+              <button
+                type="button"
+                className="btn primary"
+                onClick={() => {
+                  setMessage('')
+                  setEditingOpening(false)
+                  setEditing('new')
+                }}
+              >
+                <Plus size={16} aria-hidden /> Thêm thu chi
+              </button>
+            )}
           </div>
 
           <div className="stat-row finance-stats">
@@ -567,31 +579,36 @@ export function FinancePage() {
                 đầu kỳ {formatVnd(settings.openingBalance)}
                 {settings.openingDate ? ` (từ ${settings.openingDate})` : ''}
               </>
-            )}{' '}
-            <button
-              type="button"
-              className="link-btn"
-              onClick={() => {
-                setMessage('')
-                setEditing(null)
-                setEditingOpening(true)
-              }}
-            >
-              Sửa
-            </button>
+            )}
+            {canEdit && (
+              <>
+                {' '}
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={() => {
+                    setMessage('')
+                    setEditing(null)
+                    setEditingOpening(true)
+                  }}
+                >
+                  Sửa
+                </button>
+              </>
+            )}
           </p>
 
           {message && <p className="form-info">{message}</p>}
           {error && <p className="form-error">{error}</p>}
 
-          {editingOpening && (
+          {canEdit && editingOpening && (
             <OpeningBalanceEditor
               openingBalance={settings.openingBalance}
               openingDate={settings.openingDate}
               onDone={done}
             />
           )}
-          {editing && (
+          {canEdit && editing && (
             <FinanceForm
               key={editing === 'new' ? 'new' : editing.id}
               entry={editing === 'new' ? null : editing}
@@ -627,42 +644,80 @@ export function FinancePage() {
           </div>
 
           {tab === 'dues' ? (
-            <FinanceDues year={year} dues={dues[year]} members={memberList} nameOf={nameOf} />
+            <FinanceDues
+              year={year}
+              dues={dues[year]}
+              members={memberList}
+              nameOf={nameOf}
+              canEdit={canEdit}
+            />
           ) : tab === 'overview' ? (
             <>
               <section className="section panel">
                 <h2>Theo tháng</h2>
-                <div className="finance-table-wrap">
-                  <table className="finance-table">
-                    <thead>
-                      <tr>
-                        <th>Tháng</th>
-                        <th>Thu</th>
-                        <th>Chi</th>
-                        <th>Số dư cuối tháng</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {months.map((m) => (
-                        <tr key={m.month} className={m.count ? '' : 'muted'}>
-                          <td>{m.month}</td>
-                          <td className="finance-in">{m.income ? formatVnd(m.income) : '—'}</td>
-                          <td className="finance-out">{m.expense ? formatVnd(m.expense) : '—'}</td>
-                          <td>{m.closing == null ? '—' : formatVnd(m.closing)}</td>
+                {activeMonths.length === 0 ? (
+                  <p className="empty">Chưa có tháng nào có thu chi trong năm {year}.</p>
+                ) : (
+                  <div className="finance-table-wrap">
+                    <table className="finance-table">
+                      <thead>
+                        <tr>
+                          <th>Tháng</th>
+                          <th>Thu</th>
+                          <th>Chi</th>
+                          <th>Số dư cuối tháng</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {activeMonths.map((m) => (
+                          <tr key={m.month}>
+                            <td>{m.month}</td>
+                            <td className="finance-in">{m.income ? formatVnd(m.income) : '—'}</td>
+                            <td className="finance-out">
+                              {m.expense ? formatVnd(m.expense) : '—'}
+                            </td>
+                            <td>{m.closing == null ? '—' : formatVnd(m.closing)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </section>
 
               <section className="section panel">
                 <h2>Theo danh mục</h2>
-                {byCategory.length === 0 ? (
-                  <p className="empty">Chưa có khoản thu chi nào trong năm {year}.</p>
+                <div className="filter-row">
+                  {(
+                    [
+                      ['all', 'Tất cả'],
+                      ['income', 'Thu'],
+                      ['expense', 'Chi'],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={categoryTypeFilter === value ? 'chip active' : 'chip'}
+                      onClick={() => setCategoryTypeFilter(value)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {visibleCategories.length === 0 ? (
+                  <p className="empty">
+                    Chưa có khoản{' '}
+                    {categoryTypeFilter === 'income'
+                      ? 'thu'
+                      : categoryTypeFilter === 'expense'
+                        ? 'chi'
+                        : 'thu chi'}{' '}
+                    nào trong năm {year}.
+                  </p>
                 ) : (
                   <ul className="participant-list">
-                    {byCategory.map((c) => (
+                    {visibleCategories.map((c) => (
                       <li key={`${c.type}-${c.category}`} className="participant-row">
                         <div className="participant-meta">
                           <strong>{categoryLabel(c.category)}</strong>
@@ -678,6 +733,16 @@ export function FinancePage() {
                       </li>
                     ))}
                   </ul>
+                )}
+                {visibleCategories.length > 0 && (
+                  <p className="tiny muted">
+                    {categoryTypeFilter === 'income'
+                      ? 'Tổng thu'
+                      : categoryTypeFilter === 'expense'
+                        ? 'Tổng chi'
+                        : 'Chênh lệch'}
+                    : <strong>{signedVnd(visibleCategoryTotal)}</strong>
+                  </p>
                 )}
               </section>
             </>
@@ -786,7 +851,7 @@ export function FinancePage() {
                             </>
                           )}
                         </span>
-                        {!e.auto && (
+                        {canEdit && !e.auto && (
                           <span className="finance-row-actions">
                             <button
                               type="button"

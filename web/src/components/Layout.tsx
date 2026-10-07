@@ -24,8 +24,16 @@ import { useAuth } from '../context/AuthContext'
 import { brandLogoSrc, brandTitle } from '../lib/brand'
 import { reloadApp } from '../lib/pwa'
 import { formatBadgeCount, useUnreadNotificationCount } from '../lib/notifications'
+import { canViewFinance } from '../lib/permissions'
+import type { UserProfile } from '../types'
 
-type MenuItem = { to: string; label: string; icon: LucideIcon; end?: boolean }
+type MenuItem = {
+  to: string
+  label: string
+  icon: LucideIcon
+  end?: boolean
+  visible?: (profile: UserProfile | null) => boolean
+}
 type MenuGroup = { key: string; title?: string; items: MenuItem[] }
 
 const tabs: MenuItem[] = [
@@ -57,6 +65,7 @@ const menuGroups: MenuGroup[] = [
       { to: '/members', label: 'Thành viên', icon: Users },
       { to: '/hall-of-fame', label: 'Bảng vàng', icon: Trophy },
       { to: '/rewards', label: 'Thưởng - Phạt', icon: Wallet },
+      { to: '/finance', label: 'Tài chính', icon: Landmark, visible: canViewFinance },
       { to: '/support', label: 'Hỗ trợ', icon: LifeBuoy },
     ],
   },
@@ -69,7 +78,6 @@ const adminGroup: MenuGroup = {
     { to: '/admin/challenges/new', label: 'Tạo thử thách', icon: CirclePlus },
     { to: '/admin/users', label: 'Quản lý thành viên', icon: UserCog },
     { to: '/admin/records', label: 'Xác thực thành tích', icon: ShieldCheck },
-    { to: '/finance', label: 'Tài chính', icon: Landmark },
   ],
 }
 
@@ -82,7 +90,10 @@ export function Layout() {
   const menuId = useId()
   const unreadNotifications = useUnreadNotificationCount()
 
-  const navGroups = profile?.admin ? [...menuGroups, adminGroup] : menuGroups
+  const navGroups = (profile?.admin ? [...menuGroups, adminGroup] : menuGroups).map((group) => ({
+    ...group,
+    items: group.items.filter((item) => !item.visible || item.visible(profile)),
+  }))
 
   useEffect(() => {
     setMenuOpen(false)

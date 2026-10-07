@@ -7,6 +7,7 @@ import { HomePage } from './pages/HomePage'
 import { RequireAdmin } from './components/RequireAdmin'
 import { PwaUpdatePrompt } from './components/PwaUpdatePrompt'
 import { brandLogoSrc, brandTitle } from './lib/brand'
+import { canViewFinance } from './lib/permissions'
 
 /** Mỗi trang một chunk riêng; trang nằm trong named export. */
 function lazyPage<M extends Record<string, unknown>>(
@@ -121,7 +122,7 @@ function AppRoutes() {
         <Route
           path="finance"
           element={
-            <RequireAdmin>
+            <RequireAdmin allow={canViewFinance}>
               <FinancePage />
             </RequireAdmin>
           }

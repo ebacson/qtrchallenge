@@ -19,17 +19,19 @@ function foldText(value: string): string {
     .trim()
 }
 
-/** Quỹ năm: admin đặt mức (có thể 0đ), xác nhận từng thành viên chính thức đã đóng. */
+/** Quỹ năm: admin đặt mức (có thể 0đ), xác nhận từng thành viên chính thức đã đóng; thành viên chỉ xem. */
 export function FinanceDues({
   year,
   dues,
   members,
   nameOf,
+  canEdit,
 }: {
   year: number
   dues: DuesYear | undefined
   members: Member[]
   nameOf: (uid: string) => string
+  canEdit: boolean
 }) {
   const { user } = useAuth()
   const amount = dues?.amount ?? null
@@ -112,7 +114,17 @@ export function FinanceDues({
   return (
     <section className="section panel">
       <h2>Quỹ {year}</h2>
-      {editingAmount || amount == null ? (
+      {!canEdit ? (
+        <p className="tiny muted">
+          {amount == null ? (
+            'Chưa đặt mức quỹ năm này.'
+          ) : (
+            <>
+              Mức quỹ: <strong>{formatVnd(amount)}</strong> / người
+            </>
+          )}
+        </p>
+      ) : editingAmount || amount == null ? (
         <form className="auth-form finance-dues-amount" onSubmit={(e) => void saveAmount(e)}>
           <label>
             Mức quỹ năm {year} (đ / người, có thể 0)
@@ -231,7 +243,11 @@ export function FinanceDues({
                     </span>
                   ) : null}
                   <span className="penalty-pay">
-                    {paid ? (
+                    {!canEdit ? (
+                      <span className={`penalty-pay-badge ${paid ? 'paid' : 'unpaid'}`}>
+                        {paid ? '✓ Đã đóng' : 'Chưa đóng'}
+                      </span>
+                    ) : paid ? (
                       <>
                         <span className="penalty-pay-badge paid">✓ Đã đóng</span>
                         <button

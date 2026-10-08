@@ -666,7 +666,7 @@ export function FinancePage() {
                           <th>Tháng</th>
                           <th>Thu</th>
                           <th>Chi</th>
-                          <th>Số dư cuối tháng</th>
+                          <th>Tồn</th>
                         </tr>
                       </thead>
                       <tbody>

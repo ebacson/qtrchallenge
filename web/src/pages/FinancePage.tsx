@@ -748,7 +748,7 @@ export function FinancePage() {
                       ? 'Tổng thu'
                       : categoryTypeFilter === 'expense'
                         ? 'Tổng chi'
-                        : 'Chênh lệch'}
+                        : 'Cân đối'}
                     : <strong>{signedVnd(visibleCategoryTotal)}</strong>
                   </p>
                 )}
@@ -804,7 +804,7 @@ export function FinancePage() {
               </div>
               <div className="finance-ledger-summary">
                 <span className="tiny muted">
-                  {filtered.length} khoản · Chênh lệch <strong>{signedVnd(filteredTotal)}</strong>
+                  {filtered.length} khoản · Cân đối: <strong>{signedVnd(filteredTotal)}</strong>
                   {filteredBefore > 0 &&
                     ` (không tính ${filteredBefore} khoản trước ngày ${settings.openingDate})`}
                 </span>

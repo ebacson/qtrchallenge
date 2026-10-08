@@ -547,20 +547,6 @@ export function FinancePage() {
             )}
           </div>
 
-          <div className="stat-row finance-stats">
-            <div className="stat">
-              <strong className="stat-money">{formatVnd(totals.balance)}</strong>
-              <span>Số dư hiện tại</span>
-            </div>
-            <div className="stat">
-              <strong className="stat-money stat-paid">{formatVnd(totals.income)}</strong>
-              <span>{isOpeningYear ? `Thu từ ${settings.openingDate}` : `Thu ${year}`}</span>
-            </div>
-            <div className="stat">
-              <strong className="stat-money stat-unpaid">{formatVnd(totals.expense)}</strong>
-              <span>{isOpeningYear ? `Chi từ ${settings.openingDate}` : `Chi ${year}`}</span>
-            </div>
-          </div>
           <p className="tiny muted finance-opening">
             {beforeOpening ? (
               <>
@@ -597,6 +583,20 @@ export function FinancePage() {
               </>
             )}
           </p>
+          <div className="stat-row finance-stats">
+            <div className="stat">
+              <strong className="stat-money">{formatVnd(totals.balance)}</strong>
+              <span>Số dư hiện tại</span>
+            </div>
+            <div className="stat">
+              <strong className="stat-money stat-paid">{formatVnd(totals.income)}</strong>
+              <span>{isOpeningYear ? `Thu từ ${settings.openingDate}` : `Thu ${year}`}</span>
+            </div>
+            <div className="stat">
+              <strong className="stat-money stat-unpaid">{formatVnd(totals.expense)}</strong>
+              <span>{isOpeningYear ? `Chi từ ${settings.openingDate}` : `Chi ${year}`}</span>
+            </div>
+          </div>
 
           {message && <p className="form-info">{message}</p>}
           {error && <p className="form-error">{error}</p>}

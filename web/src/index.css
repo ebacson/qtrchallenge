@@ -3678,11 +3678,11 @@ code {
 }
 
 .finance-stats {
-  margin-bottom: 8px;
+  margin-bottom: 16px;
 }
 
 .finance-opening {
-  margin: 0 0 16px;
+  margin: 0 0 8px;
 }
 
 .link-btn {

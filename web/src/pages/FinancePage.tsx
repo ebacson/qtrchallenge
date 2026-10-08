@@ -424,7 +424,8 @@ export function FinancePage() {
             rows.slice(0, i + 1).reduce((s, r) => s + r.income - r.expense, 0),
     }))
   }, [countedYearEntries, totals.openingOfYear, beforeOpening, isOpeningYear, openingMonth])
-  const activeMonths = months.filter((m) => m.count > 0)
+  const isOpeningMonth = (month: number) => isOpeningYear && month === openingMonth
+  const activeMonths = months.filter((m) => m.count > 0 || isOpeningMonth(m.month))
 
   const byCategory = useMemo(() => {
     const map = new Map<string, { type: FinanceType; amount: number; count: number }>()
@@ -671,7 +672,14 @@ export function FinancePage() {
                       <tbody>
                         {activeMonths.map((m) => (
                           <tr key={m.month}>
-                            <td>{m.month}</td>
+                            <td>
+                              {m.month}
+                              {isOpeningMonth(m.month) && (
+                                <span className="tiny muted finance-month-note">
+                                  Đầu kỳ {formatVnd(settings.openingBalance)}
+                                </span>
+                              )}
+                            </td>
                             <td className="finance-in">{m.income ? formatVnd(m.income) : '—'}</td>
                             <td className="finance-out">
                               {m.expense ? formatVnd(m.expense) : '—'}

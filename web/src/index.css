@@ -3685,6 +3685,11 @@ code {
   margin: 0 0 8px;
 }
 
+.finance-month-note {
+  display: block;
+  white-space: nowrap;
+}
+
 .link-btn {
   border: 0;
   background: none;

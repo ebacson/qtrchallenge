@@ -1,28 +1,28 @@
-import { useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { ref, set } from 'firebase/database'
-import { ExternalLink, Link2, Phone, Plus, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, ExternalLink, Link2, Phone, Plus, Trash2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
 import { useSharedValue } from '../lib/sharedValue'
+import { USER_PROFILES_PATH } from '../lib/userProfile'
 
-type Contact = { name: string; role?: string; phone: string }
+type Contact = { uid?: string; name: string; role: string; phone: string; avatar?: string }
 
-const groups: { title: string; contacts: Contact[] }[] = [
-  {
-    title: 'Ban chủ nhiệm',
-    contacts: [
-      { name: 'Hoàng Minh An', role: 'Chủ nhiệm', phone: '0973.234.555' },
-      { name: 'Nguyễn Ngọc Chiến', role: 'PCN TT', phone: '0914.185.285' },
-      { name: 'Trần Mạnh Thường', role: 'PCN Đối ngoại', phone: '0914.145.575' },
-      { name: 'Trương Công Tuyên', role: 'PCN Hậu cần', phone: '0907.779.995' },
-      { name: 'Lê Thị Đoài', role: 'Thủ quỹ', phone: '0918.190.555' },
-    ],
-  },
-  {
-    title: 'CNTT - Quản lý Web app',
-    contacts: [{ name: 'Tạ Bắc Sơn', phone: '0913.485.889' }],
-  },
+/** Lưu dạng `{ items, updatedAt, updatedBy }`; chưa có node thì dùng danh sách mặc định. */
+const BOARD_PATH = 'settings/support/board'
+const IT_PATH = 'settings/support/it'
+
+const DEFAULT_BOARD: Contact[] = [
+  { name: 'Hoàng Minh An', role: 'Chủ nhiệm', phone: '0973.234.555' },
+  { name: 'Nguyễn Ngọc Chiến', role: 'PCN TT', phone: '0914.185.285' },
+  { name: 'Trần Mạnh Thường', role: 'PCN Đối ngoại', phone: '0914.145.575' },
+  { name: 'Trương Công Tuyên', role: 'PCN Hậu cần', phone: '0907.779.995' },
+  { name: 'Lê Thị Đoài', role: 'Thủ quỹ', phone: '0918.190.555' },
 ]
+
+const DEFAULT_IT: Contact[] = [{ name: 'Tạ Bắc Sơn', role: '', phone: '0913.485.889' }]
+
+const PHONE_RE = /^[0-9+().\s-]{6,20}$/
 
 type SupportLink = { label: string; url: string }
 
@@ -109,6 +109,270 @@ function parseLinks(raw: unknown): SupportLink[] {
       return { label: String(row.label ?? '').trim(), url: String(row.url ?? '').trim() }
     })
     .filter((l) => l.url)
+}
+
+function parseContacts(raw: unknown): Contact[] {
+  if (raw == null || typeof raw !== 'object') return []
+  const values = Array.isArray(raw)
+    ? raw
+    : Object.entries(raw as Record<string, unknown>)
+        .sort(([a], [b]) => Number(a) - Number(b))
+        .map(([, v]) => v)
+  return values
+    .map((v) => {
+      const row = (v ?? {}) as Record<string, unknown>
+      const contact: Contact = {
+        name: String(row.name ?? '').trim(),
+        role: String(row.role ?? '').trim(),
+        phone: String(row.phone ?? '').trim(),
+      }
+      if (typeof row.uid === 'string' && row.uid) contact.uid = row.uid
+      if (typeof row.avatar === 'string' && row.avatar) contact.avatar = row.avatar
+      return contact
+    })
+    .filter((c) => c.name)
+}
+
+type Profiles = Record<string, Record<string, unknown>>
+
+function ContactSection({
+  title,
+  path,
+  defaults,
+}: {
+  title: string
+  path: string
+  defaults: Contact[]
+}) {
+  const { user, profile } = useAuth()
+  const isAdmin = Boolean(profile?.admin)
+  const value = useSharedValue<{ items?: unknown }>(path)
+  const contacts = value ? parseContacts(value.items) : defaults
+  const [draft, setDraft] = useState<Contact[] | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  // Chỉ tải hồ sơ thành viên khi Admin đang sửa
+  const profiles = useSharedValue<Profiles>(draft ? USER_PROFILES_PATH : null, 24 * 60 * 60_000)
+
+  const candidates = useMemo(() => {
+    if (!draft || !profiles) return []
+    const taken = new Set(draft.map((c) => c.uid).filter(Boolean))
+    return Object.entries(profiles)
+      .filter(([uid, p]) => p?.member === true && !taken.has(uid))
+      .map(([uid, p]) => ({ uid, name: String(p.fullName ?? '').trim() || 'Thành viên', profile: p }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
+  }, [draft, profiles])
+
+  function updateRow(index: number, patch: Partial<Contact>) {
+    setDraft((rows) => rows?.map((r, i) => (i === index ? { ...r, ...patch } : r)) ?? null)
+  }
+
+  function moveRow(index: number, delta: number) {
+    setDraft((rows) => {
+      if (!rows) return rows
+      const target = index + delta
+      if (target < 0 || target >= rows.length) return rows
+      const next = [...rows]
+      ;[next[index], next[target]] = [next[target], next[index]]
+      return next
+    })
+  }
+
+  function addMember(uid: string) {
+    const picked = candidates.find((c) => c.uid === uid)
+    if (!picked) return
+    const avatar = typeof picked.profile.avatar === 'string' ? picked.profile.avatar : ''
+    setDraft((rows) => [
+      ...(rows ?? []),
+      {
+        uid,
+        name: picked.name,
+        role: '',
+        phone: String(picked.profile.phone ?? '').trim(),
+        ...(avatar ? { avatar } : {}),
+      },
+    ])
+  }
+
+  async function save(e: FormEvent) {
+    e.preventDefault()
+    if (!draft || !user) return
+    const items = draft.map((c) => ({ ...c, name: c.name.trim(), role: c.role.trim(), phone: c.phone.trim() }))
+    const unnamed = items.find((c) => !c.name)
+    if (unnamed) {
+      setError('Mỗi người cần có tên hiển thị')
+      return
+    }
+    const badPhone = items.find((c) => c.phone && !PHONE_RE.test(c.phone))
+    if (badPhone) {
+      setError(`Số điện thoại không hợp lệ (${badPhone.name})`)
+      return
+    }
+    setBusy(true)
+    setError('')
+    try {
+      await set(ref(db, path), {
+        items: items.map((c) => ({
+          name: c.name,
+          role: c.role,
+          phone: c.phone,
+          ...(c.uid ? { uid: c.uid } : {}),
+          ...(c.avatar ? { avatar: c.avatar } : {}),
+        })),
+        updatedAt: Date.now(),
+        updatedBy: user.uid,
+      })
+      setDraft(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không lưu được')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="section panel">
+      <div className="section-head">
+        <h2>{title}</h2>
+        {isAdmin && !draft && value !== undefined && (
+          <button
+            type="button"
+            className="btn ghost compact"
+            onClick={() => {
+              setDraft(contacts)
+              setError('')
+            }}
+          >
+            Sửa
+          </button>
+        )}
+      </div>
+
+      {value === undefined ? (
+        <p className="empty">Đang tải…</p>
+      ) : draft ? (
+        <form className="support-link-form" onSubmit={(e) => void save(e)}>
+          {draft.length === 0 && <p className="empty">Chưa có ai. Thêm từ danh sách thành viên chính thức bên dưới.</p>}
+          {draft.map((c, i) => (
+            <div key={c.uid ?? `row-${i}`} className="support-link-edit">
+              <div className="hof-avatar">
+                {c.avatar ? <img src={c.avatar} alt="" /> : <span>{initials(c.name)}</span>}
+              </div>
+              <div className="support-link-inputs">
+                <input
+                  value={c.name}
+                  onChange={(e) => updateRow(i, { name: e.target.value })}
+                  placeholder="Họ tên"
+                  maxLength={60}
+                />
+                <div className="support-contact-inputs">
+                  <input
+                    value={c.role}
+                    onChange={(e) => updateRow(i, { role: e.target.value })}
+                    placeholder="Chức vụ (tùy chọn)"
+                    maxLength={40}
+                  />
+                  <input
+                    type="tel"
+                    inputMode="tel"
+                    value={c.phone}
+                    onChange={(e) => updateRow(i, { phone: e.target.value })}
+                    placeholder="Số điện thoại"
+                    maxLength={20}
+                  />
+                </div>
+              </div>
+              <div className="support-contact-actions">
+                <button
+                  type="button"
+                  className="btn ghost compact"
+                  aria-label="Lên trên"
+                  disabled={i === 0}
+                  onClick={() => moveRow(i, -1)}
+                >
+                  <ArrowUp size={16} />
+                </button>
+                <button
+                  type="button"
+                  className="btn ghost compact"
+                  aria-label="Xuống dưới"
+                  disabled={i === draft.length - 1}
+                  onClick={() => moveRow(i, 1)}
+                >
+                  <ArrowDown size={16} />
+                </button>
+                <button
+                  type="button"
+                  className="btn ghost compact danger"
+                  aria-label={`Bỏ ${c.name}`}
+                  onClick={() => setDraft((rows) => rows?.filter((_, j) => j !== i) ?? null)}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+          ))}
+          <label className="search-field support-contact-add">
+            <span className="sr-only">Thêm thành viên chính thức</span>
+            <select
+              value=""
+              disabled={!profiles}
+              onChange={(e) => addMember(e.target.value)}
+            >
+              <option value="">
+                {profiles ? '+ Thêm thành viên chính thức…' : 'Đang tải danh sách thành viên…'}
+              </option>
+              {candidates.map((m) => (
+                <option key={m.uid} value={m.uid}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {error && <p className="form-error">{error}</p>}
+          <div className="cta-row">
+            <button type="submit" className="btn primary" disabled={busy}>
+              {busy ? 'Đang lưu…' : 'Lưu'}
+            </button>
+            <button
+              type="button"
+              className="btn ghost"
+              disabled={busy}
+              onClick={() => setDraft(null)}
+            >
+              Hủy
+            </button>
+          </div>
+        </form>
+      ) : contacts.length === 0 ? (
+        <p className="empty">Chưa có thông tin.</p>
+      ) : (
+        <ul className="participant-list support-list">
+          {contacts.map((c, i) => (
+            <li key={c.uid ?? `${c.name}-${i}`} className="participant-row">
+              <div className="hof-avatar">
+                {c.avatar ? <img src={c.avatar} alt="" /> : <span>{initials(c.name)}</span>}
+              </div>
+              <div className="participant-meta">
+                <strong>{c.name}</strong>
+                {c.role && <span className="tiny muted">{c.role}</span>}
+              </div>
+              {c.phone && (
+                <a
+                  className="btn ghost compact support-call"
+                  href={`tel:${c.phone.replace(/[^\d+]/g, '')}`}
+                  aria-label={`Gọi ${c.name}`}
+                >
+                  <Phone size={16} aria-hidden />
+                  {c.phone}
+                </a>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
 }
 
 function LinkSection({
@@ -268,33 +532,8 @@ export function SupportPage() {
         <h1>☎ Liên hệ hỗ trợ</h1>
       </header>
 
-      {groups.map((g) => (
-        <section key={g.title} className="section panel">
-          <h2>{g.title}</h2>
-          <ul className="participant-list support-list">
-            {g.contacts.map((c) => (
-              <li key={c.phone} className="participant-row">
-                <div className="hof-avatar">
-                  <span>{initials(c.name)}</span>
-                </div>
-                <div className="participant-meta">
-                  <strong>{c.name}</strong>
-                  {c.role && <span className="tiny muted">{c.role}</span>}
-                </div>
-                <a
-                  className="btn ghost compact support-call"
-                  href={`tel:${c.phone.replace(/\D/g, '')}`}
-                  aria-label={`Gọi ${c.name}`}
-                >
-                  <Phone size={16} aria-hidden />
-                  {c.phone}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
-
+      <ContactSection title="Ban chủ nhiệm" path={BOARD_PATH} defaults={DEFAULT_BOARD} />
+      <ContactSection title="CNTT - Quản lý Web app" path={IT_PATH} defaults={DEFAULT_IT} />
       <LinkSection title="Quỹ CLB" path={FUND_PATH} defaults={DEFAULT_FUND_LINKS} />
       <LinkSection title="Các group của QTR" path={GROUPS_PATH} defaults={groupDefaults} />
     </div>

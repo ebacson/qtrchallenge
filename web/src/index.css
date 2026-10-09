@@ -2804,6 +2804,27 @@ code {
   font-size: 0.9rem;
 }
 
+.support-contact-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.support-contact-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.support-contact-actions .btn {
+  padding: 4px 8px;
+}
+
+.support-contact-add {
+  align-self: flex-start;
+}
+
 .support-link-add {
   align-self: flex-start;
   display: inline-flex;

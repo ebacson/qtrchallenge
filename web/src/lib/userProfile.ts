@@ -12,6 +12,7 @@ export const PROFILE_FIELDS = [
   'level',
   'member',
   'memberSince',
+  'memberUntil',
   'admin',
   'phone',
   'gender',

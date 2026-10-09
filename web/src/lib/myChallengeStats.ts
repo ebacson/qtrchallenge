@@ -9,6 +9,7 @@ import {
 import {
   absentPenaltyFor,
   applyPenaltyWaiver,
+  countsAsOfficial,
   isRewardEligible,
   participantCompletion,
   type ParticipantCompletion,
@@ -43,6 +44,7 @@ export function useMyChallengeEntries(): MyChallengeEntry[] | null {
   const raw = useSharedValue<Record<string, Record<string, unknown>>>(user ? 'challenges' : null)
   const isMember = Boolean(profile?.member)
   const memberSince = profile?.memberSince
+  const memberUntil = profile?.memberUntil
 
   return useMemo(() => {
     if (!user) return []
@@ -55,9 +57,12 @@ export function useMyChallengeEntries(): MyChallengeEntry[] | null {
         user.uid
       ]
       const joined = row != null
-      // Thưởng – phạt: thành viên chính thức, thử thách đã kết thúc từ REWARD_START_YEAR
+      // Thưởng – phạt: thành viên chính thức (kể cả đã chuyển Tự do sau khi thử thách kết thúc),
+      // thử thách đã kết thúc từ REWARD_START_YEAR
       const penalized =
-        isMember && challenge.status === STATUS_FINISHED && isRewardEligible(challenge)
+        countsAsOfficial({ member: isMember, memberUntil }, challenge) &&
+        challenge.status === STATUS_FINISHED &&
+        isRewardEligible(challenge)
       const payment = challenge.penaltyPayments?.[user.uid]
       let completion: ParticipantCompletion | null = null
       let penalty = 0
@@ -102,7 +107,7 @@ export function useMyChallengeEntries(): MyChallengeEntry[] | null {
       })
     }
     return list.sort((a, b) => b.endMs - a.endMs)
-  }, [raw, user, isMember, memberSince])
+  }, [raw, user, isMember, memberSince, memberUntil])
 }
 
 /** Số thử thách và tổng tiền phạt người dùng hiện tại chưa nộp. */

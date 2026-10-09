@@ -14,6 +14,9 @@
         "memberSince": {
           ".validate": "root.child('users').child(auth.uid).child('admin').val() === true || newData.val() === data.val()"
         },
+        "memberUntil": {
+          ".validate": "root.child('users').child(auth.uid).child('admin').val() === true || newData.val() === data.val()"
+        },
         "isFullMarathonVerified": {
           ".validate": "root.child('users').child(auth.uid).child('admin').val() === true || newData.val() === data.val() || newData.val() === false"
         },
@@ -37,6 +40,9 @@
         },
         "memberSince": {
           ".validate": "root.child('users').child(auth.uid).child('admin').val() === true || newData.val() === newData.parent().parent().parent().child('users').child($uid).child('memberSince').val()"
+        },
+        "memberUntil": {
+          ".validate": "root.child('users').child(auth.uid).child('admin').val() === true || newData.val() === newData.parent().parent().parent().child('users').child($uid).child('memberUntil').val()"
         },
         "isFullMarathonVerified": {
           ".validate": "root.child('users').child(auth.uid).child('admin').val() === true || newData.val() === newData.parent().parent().parent().child('users').child($uid).child('isFullMarathonVerified').val()"

@@ -58,6 +58,7 @@ function mapProfile(id: string, data: Record<string, unknown>): UserProfile {
     admin: Boolean(data.admin),
     member: Boolean(data.member),
     memberSince: Number(data.memberSince) || undefined,
+    memberUntil: Number(data.memberUntil) || undefined,
     level: Number(data.level ?? 0) || 0,
   }
 }

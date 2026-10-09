@@ -22,6 +22,7 @@ type AdminUser = {
   level: number
   member: boolean
   memberSince: number
+  memberUntil: number
   admin: boolean
   phone: string
   gender: string
@@ -78,6 +79,13 @@ const DATE_TIME = new Intl.DateTimeFormat('vi-VN', {
   hour12: false,
 })
 
+type MemberDateField = 'memberSince' | 'memberUntil'
+
+const MEMBER_DATE_LABELS: Record<MemberDateField, string> = {
+  memberSince: 'ngày chính thức',
+  memberUntil: 'ngày hết chính thức',
+}
+
 /** ms → giờ Việt Nam kèm ngày; '' nếu chưa có */
 function formatDateTime(ms: number): string {
   return ms > 0 ? DATE_TIME.format(new Date(ms)) : ''
@@ -95,7 +103,11 @@ export function AdminUsersPage() {
   const challenges = useSharedValue<Record<string, Record<string, unknown>>>('challenges')
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<FullSyncSummary | null>(null)
-  const [editingSince, setEditingSince] = useState<{ uid: string; value: string } | null>(null)
+  const [editingSince, setEditingSince] = useState<{
+    uid: string
+    field: MemberDateField
+    value: string
+  } | null>(null)
   const users = useMemo<AdminUser[]>(
     () =>
       Object.entries(profiles ?? {})
@@ -107,6 +119,7 @@ export function AdminUsersPage() {
           level: Number(row.level ?? 0) || 0,
           member: Boolean(row.member),
           memberSince: Number(row.memberSince) || 0,
+          memberUntil: Number(row.memberUntil) || 0,
           admin: Boolean(row.admin),
           phone: String(row.phone ?? ''),
           gender: String(row.gender ?? ''),
@@ -183,10 +196,14 @@ export function AdminUsersPage() {
     })
   }, [users, q, memberType])
 
-  /** Cảnh báo khoản phạt chưa nộp: khi không còn là chính thức, khoản này không còn hiện ở đâu */
-  function unpaidPenaltyWarning(target: AdminUser, action = 'chuyển'): string {
-    if (!target.member) return ''
-    const unpaid = unpaidPenaltiesOf(challenges, target.id, target.memberSince || undefined)
+  /** Cảnh báo khoản phạt chưa nộp trước khi chuyển Tự do hoặc xóa */
+  function unpaidPenaltyWarning(target: AdminUser, action: 'chuyển' | 'xóa' = 'chuyển'): string {
+    if (!target.member && !target.memberUntil) return ''
+    const unpaid = unpaidPenaltiesOf(challenges, target.id, {
+      member: target.member,
+      memberSince: target.memberSince || undefined,
+      memberUntil: target.memberUntil || undefined,
+    })
     if (!unpaid.length) return ''
     const total = unpaid.reduce((s, p) => s + p.amount, 0)
     const lines = unpaid.slice(0, 8).map((p) => `• ${p.name}: ${formatVnd(p.amount)}`)
@@ -194,8 +211,10 @@ export function AdminUsersPage() {
     return (
       `\n\n⚠️ Còn nợ ${formatVnd(total)} tiền phạt chưa nộp ở ${unpaid.length} thử thách:\n` +
       `${lines.join('\n')}\n\n` +
-      `Sau khi ${action}, các khoản này không còn hiện ở trang Thưởng - Phạt. ` +
-      'Nên xác nhận đã nộp hoặc miễn phạt trước.'
+      (action === 'chuyển'
+        ? 'Các khoản này vẫn hiện ở trang Thưởng - Phạt (ghi "Đã chuyển Tự do") để tiếp tục thu.'
+        : 'Sau khi xóa, các khoản này không còn hiện ở trang Thưởng - Phạt. ' +
+          'Nên xác nhận đã nộp hoặc miễn phạt trước.')
     )
   }
 
@@ -222,7 +241,9 @@ export function AdminUsersPage() {
       await updateUser(
         uid,
         field === 'member'
-          ? { member: value, memberSince: value ? Date.now() : null }
+          ? value
+            ? { member: true, memberSince: Date.now(), memberUntil: null }
+            : { member: false, memberUntil: Date.now() }
           : { admin: value },
       )
       setMessage(
@@ -241,15 +262,18 @@ export function AdminUsersPage() {
     }
   }
 
-  function startEditSince(target: AdminUser) {
+  function startEditSince(target: AdminUser, field: MemberDateField) {
+    const current = target[field]
     setEditingSince({
       uid: target.id,
-      value: target.memberSince ? inputDateFromMs(target.memberSince) : '',
+      field,
+      value: current ? inputDateFromMs(current) : '',
     })
   }
 
   async function saveMemberSince(target: AdminUser) {
     if (!editingSince) return
+    const { field } = editingSince
     const ms = msFromInputDate(editingSince.value)
     if (editingSince.value && ms === null) {
       setError('Ngày không hợp lệ.')
@@ -259,18 +283,60 @@ export function AdminUsersPage() {
     setError('')
     setMessage('')
     try {
-      await updateUser(target.id, { memberSince: ms })
+      await updateUser(target.id, { [field]: ms })
       setEditingSince(null)
+      const label = MEMBER_DATE_LABELS[field]
       setMessage(
         ms
-          ? `Đã lưu ngày chính thức của ${target.fullName || target.email}.`
-          : `Đã xóa ngày chính thức của ${target.fullName || target.email}.`,
+          ? `Đã lưu ${label} của ${target.fullName || target.email}.`
+          : `Đã xóa ${label} của ${target.fullName || target.email}.`,
       )
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không lưu được')
     } finally {
       setBusyId(null)
     }
+  }
+
+  function memberDateCell(u: AdminUser, field: MemberDateField, busy: boolean) {
+    if (editingSince?.uid === u.id && editingSince.field === field) {
+      return (
+        <span className="member-since-edit">
+          <input
+            type="date"
+            value={editingSince.value}
+            max={inputDateFromMs(Date.now())}
+            onChange={(e) => setEditingSince({ uid: u.id, field, value: e.target.value })}
+          />
+          <button
+            type="button"
+            className="btn primary compact"
+            disabled={busy}
+            onClick={() => void saveMemberSince(u)}
+          >
+            Lưu
+          </button>
+          <button
+            type="button"
+            className="btn ghost compact"
+            disabled={busy}
+            onClick={() => setEditingSince(null)}
+          >
+            Hủy
+          </button>
+        </span>
+      )
+    }
+    return (
+      <>
+        {formatMemberSince(u[field]) || (
+          <span className="muted">{field === 'memberSince' ? 'Chưa rõ' : 'Chưa có'}</span>
+        )}{' '}
+        <button type="button" className="admin-uid" onClick={() => startEditSince(u, field)}>
+          Sửa
+        </button>
+      </>
+    )
   }
 
   async function deleteMemberCompletely(target: AdminUser) {
@@ -514,52 +580,16 @@ export function AdminUsersPage() {
                     <dt>Thử thách đã tham gia</dt>
                     <dd>{joinedCounts[u.id] ?? 0}</dd>
                   </div>
-                  {u.member && (
+                  {(u.member || u.memberSince > 0) && (
                     <div>
                       <dt>Chính thức từ</dt>
-                      <dd>
-                        {editingSince?.uid === u.id ? (
-                          <span className="member-since-edit">
-                            <input
-                              type="date"
-                              value={editingSince.value}
-                              max={inputDateFromMs(Date.now())}
-                              onChange={(e) =>
-                                setEditingSince({ uid: u.id, value: e.target.value })
-                              }
-                            />
-                            <button
-                              type="button"
-                              className="btn primary compact"
-                              disabled={busy}
-                              onClick={() => void saveMemberSince(u)}
-                            >
-                              Lưu
-                            </button>
-                            <button
-                              type="button"
-                              className="btn ghost compact"
-                              disabled={busy}
-                              onClick={() => setEditingSince(null)}
-                            >
-                              Hủy
-                            </button>
-                          </span>
-                        ) : (
-                          <>
-                            {formatMemberSince(u.memberSince) || (
-                              <span className="muted">Chưa rõ</span>
-                            )}{' '}
-                            <button
-                              type="button"
-                              className="admin-uid"
-                              onClick={() => startEditSince(u)}
-                            >
-                              Sửa
-                            </button>
-                          </>
-                        )}
-                      </dd>
+                      <dd>{memberDateCell(u, 'memberSince', busy)}</dd>
+                    </div>
+                  )}
+                  {!u.member && (
+                    <div>
+                      <dt>Hết chính thức</dt>
+                      <dd>{memberDateCell(u, 'memberUntil', busy)}</dd>
                     </div>
                   )}
                 </dl>

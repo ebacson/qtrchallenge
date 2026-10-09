@@ -31,6 +31,8 @@ export interface UserProfile {
   member: boolean
   /** Thời điểm (ms) được phê duyệt thành viên chính thức; không có với thành viên duyệt trước khi lưu mốc này */
   memberSince?: number
+  /** Thời điểm (ms) bị chuyển sang Tự do; vẫn chịu thưởng phạt các thử thách kết thúc trước mốc này */
+  memberUntil?: number
   level: number
 }
 

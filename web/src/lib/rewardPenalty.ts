@@ -1,6 +1,7 @@
 import {
   parseChallenge,
   parseChallengeDay,
+  parseChallengeDayEndInclusiveMs,
   parseChallengeDayStartMs,
   STATUS_FINISHED,
   userDayQuotaProgress,
@@ -19,6 +20,20 @@ export const REWARD_START_YEAR = 2026
 export function isRewardEligible(challenge: Challenge): boolean {
   const start = parseChallengeDay(challenge.startDate)
   return start !== null && start.getFullYear() >= REWARD_START_YEAR
+}
+
+/**
+ * Có tính thưởng – phạt thử thách này như thành viên chính thức không: đang chính thức, hoặc đã
+ * chuyển Tự do (`memberUntil`) sau khi thử thách kết thúc.
+ */
+export function countsAsOfficial(
+  person: { member?: boolean; memberUntil?: number },
+  challenge: Challenge,
+): boolean {
+  if (person.member) return true
+  if (!person.memberUntil) return false
+  const endMs = parseChallengeDayEndInclusiveMs(challenge.endDate)
+  return endMs != null && endMs <= person.memberUntil
 }
 
 /** Thử thách không đặt mức phạt (kể cả thử thách cũ) thì không phạt */
@@ -270,18 +285,19 @@ export function formatVnd(amount: number): string {
 export type UnpaidPenalty = { challengeId: string; name: string; amount: number }
 
 /**
- * Tiền phạt chưa nộp của một thành viên chính thức ở các thử thách đã kết thúc (sau miễn phạt),
- * cùng cách tính với trang Thưởng - Phạt.
+ * Tiền phạt chưa nộp ở các thử thách đã kết thúc (sau miễn phạt) mà người này chịu thưởng phạt
+ * như thành viên chính thức, cùng cách tính với trang Thưởng - Phạt.
  */
 export function unpaidPenaltiesOf(
   challenges: Record<string, Record<string, unknown>> | null | undefined,
   uid: string,
-  memberSince: number | undefined,
+  person: { member?: boolean; memberSince?: number; memberUntil?: number },
 ): UnpaidPenalty[] {
   const out: UnpaidPenalty[] = []
   for (const [id, raw] of Object.entries(challenges ?? {})) {
     const challenge = parseChallenge(id, raw)
     if (challenge.status !== STATUS_FINISHED || !isRewardEligible(challenge)) continue
+    if (!countsAsOfficial(person, challenge)) continue
     if (challenge.penaltyPayments?.[uid]) continue
     const row = (raw.user_challenges as Record<string, Record<string, unknown> | null> | undefined)?.[
       uid
@@ -291,7 +307,7 @@ export function unpaidPenaltiesOf(
       const completion = participantCompletion(challenge, row)
       amount = completion ? applyPenaltyWaiver(challenge, uid, completion).penalty : 0
     } else {
-      amount = absentPenaltyFor(challenge, uid, memberSince).penalty
+      amount = absentPenaltyFor(challenge, uid, person.memberSince).penalty
     }
     if (amount > 0) out.push({ challengeId: id, name: challenge.name || 'Thử thách', amount })
   }

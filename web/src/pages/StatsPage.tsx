@@ -44,7 +44,8 @@ function PenaltyBadge({ entry }: { entry: ChallengeEntry }) {
 
 function ChallengeStats() {
   const { profile } = useAuth()
-  const isMember = Boolean(profile?.member)
+  // Đã chuyển Tự do vẫn xem được tiền phạt của các thử thách khi còn chính thức
+  const isMember = Boolean(profile?.member || profile?.memberUntil)
   const [year, setYear] = useState(ALL_YEARS)
   const loaded = useMyChallengeEntries()
   const entries = useMemo(() => loaded ?? [], [loaded])

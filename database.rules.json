@@ -4,7 +4,7 @@
       ".read": "auth != null && root.child('users').child(auth.uid).child('admin').val() === true",
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
-        ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('admin').val() === true)",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('admin').val() === true || (auth.uid === $uid && newData.exists() && newData.child('memberUntil').val() === data.child('memberUntil').val()))",
         "admin": {
           ".validate": "root.child('users').child(auth.uid).child('admin').val() === true || newData.val() === data.val() || newData.val() === false"
         },
@@ -31,7 +31,7 @@
     "user_profiles": {
       ".read": "auth != null",
       "$uid": {
-        ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('admin').val() === true)",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('admin').val() === true || (auth.uid === $uid && newData.exists() && newData.child('memberUntil').val() === data.child('memberUntil').val()))",
         "admin": {
           ".validate": "root.child('users').child(auth.uid).child('admin').val() === true || newData.val() === newData.parent().parent().parent().child('users').child($uid).child('admin').val()"
         },

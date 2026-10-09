@@ -269,9 +269,10 @@ export function AdminUsersPage() {
     const ok = window.confirm(
       `Xóa hoàn toàn "${target.fullName || target.email}"?\n\n` +
         '1. Ngắt kết nối Strava (thu hồi quyền truy cập).\n' +
-        '2. Xóa dữ liệu tham gia, nộp phạt, quay thưởng ở mọi thử thách và dấu đã đọc thông báo.\n' +
+        '2. Xóa dữ liệu tham gia, quay thưởng ở mọi thử thách và dấu đã đọc thông báo.\n' +
         '3. Xóa hồ sơ, hoạt động Strava đã đồng bộ và avatar.\n' +
-        '4. Xóa tài khoản đăng nhập Firebase Auth.\n\n' +
+        '4. Xóa tài khoản đăng nhập Firebase Auth.\n' +
+        '5. Giữ lại sổ sách tiền (nộp phạt, quỹ, thu chi) kèm tên thành viên.\n\n' +
         'Không thể hoàn tác.',
     )
     if (!ok) return
@@ -294,9 +295,11 @@ export function AdminUsersPage() {
       }[summary.strava]
       setMessage(
         `Đã xóa hoàn toàn ${target.fullName || target.email}: ${strava}, ` +
-          `${summary.challenges} thử thách, ${summary.penaltyPayments} nộp phạt, ` +
+          `${summary.challenges} thử thách, ` +
           `${summary.rewardDraws} kết quả quay thưởng, ${summary.notifications} thông báo, ` +
-          (summary.authDeleted ? 'đã xóa tài khoản đăng nhập.' : 'không có tài khoản đăng nhập.'),
+          (summary.authDeleted ? 'đã xóa tài khoản đăng nhập' : 'không có tài khoản đăng nhập') +
+          `. Giữ lại ${summary.penaltyPayments} khoản nộp phạt, ` +
+          `${summary.financeRecords ?? 0} khoản quỹ/thu chi.`,
       )
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không xóa được')

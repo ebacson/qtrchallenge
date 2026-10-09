@@ -3,7 +3,13 @@ import { ref, set, update } from 'firebase/database'
 import { Search, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
-import { duesPaymentFields, FINANCE_PATH, msToDay, type DuesYear } from '../lib/finance'
+import {
+  duesPaymentFields,
+  FINANCE_PATH,
+  msToDay,
+  type DuesYear,
+  type NameOf,
+} from '../lib/finance'
 import { formatVnd } from '../lib/rewardPenalty'
 
 type Member = { uid: string; name: string; avatar: string; member: boolean }
@@ -30,7 +36,7 @@ export function FinanceDues({
   year: number
   dues: DuesYear | undefined
   members: Member[]
-  nameOf: (uid: string) => string
+  nameOf: NameOf
   canEdit: boolean
 }) {
   const { user } = useAuth()
@@ -49,7 +55,15 @@ export function FinanceDues({
     ...members.filter((m) => m.member),
     ...Object.keys(paidMap)
       .filter((uid) => !members.some((m) => m.uid === uid && m.member))
-      .map((uid) => members.find((m) => m.uid === uid) ?? { uid, name: nameOf(uid), avatar: '', member: false }),
+      .map(
+        (uid) =>
+          members.find((m) => m.uid === uid) ?? {
+            uid,
+            name: nameOf(uid, paidMap[uid]?.memberName),
+            avatar: '',
+            member: false,
+          },
+      ),
   ]
   const paidCount = rows.filter((m) => paidMap[m.uid]).length
   const paidTotal = Object.values(paidMap).reduce((s, p) => s + p.amount, 0)
@@ -90,7 +104,7 @@ export function FinanceDues({
     setBusyUid(m.uid)
     setError('')
     try {
-      await set(ref(db, `${base}/members/${m.uid}`), duesPaymentFields(amount, user.uid))
+      await set(ref(db, `${base}/members/${m.uid}`), duesPaymentFields(amount, user.uid, m.name))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không lưu được')
     } finally {

@@ -16,7 +16,10 @@ export class DeleteUserError extends Error {
 export type DeleteUserSummary = {
   strava: 'revoked' | 'not_connected' | 'already_revoked'
   challenges: number
+  /** Khoản nộp phạt được giữ lại (gắn tên) trong sổ sách */
   penaltyPayments: number
+  /** Khoản quỹ / thu chi trong `finance` được gắn tên */
+  financeRecords: number
   rewardDraws: number
   notifications: number
   authDeleted: boolean
@@ -74,8 +77,9 @@ async function disconnectStrava(uid: string): Promise<DeleteUserSummary['strava'
 }
 
 /**
- * Ngắt Strava, xóa mọi dữ liệu RTDB gắn với uid (tham gia/nộp phạt/quay thưởng thử thách,
- * dấu đã đọc thông báo, hồ sơ) rồi xóa tài khoản Firebase Auth.
+ * Ngắt Strava, xóa mọi dữ liệu RTDB gắn với uid (tham gia/quay thưởng thử thách, dấu đã đọc
+ * thông báo, hồ sơ) rồi xóa tài khoản Firebase Auth. Sổ sách tiền (nộp phạt, quỹ, thu chi)
+ * được giữ lại và gắn `memberName` để vẫn hiện đúng tên sau khi hồ sơ bị xóa.
  */
 export async function deleteUserCompletely(
   adminUid: string,
@@ -91,9 +95,21 @@ export async function deleteUserCompletely(
 
   const strava = await disconnectStrava(targetUid)
 
+  const [profileName, userName, userEmail] = await Promise.all([
+    db.ref(`${USER_PROFILES_PATH}/${targetUid}/fullName`).get(),
+    db.ref(`users/${targetUid}/fullName`).get(),
+    db.ref(`users/${targetUid}/email`).get(),
+  ])
+  const memberName =
+    String(profileName.val() ?? '').trim() ||
+    String(userName.val() ?? '').trim() ||
+    String(userEmail.val() ?? '').trim() ||
+    targetUid
+
   const updates: Dict = {}
   let challengeCount = 0
   let penaltyCount = 0
+  let financeCount = 0
   let drawCount = 0
 
   const challenges = asDict((await db.ref('challenges').get()).val()) ?? {}
@@ -106,8 +122,11 @@ export async function deleteUserCompletely(
       updates[`${base}/user_challenges/${targetUid}`] = null
       challengeCount++
     }
-    if (asDict(challenge.penaltyPayments)?.[targetUid] != null) {
-      updates[`${base}/penaltyPayments/${targetUid}`] = null
+    const payment = asDict(asDict(challenge.penaltyPayments)?.[targetUid])
+    if (payment) {
+      if (!payment.memberName) {
+        updates[`${base}/penaltyPayments/${targetUid}/memberName`] = memberName
+      }
       penaltyCount++
     }
 
@@ -126,6 +145,29 @@ export async function deleteUserCompletely(
       updates[`${base}/rewardDraws/${index}/winners`] = keep.map((i) => winners[i])
       updates[`${base}/rewardDraws/${index}/prizes`] = keep.map((i) => prizes[i] ?? null)
       drawCount++
+    }
+  }
+
+  const [duesSnap, transactionsSnap] = await Promise.all([
+    db.ref('finance/dues').get(),
+    db.ref('finance/transactions').get(),
+  ])
+  for (const [year, raw] of Object.entries(asDict(duesSnap.val()) ?? {})) {
+    const paid = asDict(asDict(asDict(raw)?.members)?.[targetUid])
+    if (!paid) continue
+    if (!paid.memberName) {
+      updates[`finance/dues/${year}/members/${targetUid}/memberName`] = memberName
+    }
+    financeCount++
+  }
+  for (const [year, raw] of Object.entries(asDict(transactionsSnap.val()) ?? {})) {
+    for (const [id, rowRaw] of Object.entries(asDict(raw) ?? {})) {
+      const row = asDict(rowRaw)
+      if (!row || row.memberUid !== targetUid) continue
+      if (!row.memberName) {
+        updates[`finance/transactions/${year}/${id}/memberName`] = memberName
+      }
+      financeCount++
     }
   }
 
@@ -154,6 +196,7 @@ export async function deleteUserCompletely(
     strava,
     challenges: challengeCount,
     penaltyPayments: penaltyCount,
+    financeRecords: financeCount,
     rewardDraws: drawCount,
     notifications: notificationCount,
     authDeleted,

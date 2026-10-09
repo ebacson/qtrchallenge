@@ -28,6 +28,7 @@ import {
   softDeleteFields,
   type FinanceEntry,
   type FinanceType,
+  type NameOf,
 } from '../lib/finance'
 import { FinanceDues } from '../components/FinanceDues'
 
@@ -110,6 +111,9 @@ function FinanceForm({
         date: day,
         note: note.trim(),
         memberUid: memberUid || null,
+        memberName: memberUid
+          ? (members.find((m) => m.uid === memberUid)?.name ?? entry?.memberName ?? null)
+          : null,
         challengeId: challengeId || null,
       }
       if (entry) {
@@ -194,6 +198,9 @@ function FinanceForm({
           Thành viên (tùy chọn)
           <select value={memberUid} onChange={(e) => setMemberUid(e.target.value)}>
             <option value="">—</option>
+            {memberUid && !members.some((m) => m.uid === memberUid) && (
+              <option value={memberUid}>{entry?.memberName || 'Người dùng'} (đã xóa)</option>
+            )}
             {members.map((m) => (
               <option key={m.uid} value={m.uid}>
                 {m.name}
@@ -323,8 +330,14 @@ export function FinancePage() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
-  const nameOf = useMemo(() => {
-    return (uid: string) => String(profiles?.[uid]?.fullName ?? '') || 'Người dùng ẩn danh'
+  const nameOf = useMemo<NameOf>(() => {
+    return (uid, snapshot) => {
+      const current = profiles?.[uid]
+      const name = String(current?.fullName ?? '')
+      if (name) return name
+      if (snapshot) return current || !profiles ? snapshot : `${snapshot} (đã xóa)`
+      return 'Người dùng ẩn danh'
+    }
   }, [profiles])
 
   const challengeList = useMemo(
@@ -836,7 +849,7 @@ export function FinancePage() {
                         )}
                         <span className="tiny muted">
                           {e.date} · {categoryLabel(e.category)}
-                          {e.memberUid && !e.auto ? ` · ${nameOf(e.memberUid)}` : ''}
+                          {e.memberUid && !e.auto ? ` · ${nameOf(e.memberUid, e.memberName)}` : ''}
                           {e.challengeId && !e.auto ? ` · ${challengeName(e.challengeId)}` : ''}
                         </span>
                         <span className="tiny muted">

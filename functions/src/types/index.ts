@@ -103,6 +103,8 @@ export interface PenaltyPayment {
   /** Admin miễn phạt (mức phạt tính là 0) thay vì xác nhận đã nộp */
   waived?: boolean
   reason?: string
+  /** Tên thành viên lúc ghi nhận, để sổ sách vẫn hiện đúng tên khi tài khoản đã bị xóa */
+  memberName?: string
 }
 
 export interface Challenge {

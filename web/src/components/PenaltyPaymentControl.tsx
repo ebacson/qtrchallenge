@@ -49,7 +49,7 @@ export function PenaltyPaymentControl({
   function confirmPaid() {
     if (!user) return
     if (!window.confirm(`Xác nhận ${name} đã nộp ${formatVnd(amount)} phạt "${label}"?`)) return
-    void write({ amount, confirmedAt: Date.now(), confirmedBy: user.uid })
+    void write({ amount, confirmedAt: Date.now(), confirmedBy: user.uid, memberName: name })
   }
 
   function waive() {
@@ -63,7 +63,14 @@ export function PenaltyPaymentControl({
       setError('Cần nhập lý do miễn phạt.')
       return
     }
-    void write({ amount, waived: true, reason, confirmedAt: Date.now(), confirmedBy: user.uid })
+    void write({
+      amount,
+      waived: true,
+      reason,
+      confirmedAt: Date.now(),
+      confirmedBy: user.uid,
+      memberName: name,
+    })
   }
 
   function undo() {

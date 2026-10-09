@@ -43,6 +43,8 @@ export type FinanceEntry = {
   dateMs: number
   note: string
   memberUid?: string
+  /** Tên thành viên lúc ghi nhận, dùng khi tài khoản đã bị xóa */
+  memberName?: string
   challengeId?: string
   createdAt: number
   createdBy: string
@@ -55,6 +57,9 @@ export type FinanceEntry = {
 }
 
 export type FinanceSettings = { openingBalance: number; openingDate: string }
+
+/** Tên theo hồ sơ hiện tại; `snapshot` là tên đã lưu cùng bản ghi khi hồ sơ không còn */
+export type NameOf = (uid: string, snapshot?: string) => string
 
 type Dict = Record<string, unknown>
 
@@ -114,6 +119,7 @@ export function parseTransactions(value: unknown): FinanceEntry[] {
         dateMs: parseChallengeDayStartMs(date) ?? 0,
         note: String(row.note ?? ''),
         memberUid: row.memberUid ? String(row.memberUid) : undefined,
+        memberName: row.memberName ? String(row.memberName) : undefined,
         challengeId: row.challengeId ? String(row.challengeId) : undefined,
         createdAt: Number(row.createdAt) || 0,
         createdBy: String(row.createdBy ?? ''),
@@ -129,7 +135,7 @@ export function parseTransactions(value: unknown): FinanceEntry[] {
 /** Tiền phạt admin đã xác nhận nộp (không tính miễn phạt), ghi nhận vào ngày xác nhận. */
 export function penaltyIncomeEntries(
   challenges: Record<string, Dict> | null | undefined,
-  nameOf: (uid: string) => string,
+  nameOf: NameOf,
 ): FinanceEntry[] {
   const out: FinanceEntry[] = []
   for (const [challengeId, raw] of Object.entries(challenges ?? {})) {
@@ -144,8 +150,9 @@ export function penaltyIncomeEntries(
         category: PENALTY_CATEGORY,
         date,
         dateMs: parseChallengeDayStartMs(date) ?? 0,
-        note: `Phạt "${challenge.name || 'Thử thách'}" — ${nameOf(uid)}`,
+        note: `Phạt "${challenge.name || 'Thử thách'}" — ${nameOf(uid, payment.memberName)}`,
         memberUid: uid,
+        memberName: payment.memberName,
         challengeId,
         createdAt: payment.confirmedAt,
         createdBy: payment.confirmedBy,
@@ -156,13 +163,22 @@ export function penaltyIncomeEntries(
   return out
 }
 
-export type DuesPayment = { amount: number; paidAt: number; confirmedBy: string }
+export type DuesPayment = {
+  amount: number
+  paidAt: number
+  confirmedBy: string
+  memberName?: string
+}
 
 /** `amount` null khi năm đó chưa đặt mức quỹ (0đ là mức hợp lệ) */
 export type DuesYear = { amount: number | null; members: Record<string, DuesPayment> }
 
-export function duesPaymentFields(amount: number, confirmedBy: string): DuesPayment {
-  return { amount, paidAt: Date.now(), confirmedBy }
+export function duesPaymentFields(
+  amount: number,
+  confirmedBy: string,
+  memberName: string,
+): DuesPayment {
+  return { amount, paidAt: Date.now(), confirmedBy, memberName }
 }
 
 /** `finance/dues/{year}`: `settings/amount` và `members/{uid}` (ai đã đóng). */
@@ -181,6 +197,7 @@ export function parseDues(value: unknown): Record<number, DuesYear> {
         amount,
         paidAt: Number(row.paidAt) || 0,
         confirmedBy: String(row.confirmedBy ?? ''),
+        ...(row.memberName ? { memberName: String(row.memberName) } : {}),
       }
     }
     const setting = Number(asDict(dict.settings)?.amount)
@@ -192,7 +209,7 @@ export function parseDues(value: unknown): Record<number, DuesYear> {
 /** Quỹ đã đóng (khác 0đ), ghi nhận vào ngày xác nhận. */
 export function duesIncomeEntries(
   dues: Record<number, DuesYear>,
-  nameOf: (uid: string) => string,
+  nameOf: NameOf,
 ): FinanceEntry[] {
   const out: FinanceEntry[] = []
   for (const [year, info] of Object.entries(dues)) {
@@ -206,8 +223,9 @@ export function duesIncomeEntries(
         category: 'dues',
         date,
         dateMs: parseChallengeDayStartMs(date) ?? 0,
-        note: `Quỹ ${year} — ${nameOf(uid)}`,
+        note: `Quỹ ${year} — ${nameOf(uid, p.memberName)}`,
         memberUid: uid,
+        memberName: p.memberName,
         createdAt: p.paidAt,
         createdBy: p.confirmedBy,
         auto: 'dues',
@@ -239,7 +257,7 @@ function csvCell(value: string | number): string {
 export function downloadFinanceCsv(
   filename: string,
   entries: FinanceEntry[],
-  nameOf: (uid: string) => string,
+  nameOf: NameOf,
   challengeName: (id: string) => string,
   counted: (entry: FinanceEntry) => boolean,
 ): void {
@@ -262,7 +280,7 @@ export function downloadFinanceCsv(
       categoryLabel(e.category),
       signedAmount(e),
       e.note,
-      e.memberUid ? nameOf(e.memberUid) : '',
+      e.memberUid ? nameOf(e.memberUid, e.memberName) : '',
       e.challengeId ? challengeName(e.challengeId) : '',
       e.auto ? 'Tự động' : 'Nhập tay',
       e.createdBy ? nameOf(e.createdBy) : '',

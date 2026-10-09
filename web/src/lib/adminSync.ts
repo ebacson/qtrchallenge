@@ -17,6 +17,7 @@ export type DeleteUserSummary = {
   strava: 'revoked' | 'not_connected' | 'already_revoked'
   challenges: number
   penaltyPayments: number
+  financeRecords?: number
   rewardDraws: number
   notifications: number
   authDeleted: boolean

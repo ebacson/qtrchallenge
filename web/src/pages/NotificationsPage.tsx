@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
 import { Heart } from 'lucide-react'
 import { normalizeText, plainText, RichText } from '../components/RichText'
-import { useUserProfiles } from '../lib/userWrites'
+import { useDeletedUsers, useUserProfiles } from '../lib/userWrites'
 
 type Noti = {
   id: string
@@ -129,6 +129,7 @@ export function NotificationsPage() {
   const [items, setItems] = useState<Noti[]>([])
   const [loading, setLoading] = useState(true)
   const profiles = useUserProfiles()
+  const deletedUsers = useDeletedUsers()
 
   const [formOpen, setFormOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -287,7 +288,11 @@ export function NotificationsPage() {
                   </div>
                   <p className="tiny muted noti-meta">
                     {[
-                      String(profiles?.[n.creatorUserID]?.fullName ?? ''),
+                      String(
+                        profiles?.[n.creatorUserID]?.fullName ??
+                          deletedUsers[n.creatorUserID]?.fullName ??
+                          '',
+                      ),
                       formatCreatedAt(n.createdAt),
                       n.updatedAt && `đã sửa ${formatCreatedAt(n.updatedAt)}`,
                     ]

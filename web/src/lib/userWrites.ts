@@ -33,3 +33,12 @@ export function useUserProfiles(): Profiles | null {
   const value = useSharedValue<Profiles>(USER_PROFILES_PATH, 24 * 60 * 60_000)
   return value === undefined ? null : (value ?? {})
 }
+
+export const DELETED_USERS_PATH = 'deleted_users'
+
+const NO_PROFILES: Profiles = {}
+
+/** Tên các tài khoản đã bị xóa (`deleted_users/{uid}/fullName`), ghi bởi Cloud Function. */
+export function useDeletedUsers(): Profiles {
+  return useSharedValue<Profiles>(DELETED_USERS_PATH, 24 * 60 * 60_000) ?? NO_PROFILES
+}

@@ -5,7 +5,7 @@ import { Download, Plus, Search, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
 import { useSharedValue } from '../lib/sharedValue'
-import { useUserProfiles } from '../lib/userWrites'
+import { useDeletedUsers, useUserProfiles } from '../lib/userWrites'
 import { formatVnd } from '../lib/rewardPenalty'
 import { parseChallengeDayStartMs } from '../lib/challengeRules'
 import {
@@ -330,15 +330,17 @@ export function FinancePage() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
+  const deletedUsers = useDeletedUsers()
   const nameOf = useMemo<NameOf>(() => {
     return (uid, snapshot) => {
       const current = profiles?.[uid]
       const name = String(current?.fullName ?? '')
       if (name) return name
-      if (snapshot) return current || !profiles ? snapshot : `${snapshot} (đã xóa)`
-      return 'Người dùng ẩn danh'
+      if (current || !profiles) return snapshot || 'Người dùng ẩn danh'
+      const former = String(deletedUsers[uid]?.fullName ?? '') || snapshot
+      return former ? `${former} (đã xóa)` : 'Người dùng ẩn danh'
     }
-  }, [profiles])
+  }, [profiles, deletedUsers])
 
   const challengeList = useMemo(
     () =>

@@ -79,7 +79,8 @@ async function disconnectStrava(uid: string): Promise<DeleteUserSummary['strava'
 /**
  * Ngắt Strava, xóa mọi dữ liệu RTDB gắn với uid (tham gia/quay thưởng thử thách, dấu đã đọc
  * thông báo, hồ sơ) rồi xóa tài khoản Firebase Auth. Sổ sách tiền (nộp phạt, quỹ, thu chi)
- * được giữ lại và gắn `memberName` để vẫn hiện đúng tên sau khi hồ sơ bị xóa.
+ * được giữ lại và gắn `memberName`; tên còn được lưu ở `deleted_users/{uid}` cho các chỗ
+ * khác tham chiếu uid (người xác nhận, người nhập, người tạo thông báo).
  */
 export async function deleteUserCompletely(
   adminUid: string,
@@ -100,11 +101,8 @@ export async function deleteUserCompletely(
     db.ref(`users/${targetUid}/fullName`).get(),
     db.ref(`users/${targetUid}/email`).get(),
   ])
-  const memberName =
-    String(profileName.val() ?? '').trim() ||
-    String(userName.val() ?? '').trim() ||
-    String(userEmail.val() ?? '').trim() ||
-    targetUid
+  const fullName = String(profileName.val() ?? '').trim() || String(userName.val() ?? '').trim()
+  const memberName = fullName || String(userEmail.val() ?? '').trim() || targetUid
 
   const updates: Dict = {}
   let challengeCount = 0
@@ -182,6 +180,12 @@ export async function deleteUserCompletely(
 
   updates[`users/${targetUid}`] = null
   updates[`${USER_PROFILES_PATH}/${targetUid}`] = null
+  // Chỉ giữ tên (không email/SĐT) để các bản ghi cũ trỏ tới uid này vẫn hiện đúng người
+  updates[`deleted_users/${targetUid}`] = {
+    fullName: fullName || 'Thành viên',
+    deletedAt: Date.now(),
+    deletedBy: adminUid,
+  }
   await db.ref().update(updates)
 
   let authDeleted = false

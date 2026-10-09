@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { get, ref } from 'firebase/database'
 import { auth, db } from '../lib/firebase'
@@ -47,6 +47,52 @@ async function loadEventIds(): Promise<string[]> {
   if (!res.ok) throw new Error(`Không tải được danh sách event (${res.status})`)
   const val = (await res.json()) as Record<string, unknown> | null
   return Object.keys(val ?? {})
+}
+
+type GenderFilter = 'all' | 'male' | 'female' | 'team'
+
+const GENDER_FILTERS: { value: GenderFilter; label: string }[] = [
+  { value: 'all', label: 'Tất cả' },
+  { value: 'male', label: 'Nam' },
+  { value: 'female', label: 'Nữ' },
+  { value: 'team', label: 'Đồng đội' },
+]
+
+/** Trường `Gen` của kết quả: "Male"/"Female", "Team" ở giải tiếp sức (chấp nhận cả M/F, Nam/Nữ). */
+function genderOf(row: Record<string, string>): GenderFilter | null {
+  const g = (row.Gen || row.Gender || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+  if (g === 'male' || g === 'm' || g === 'nam') return 'male'
+  if (g === 'female' || g === 'f' || g === 'nu') return 'female'
+  if (g === 'team') return 'team'
+  return null
+}
+
+const CHIP_STATUS_LABELS: Record<string, string> = {
+  disqualified: 'Bị loại',
+  'no result': 'Không có KQ',
+}
+
+/** "h:mm:ss", "mm:ss", "hh:mm:ss.SS" → số giây; null nếu không đọc được. */
+function chipSeconds(value: string): number | null {
+  const parts = value.trim().split(':')
+  if (parts.length < 2 || parts.length > 3) return null
+  const nums = parts.map(Number)
+  if (nums.some((n) => !Number.isFinite(n) || n < 0)) return null
+  const [h, m, s] = nums.length === 3 ? nums : [0, nums[0], nums[1]]
+  return h * 3600 + m * 60 + s
+}
+
+/** Thời gian chip dạng hh:mm:ss (bỏ phần lẻ của giây). */
+function formatChipTime(value: string): string {
+  const total = chipSeconds(value)
+  if (total == null) return CHIP_STATUS_LABELS[value.trim().toLowerCase()] ?? (value || '—')
+  const secs = Math.floor(total)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(Math.floor(secs / 3600))}:${pad(Math.floor((secs % 3600) / 60))}:${pad(secs % 60)}`
 }
 
 /** Ngày "dd-MM-yyyy" → khoá sắp xếp "yyyyMMdd". */
@@ -126,6 +172,24 @@ export function EventDetailPage() {
   const [event, setEvent] = useState<ClubEvent | null>(null)
   const [results, setResults] = useState<Record<string, string>[]>([])
   const [loading, setLoading] = useState(true)
+  const [gender, setGender] = useState<GenderFilter>('all')
+  const genderCounts = useMemo(() => {
+    const counts: Record<GenderFilter, number> = {
+      all: results.length,
+      male: 0,
+      female: 0,
+      team: 0,
+    }
+    for (const r of results) {
+      const g = genderOf(r)
+      if (g) counts[g] += 1
+    }
+    return counts
+  }, [results])
+  const visibleResults = useMemo(
+    () => (gender === 'all' ? results : results.filter((r) => genderOf(r) === gender)),
+    [results, gender],
+  )
 
   useEffect(() => {
     if (!id) return
@@ -142,8 +206,10 @@ export function EventDetailPage() {
             for (const [k, v] of Object.entries(row)) out[k] = String(v ?? '')
             return out
           })
-        rows.sort((a, b) =>
-          String(a['Chip Time'] || '').localeCompare(String(b['Chip Time'] || '')),
+        rows.sort(
+          (a, b) =>
+            (chipSeconds(a['Chip Time'] || '') ?? Infinity) -
+            (chipSeconds(b['Chip Time'] || '') ?? Infinity),
         )
         setResults(rows)
       })
@@ -197,9 +263,25 @@ export function EventDetailPage() {
         </section>
       )}
       <section className="section panel">
-        <h2>Kết quả ({results.length})</h2>
+        <h2>Kết quả ({visibleResults.length})</h2>
+        {results.length > 0 && (
+          <div className="filter-row">
+            {GENDER_FILTERS.filter((f) => f.value !== 'team' || genderCounts.team > 0).map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                className={gender === f.value ? 'chip active' : 'chip'}
+                onClick={() => setGender(f.value)}
+              >
+                {f.label} ({genderCounts[f.value]})
+              </button>
+            ))}
+          </div>
+        )}
         {results.length === 0 ? (
           <p className="muted">Chưa có bảng xếp hạng.</p>
+        ) : visibleResults.length === 0 ? (
+          <p className="muted">Không có vận động viên phù hợp.</p>
         ) : (
           <div className="results-table-wrap">
             <table className="results-table">
@@ -213,12 +295,12 @@ export function EventDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {results.slice(0, 100).map((r, i) => (
+                {visibleResults.slice(0, 100).map((r, i) => (
                   <tr key={`${r.BIB}-${i}`}>
-                    <td>{i + 1}</td>
+                    <td>{chipSeconds(r['Chip Time'] || '') == null ? '—' : i + 1}</td>
                     <td>{r.Name || '—'}</td>
                     <td>{r.BIB || '—'}</td>
-                    <td>{r['Chip Time'] || '—'}</td>
+                    <td>{r['Chip Time'] ? formatChipTime(r['Chip Time']) : '—'}</td>
                     <td>{r.Distance || '—'}</td>
                   </tr>
                 ))}

@@ -1,6 +1,8 @@
 import {
+  parseChallenge,
   parseChallengeDay,
   parseChallengeDayStartMs,
+  STATUS_FINISHED,
   userDayQuotaProgress,
 } from './challengeRules'
 import type { Challenge, PenaltyTier, RewardItem } from '../types'
@@ -263,6 +265,37 @@ export function pickRandom<T>(list: T[]): T | undefined {
 
 export function formatVnd(amount: number): string {
   return `${amount.toLocaleString('vi-VN')}đ`
+}
+
+export type UnpaidPenalty = { challengeId: string; name: string; amount: number }
+
+/**
+ * Tiền phạt chưa nộp của một thành viên chính thức ở các thử thách đã kết thúc (sau miễn phạt),
+ * cùng cách tính với trang Thưởng - Phạt.
+ */
+export function unpaidPenaltiesOf(
+  challenges: Record<string, Record<string, unknown>> | null | undefined,
+  uid: string,
+  memberSince: number | undefined,
+): UnpaidPenalty[] {
+  const out: UnpaidPenalty[] = []
+  for (const [id, raw] of Object.entries(challenges ?? {})) {
+    const challenge = parseChallenge(id, raw)
+    if (challenge.status !== STATUS_FINISHED || !isRewardEligible(challenge)) continue
+    if (challenge.penaltyPayments?.[uid]) continue
+    const row = (raw.user_challenges as Record<string, Record<string, unknown> | null> | undefined)?.[
+      uid
+    ]
+    let amount = 0
+    if (row) {
+      const completion = participantCompletion(challenge, row)
+      amount = completion ? applyPenaltyWaiver(challenge, uid, completion).penalty : 0
+    } else {
+      amount = absentPenaltyFor(challenge, uid, memberSince).penalty
+    }
+    if (amount > 0) out.push({ challengeId: id, name: challenge.name || 'Thử thách', amount })
+  }
+  return out
 }
 
 /** Phần trăm làm tròn xuống để 99,6% không hiển thị thành 100% */

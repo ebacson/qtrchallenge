@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext'
 import { deleteUserAvatar } from '../lib/adminOps'
 import { runAdminDeleteUser, runAdminFullSync, type FullSyncSummary } from '../lib/adminSync'
 import { useSharedValue } from '../lib/sharedValue'
+import { formatVnd, unpaidPenaltiesOf } from '../lib/rewardPenalty'
 import { formatMemberSince } from '../lib/userProfile'
 import { updateUser, useUserProfiles } from '../lib/userWrites'
 
@@ -182,6 +183,22 @@ export function AdminUsersPage() {
     })
   }, [users, q, memberType])
 
+  /** Cảnh báo khoản phạt chưa nộp: khi không còn là chính thức, khoản này không còn hiện ở đâu */
+  function unpaidPenaltyWarning(target: AdminUser, action = 'chuyển'): string {
+    if (!target.member) return ''
+    const unpaid = unpaidPenaltiesOf(challenges, target.id, target.memberSince || undefined)
+    if (!unpaid.length) return ''
+    const total = unpaid.reduce((s, p) => s + p.amount, 0)
+    const lines = unpaid.slice(0, 8).map((p) => `• ${p.name}: ${formatVnd(p.amount)}`)
+    if (unpaid.length > 8) lines.push(`• … và ${unpaid.length - 8} thử thách khác`)
+    return (
+      `\n\n⚠️ Còn nợ ${formatVnd(total)} tiền phạt chưa nộp ở ${unpaid.length} thử thách:\n` +
+      `${lines.join('\n')}\n\n` +
+      `Sau khi ${action}, các khoản này không còn hiện ở trang Thưởng - Phạt. ` +
+      'Nên xác nhận đã nộp hoặc miễn phạt trước.'
+    )
+  }
+
   async function setFlag(target: AdminUser, field: 'admin' | 'member', value: boolean) {
     const uid = target.id
     if (!user || uid === user.uid) {
@@ -196,7 +213,7 @@ export function AdminUsersPage() {
           : `Hủy quyền Admin của "${who}"?`
         : value
           ? `Phê duyệt "${who}" thành thành viên Chính thức?`
-          : `Chuyển "${who}" sang thành viên Tự do?`
+          : `Chuyển "${who}" sang thành viên Tự do?` + unpaidPenaltyWarning(target)
     if (!window.confirm(question)) return
     setBusyId(uid)
     setError('')
@@ -273,7 +290,8 @@ export function AdminUsersPage() {
         '3. Xóa hồ sơ, hoạt động Strava đã đồng bộ và avatar.\n' +
         '4. Xóa tài khoản đăng nhập Firebase Auth.\n' +
         '5. Giữ lại sổ sách tiền (nộp phạt, quỹ, thu chi) kèm tên thành viên.\n\n' +
-        'Không thể hoàn tác.',
+        'Không thể hoàn tác.' +
+        unpaidPenaltyWarning(target, 'xóa'),
     )
     if (!ok) return
     const typed = window.prompt(`Gõ email "${target.email}" để xác nhận xóa:`)

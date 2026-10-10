@@ -73,9 +73,13 @@ function GiftRulesView({ config }: { config: GiftConfig }) {
           <h2>{SECTION_TITLES[section]}</h2>
           {config.categories
             .filter((c) => c.section === section)
-            .map((c) => (
+            .map((c, index) => (
               <div key={c.id} className="gift-category">
-                {section === 'race' && <h3>{c.title}</h3>}
+                {section === 'race' && (
+                  <h3>
+                    {index + 1}. {c.title}
+                  </h3>
+                )}
                 {c.note && <p className="tiny muted">{c.note}</p>}
                 {c.tiers.length === 0 ? (
                   <p className="empty">Chưa có mức quà.</p>
@@ -138,6 +142,16 @@ function GiftRulesView({ config }: { config: GiftConfig }) {
             ))}
         </section>
       ))}
+      {config.notes.length > 0 && (
+        <section className="section panel gift-notes">
+          <h2>Ghi chú</h2>
+          <ul>
+            {config.notes.map((n, i) => (
+              <li key={i}>{n}</li>
+            ))}
+          </ul>
+        </section>
+      )}
     </>
   )
 }
@@ -152,6 +166,7 @@ function GiftRulesEditor({
   const { user } = useAuth()
   const [draft, setDraft] = useState<GiftConfig>(config)
   const [effective, setEffective] = useState(dayToInputDate(config.effectiveFrom))
+  const [notesText, setNotesText] = useState(config.notes.join('\n'))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -214,7 +229,14 @@ function GiftRulesEditor({
     setError('')
     try {
       await set(ref(db, `${GIFTS_PATH}/config`), {
-        ...serializeGiftConfig({ ...draft, effectiveFrom }),
+        ...serializeGiftConfig({
+          ...draft,
+          effectiveFrom,
+          notes: notesText
+            .split('\n')
+            .map((line) => line.replace(/^\s*[-•+]\s*/, '').trim())
+            .filter(Boolean),
+        }),
         updatedAt: Date.now(),
         updatedBy: user.uid,
       })
@@ -330,6 +352,17 @@ function GiftRulesEditor({
           </button>
         </section>
       ))}
+      <section className="section panel">
+        <label>
+          Ghi chú (mỗi dòng một ý)
+          <textarea
+            rows={7}
+            maxLength={3000}
+            value={notesText}
+            onChange={(e) => setNotesText(e.target.value)}
+          />
+        </label>
+      </section>
       {error && <p className="form-error">{error}</p>}
       <div className="btn-row">
         <button type="submit" className="btn primary" disabled={busy}>

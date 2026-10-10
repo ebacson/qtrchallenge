@@ -34,6 +34,8 @@ export type GiftCategory = {
 export type GiftConfig = {
   effectiveFrom: string
   categories: GiftCategory[]
+  /** Ghi chú chung cuối trang, mỗi phần tử một ý */
+  notes: string[]
 }
 
 export type GiftStatus = 'pending' | 'given'
@@ -164,6 +166,14 @@ export const DEFAULT_GIFT_CONFIG: GiftConfig = {
       ],
     },
   ],
+  notes: [
+    'Thành tích được tính từ các giải sau khi tham gia TVCT.',
+    'Thành tích tính theo Chiptime của BTC.',
+    'Các phần thưởng hiện vật cá nhân có thể tự chọn mẫu theo sở thích, nếu giá trị > số tiền quy định thì cá nhân phải đóng thêm chi phí sản xuất.',
+    'Sub3 yêu cầu mang áo QTR khi đi race.',
+    'Mục 5 yêu cầu mang áo QTR khi nhận thưởng.',
+    'Nếu trong 1 race đủ điều kiện nhận từ 2 phần thưởng thì chỉ được nhận phần thưởng cao nhất.',
+  ],
 }
 
 function asDict(value: unknown): Record<string, unknown> | null {
@@ -216,6 +226,10 @@ export function parseGiftConfig(raw: unknown): GiftConfig {
   const stored = asDict(dict.categories) ?? {}
   return {
     effectiveFrom: text(dict.effectiveFrom) || DEFAULT_GIFT_CONFIG.effectiveFrom,
+    notes:
+      dict.notes == null
+        ? DEFAULT_GIFT_CONFIG.notes
+        : listOf(dict.notes).map(text).filter(Boolean),
     categories: DEFAULT_GIFT_CONFIG.categories.map((base) => {
       const row = asDict(stored[base.id])
       if (!row) return base
@@ -235,6 +249,8 @@ export function parseGiftConfig(raw: unknown): GiftConfig {
 export function serializeGiftConfig(config: GiftConfig): Record<string, unknown> {
   return {
     effectiveFrom: config.effectiveFrom,
+    // Chuỗi rỗng thay vì mảng rỗng để RTDB vẫn lưu lại việc đã xóa hết ghi chú
+    notes: config.notes.length ? config.notes : '',
     categories: Object.fromEntries(
       config.categories.map((c) => [
         c.id,

@@ -4232,6 +4232,15 @@ code {
   color: var(--ok);
 }
 
+.gift-notes ul {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  line-height: 1.5;
+}
+
 .gift-toolbar {
   justify-content: flex-end;
   margin-bottom: 12px;

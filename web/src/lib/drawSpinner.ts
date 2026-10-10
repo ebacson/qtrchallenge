@@ -3,7 +3,7 @@ import { pickRandom, rewardItemLabel } from './rewardPenalty'
 import type { RewardItem } from '../types'
 
 /** Mỗi lượt: tên đổi nhanh rồi chậm dần, dừng trên người trúng phần quà đó */
-const SPIN_MS = 7000
+const SPIN_MS = 14000
 const TICK_START_MS = 90
 const TICK_END_MS = 650
 const HOLD_MS = 1200

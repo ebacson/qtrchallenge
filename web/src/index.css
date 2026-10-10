@@ -3481,6 +3481,18 @@ code {
   cursor: pointer;
 }
 
+.draw-confirmed {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid #ffd54f;
+  color: #ffe082;
+  font-weight: 700;
+}
+
 .draw-winners {
   position: relative;
   z-index: 1;

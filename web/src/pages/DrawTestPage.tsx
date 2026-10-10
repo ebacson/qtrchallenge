@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Gift, RotateCcw, Volume2, VolumeX } from 'lucide-react'
+import { BadgeCheck, Gift, RotateCcw, Volume2, VolumeX } from 'lucide-react'
 import { pickRandom, rewardItemLabel, rewardItemsSummary } from '../lib/rewardPenalty'
 import type { RewardItem } from '../types'
 
@@ -106,6 +106,7 @@ export function DrawTestPage() {
   const [phase, setPhase] = useState<Phase>('idle')
   const [spinName, setSpinName] = useState<string | null>(null)
   const [winners, setWinners] = useState<string[]>([])
+  const [confirmed, setConfirmed] = useState(false)
   const [confetti, setConfetti] = useState<Confetti[]>([])
   const [muted, setMuted] = useState(false)
   const timers = useRef<ReturnType<typeof setTimeout>[]>([])
@@ -127,6 +128,8 @@ export function DrawTestPage() {
   const nextPrize = slots[round] ?? ''
   const lastWinner = winners.length ? byId.get(winners[winners.length - 1]) : undefined
   const busy = phase === 'spinning'
+  /** Đã xác nhận thì khóa kết quả: không quay lại, không đổi mốc hay số người */
+  const locked = busy || confirmed
 
   useEffect(
     () => () => {
@@ -229,7 +232,7 @@ export function DrawTestPage() {
               key={t.target}
               type="button"
               className={tierIndex === i ? 'chip active' : 'chip'}
-              disabled={busy}
+              disabled={locked}
               onClick={() => {
                 reset()
                 setTierIndex(i)
@@ -248,7 +251,7 @@ export function DrawTestPage() {
             min={1}
             max={SAMPLE.length}
             value={count}
-            disabled={busy}
+            disabled={locked}
             onChange={(e) => {
               reset()
               setCount(Number(e.target.value))
@@ -294,7 +297,7 @@ export function DrawTestPage() {
 
         <p className="draw-round">
           {phase === 'done'
-            ? `Đã trao ${winners.length}/${slots.length} phần quà`
+            ? `${confirmed ? 'Đã xác nhận' : 'Đã quay xong'} · ${winners.length}/${slots.length} phần quà`
             : `Lượt ${round + 1}/${totalRounds} · ${nextPrize} · còn ${pool.length} người`}
         </p>
 
@@ -320,7 +323,26 @@ export function DrawTestPage() {
         </div>
 
         <div className="draw-actions">
-          {phase !== 'done' && (
+          {confirmed ? (
+            <span className="draw-confirmed">
+              <BadgeCheck size={18} aria-hidden /> Kết quả đã được xác nhận
+            </span>
+          ) : phase === 'done' ? (
+            <button
+              type="button"
+              className="draw-go"
+              onClick={() => {
+                if (
+                  window.confirm(
+                    `Xác nhận kết quả ${winners.length} người trúng thưởng? Sau khi xác nhận sẽ không thể quay lại.`,
+                  )
+                )
+                  setConfirmed(true)
+              }}
+            >
+              Xác nhận kết quả
+            </button>
+          ) : (
             <button
               type="button"
               className="draw-go"
@@ -330,7 +352,7 @@ export function DrawTestPage() {
               {busy ? 'Đang quay…' : round === 0 ? 'Quay số' : 'Quay tiếp'}
             </button>
           )}
-          {(winners.length > 0 || phase === 'done') && !busy && (
+          {winners.length > 0 && !busy && !confirmed && (
             <button
               type="button"
               className="draw-reset"

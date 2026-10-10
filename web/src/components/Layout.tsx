@@ -6,6 +6,7 @@ import {
   CalendarDays,
   CirclePlus,
   Flag,
+  Gift,
   House,
   Images,
   Landmark,
@@ -78,6 +79,7 @@ const adminGroup: MenuGroup = {
     { to: '/admin/challenges/new', label: 'Tạo thử thách', icon: CirclePlus },
     { to: '/admin/users', label: 'Quản lý thành viên', icon: UserCog },
     { to: '/admin/records', label: 'Xác thực thành tích', icon: ShieldCheck },
+    { to: '/admin/gifts', label: 'Quà tặng', icon: Gift },
   ],
 }
 

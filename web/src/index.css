@@ -3782,6 +3782,108 @@ code {
   color: var(--danger);
 }
 
+.gift-category + .gift-category {
+  margin-top: 18px;
+}
+
+.gift-category h3 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+
+.gift-category p {
+  margin: 0 0 8px;
+}
+
+.gift-table th,
+.gift-table td {
+  text-align: left;
+}
+
+.gift-table th:last-child,
+.gift-table td:last-child {
+  text-align: right;
+}
+
+.gift-table .gift-name {
+  white-space: normal;
+  min-width: 10rem;
+}
+
+.gift-toolbar {
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.gift-search {
+  margin-bottom: 12px;
+}
+
+.gift-editor .section {
+  margin: 0;
+}
+
+.gift-editor .eyebrow {
+  margin: 0;
+}
+
+.gift-effective {
+  max-width: 16rem;
+}
+
+.gift-tier-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gift-tier-edit {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  align-items: end;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.gift-tier-edit .gift-tier-wide {
+  grid-column: span 2;
+}
+
+.gift-tier-edit label {
+  font-size: 0.8rem;
+}
+
+.gift-tier-edit input {
+  padding: 8px 10px;
+  min-width: 0;
+}
+
+.gift-tier-remove {
+  grid-column: 2;
+  justify-self: end;
+}
+
+@media (min-width: 720px) {
+  .gift-tier-edit {
+    grid-template-columns: 7rem 7rem 1fr 8rem 8rem auto;
+  }
+
+  .gift-tier-edit .gift-tier-wide {
+    grid-column: auto;
+  }
+
+  .gift-tier-edit label.gift-tier-wide:first-child {
+    grid-column: span 2;
+  }
+
+  .gift-tier-remove {
+    grid-column: auto;
+    align-self: end;
+  }
+}
+
 .finance-ledger-tools {
   display: grid;
   grid-template-columns: 1fr;

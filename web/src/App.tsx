@@ -51,6 +51,7 @@ const EditChallengePage = lazyPage(
 const AdminUsersPage = lazyPage(() => import('./pages/AdminUsersPage'), 'AdminUsersPage')
 const AdminRecordsPage = lazyPage(() => import('./pages/AdminRecordsPage'), 'AdminRecordsPage')
 const FinancePage = lazyPage(() => import('./pages/FinancePage'), 'FinancePage')
+const AdminGiftsPage = lazyPage(() => import('./pages/AdminGiftsPage'), 'AdminGiftsPage')
 
 function BootScreen() {
   return (
@@ -116,6 +117,14 @@ function AppRoutes() {
           element={
             <RequireAdmin>
               <AdminRecordsPage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="admin/gifts"
+          element={
+            <RequireAdmin>
+              <AdminGiftsPage />
             </RequireAdmin>
           }
         />

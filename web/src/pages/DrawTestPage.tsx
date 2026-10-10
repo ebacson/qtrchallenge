@@ -1,20 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
 import { Gift, RotateCcw, Volume2, VolumeX } from 'lucide-react'
-import { assignPrizes, drawWinners, pickRandom, rewardItemsSummary } from '../lib/rewardPenalty'
+import { pickRandom, rewardItemLabel, rewardItemsSummary } from '../lib/rewardPenalty'
 import type { RewardItem } from '../types'
 
-/** Cùng nhịp với quay số thử thách: tên đổi nhanh rồi chậm dần, dừng trên người trúng đầu tiên */
+/** Mỗi lượt: tên đổi nhanh rồi chậm dần, dừng trên người trúng phần quà đó */
 const SPIN_MS = 7000
 const TICK_START_MS = 90
 const TICK_END_MS = 650
-const HOLD_MS = 1500
-const REVEAL_STEP_MS = 700
+const HOLD_MS = 1200
 
 const MUSIC_URL = `${import.meta.env.BASE_URL}sounds/quayso.mp3`
 
 type Candidate = { id: string; name: string; paid: boolean }
 type TestTier = { target: string; items: RewardItem[] }
-type Phase = 'idle' | 'spinning' | 'reveal' | 'done'
+/** won: vừa công bố người trúng một phần quà, chờ quay phần tiếp theo */
+type Phase = 'idle' | 'spinning' | 'won' | 'done'
 type Confetti = { id: number; left: number; delay: number; duration: number; color: string; size: number }
 
 const SAMPLE_NAMES = [
@@ -106,8 +106,6 @@ export function DrawTestPage() {
   const [phase, setPhase] = useState<Phase>('idle')
   const [spinName, setSpinName] = useState<string | null>(null)
   const [winners, setWinners] = useState<string[]>([])
-  const [prizes, setPrizes] = useState<string[]>([])
-  const [revealed, setRevealed] = useState(0)
   const [confetti, setConfetti] = useState<Confetti[]>([])
   const [muted, setMuted] = useState(false)
   const timers = useRef<ReturnType<typeof setTimeout>[]>([])
@@ -115,11 +113,20 @@ export function DrawTestPage() {
   const runId = useRef(0)
 
   const tier = TEST_TIERS[tierIndex]
-  const gifts = tier.items.reduce((s, it) => s + it.quantity, 0)
+  /** Từng phần quà theo thứ tự đã đặt; mỗi phần quà một lượt quay */
+  const slots = tier.items.flatMap((it) =>
+    Array<string>(it.quantity).fill(rewardItemLabel(it.name)),
+  )
   const candidates = SAMPLE.slice(0, count)
   const byId = new Map(SAMPLE.map((c) => [c.id, c]))
-  const winnerSet = new Set(winners.slice(0, revealed))
-  const busy = phase === 'spinning' || phase === 'reveal'
+  const winnerSet = new Set(winners)
+  /** Người đã trúng bị loại khỏi các lượt sau */
+  const pool = candidates.filter((c) => !winnerSet.has(c.id))
+  const totalRounds = Math.min(slots.length, candidates.length)
+  const round = winners.length
+  const nextPrize = slots[round] ?? ''
+  const lastWinner = winners.length ? byId.get(winners[winners.length - 1]) : undefined
+  const busy = phase === 'spinning'
 
   useEffect(
     () => () => {
@@ -159,8 +166,6 @@ export function DrawTestPage() {
     setPhase('idle')
     setSpinName(null)
     setWinners([])
-    setPrizes([])
-    setRevealed(0)
     setConfetti([])
   }
 
@@ -182,27 +187,23 @@ export function DrawTestPage() {
     await wait(HOLD_MS)
   }
 
-  async function runDraw() {
-    if (busy || !candidates.length) return
-    reset()
+  /** Quay một phần quà trong số người chưa trúng */
+  async function runRound() {
+    if (busy || round >= totalRounds || !pool.length) return
+    runId.current += 1
     const run = runId.current
-    const ids = candidates.map((c) => c.id)
-    const picked = drawWinners(ids, gifts)
-    setWinners(picked)
-    setPrizes(assignPrizes(picked, tier.items))
+    const ids = pool.map((c) => c.id)
+    const picked = pickRandom(ids)
+    if (!picked) return
+    setConfetti([])
     setPhase('spinning')
     playMusic()
-    if (ids.length > gifts && picked.length) await spin(ids, picked[0], run)
+    if (ids.length > 1) await spin(ids, picked, run)
     if (runId.current !== run) return
     setSpinName(null)
-    setPhase('reveal')
+    setWinners((list) => [...list, picked])
     setConfetti(makeConfetti())
-    for (let i = 1; i <= picked.length; i++) {
-      setRevealed(i)
-      await wait(REVEAL_STEP_MS)
-      if (runId.current !== run) return
-    }
-    setPhase('done')
+    setPhase(round + 1 >= totalRounds ? 'done' : 'won')
   }
 
   function toggleMute() {
@@ -210,8 +211,6 @@ export function DrawTestPage() {
     setMuted(next)
     if (audio.current) audio.current.muted = next
   }
-
-  const allWin = candidates.length <= gifts
 
   return (
     <div className="page draw-test">
@@ -293,59 +292,63 @@ export function DrawTestPage() {
           Mục tiêu <strong>{tier.target}</strong> · {rewardItemsSummary(tier.items)}
         </p>
 
+        <p className="draw-round">
+          {phase === 'done'
+            ? `Đã trao ${winners.length}/${slots.length} phần quà`
+            : `Lượt ${round + 1}/${totalRounds} · ${nextPrize} · còn ${pool.length} người`}
+        </p>
+
         <div className="draw-slot" aria-live="polite">
           {phase === 'spinning' && spinName ? (
             <span key={spinName} className="draw-slot-name">
               <span className="draw-slot-avatar">{initial(spinName)}</span>
               {spinName}
             </span>
-          ) : phase === 'reveal' || phase === 'done' ? (
-            <span className="draw-slot-name draw-slot-win">
-              🎉 {winners.length} người trúng thưởng
+          ) : (phase === 'won' || phase === 'done') && lastWinner ? (
+            <span key={lastWinner.id} className="draw-slot-name draw-slot-win">
+              <span className="draw-slot-avatar">{initial(lastWinner.name)}</span>
+              {lastWinner.name}
+              <span className="draw-winner-prize">
+                <Gift size={14} aria-hidden /> {slots[winners.length - 1]}
+              </span>
             </span>
           ) : (
             <span className="draw-slot-idle">
-              {candidates.length} người · {gifts} phần quà
+              {candidates.length} người · {slots.length} phần quà
             </span>
           )}
         </div>
 
         <div className="draw-actions">
-          {phase === 'done' ? (
-            <>
-              <button type="button" className="draw-go" onClick={() => void runDraw()}>
-                Quay lại
-              </button>
-              <button type="button" className="draw-reset" onClick={reset}>
-                <RotateCcw size={16} aria-hidden /> Làm mới
-              </button>
-            </>
-          ) : (
+          {phase !== 'done' && (
             <button
               type="button"
               className="draw-go"
-              disabled={busy || !candidates.length}
-              onClick={() => void runDraw()}
+              disabled={busy || !pool.length}
+              onClick={() => void runRound()}
             >
-              {busy ? 'Đang quay…' : allWin ? 'Trao thưởng cho tất cả' : 'Quay số'}
+              {busy ? 'Đang quay…' : round === 0 ? 'Quay số' : 'Quay tiếp'}
+            </button>
+          )}
+          {(winners.length > 0 || phase === 'done') && !busy && (
+            <button type="button" className="draw-reset" onClick={reset}>
+              <RotateCcw size={16} aria-hidden /> Quay lại từ đầu
             </button>
           )}
         </div>
 
-        {revealed > 0 && (
+        {winners.length > 0 && (
           <ol className="draw-winners">
-            {winners.slice(0, revealed).map((id, i) => {
+            {winners.map((id, i) => {
               const c = byId.get(id)
               return (
                 <li key={id}>
                   <span className="draw-winner-rank">{i + 1}</span>
                   <span className="draw-slot-avatar">{initial(c?.name ?? '?')}</span>
                   <strong>{c?.name}</strong>
-                  {prizes[i] && (
-                    <span className="draw-winner-prize">
-                      <Gift size={14} aria-hidden /> {prizes[i]}
-                    </span>
-                  )}
+                  <span className="draw-winner-prize">
+                    <Gift size={14} aria-hidden /> {slots[i]}
+                  </span>
                 </li>
               )
             })}

@@ -3273,7 +3273,8 @@ code {
 }
 
 .draw-spinning .draw-lights,
-.draw-reveal .draw-lights {
+.draw-won .draw-lights,
+.draw-done .draw-lights {
   animation: draw-blink 0.35s steps(2) infinite;
 }
 
@@ -3323,9 +3324,20 @@ code {
 }
 
 .draw-target {
-  margin: 0 0 18px;
+  margin: 0 0 10px;
   font-size: 0.95rem;
   color: rgba(255, 255, 255, 0.88);
+}
+
+.draw-round {
+  display: inline-block;
+  margin: 0 0 14px;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.25);
+  color: #ffe082;
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 
 .draw-slot {
@@ -3348,8 +3360,10 @@ code {
 
 .draw-slot-name {
   display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
-  gap: 12px;
+  gap: 8px 12px;
   font-family: var(--display);
   font-size: clamp(1.7rem, 6vw, 2.6rem);
   font-weight: 700;

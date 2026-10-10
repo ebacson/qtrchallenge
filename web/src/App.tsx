@@ -97,6 +97,7 @@ function AppRoutes() {
         <Route path="activities/:uid" element={<ActivitiesPage />} />
         <Route path="challenges" element={<ChallengesPage />} />
         <Route path="challenges/:id" element={<ChallengeDetailPage />} />
+        <Route path="challenges/:id/draw" element={<ChallengeDrawPage />} />
         <Route
           path="admin/challenges/new"
           element={

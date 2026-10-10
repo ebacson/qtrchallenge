@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { get, ref, runTransaction, set, update } from 'firebase/database'
 import { BadgeCheck, RotateCcw } from 'lucide-react'
 import { DrawStage, FullscreenButton } from '../components/DrawStage'
 import { useAuth } from '../context/AuthContext'
-import { parseChallenge, STATUS_FINISHED } from '../lib/challengeRules'
+import { parseChallenge, revealedWinners, STATUS_FINISHED } from '../lib/challengeRules'
 import {
   drawPhase,
   prizeSlots,
@@ -16,6 +16,7 @@ import { db } from '../lib/firebase'
 import { pickRandom, rewardCandidates, rewardItemsSummary } from '../lib/rewardPenalty'
 import { useSharedValue } from '../lib/sharedValue'
 import { useUserProfiles } from '../lib/userWrites'
+import type { Challenge } from '../types'
 
 const SYSTEM_EMAIL = 'echiptime@gmail.com'
 
@@ -29,11 +30,36 @@ function asList(value: unknown): unknown[] {
   return []
 }
 
-/** Màn hình quay số của một thử thách: mỗi phần quà một lượt, lưu ngay sau từng lượt */
+type WatchedRound = { key: string; target: string; people: StagePerson[]; winner: StagePerson }
+
+/** Lượt Admin đang quay (đã lưu người trúng, chưa công bố): người xem quay theo trên máy mình */
+function watchedRound(
+  challenge: Challenge,
+  toPerson: (uid: string) => StagePerson,
+): WatchedRound | null {
+  for (const d of challenge.rewardDraws ?? []) {
+    if (d.confirmedAt || d.revealed == null || d.winners.length <= d.revealed) continue
+    const i = d.revealed
+    const before = new Set(d.winners.slice(0, i))
+    return {
+      key: `${d.target}:${i}:${d.winners[i]}`,
+      target: d.target,
+      people: d.candidates.filter((uid) => !before.has(uid)).map(toPerson),
+      winner: toPerson(d.winners[i]),
+    }
+  }
+  return null
+}
+
+/**
+ * Màn hình quay số của một thử thách: mỗi phần quà một lượt, lưu ngay sau từng lượt.
+ * Thành viên mở cùng màn hình để xem trực tiếp (không có nút quay/xác nhận).
+ */
 export function ChallengeDrawPage() {
   const { id = '' } = useParams<{ id: string }>()
   const [searchParams] = useSearchParams()
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
+  const isAdmin = profile?.admin === true
   const raw = useSharedValue<Record<string, unknown>>(id ? `challenges/${id}` : null)
   const rawProfiles = useUserProfiles()
   const spinner = useDrawSpinner()
@@ -67,6 +93,30 @@ export function ChallengeDrawPage() {
     avatar: String(rawProfiles?.[uid]?.avatar ?? '') || undefined,
   })
 
+  /** Lượt người xem đã quay xong trên máy mình (có thể trước khi Admin công bố vài trăm ms) */
+  const [watchedKey, setWatchedKey] = useState('')
+  const watched =
+    !isAdmin && challenge?.status === STATUS_FINISHED && rawProfiles
+      ? watchedRound(challenge, toPerson)
+      : null
+  const watchKey = watched?.key ?? ''
+
+  useEffect(() => {
+    if (!watched) return
+    let finished = false
+    void spinner.spin(watched.people, watched.winner, { music: false }).then((ok) => {
+      finished = true
+      if (!ok) return
+      setWatchedKey(watched.key)
+      setSelected(watched.target)
+    })
+    return () => {
+      if (!finished) spinner.stop()
+    }
+    // Chỉ chạy lại khi sang lượt khác; watched/spinner đổi object mỗi lần render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchKey])
+
   if (raw === undefined || rawProfiles === null) {
     return (
       <div className="page">
@@ -87,7 +137,7 @@ export function ChallengeDrawPage() {
   const drawOf = (target: string) => challenge.rewardDraws?.find((d) => d.target === target)
   const isConfirmed = (target: string) => Boolean(drawOf(target)?.confirmedAt)
   const reward =
-    rewards.find((r) => r.target === selected) ??
+    rewards.find((r) => r.target === (watched?.target ?? selected)) ??
     rewards.find((r) => !isConfirmed(r.target)) ??
     rewards[0]
   const finished = challenge.status === STATUS_FINISHED
@@ -132,7 +182,12 @@ export function ChallengeDrawPage() {
     (draw.candidates.length !== liveIds.length ||
       draw.candidates.some((uid) => !liveIds.includes(uid)))
   const slots = prizeSlots(reward.items)
-  const savedWinners = draw?.winners ?? []
+  const allWinners = draw?.winners ?? []
+  const shownCount = isAdmin
+    ? allWinners.length
+    : (draw ? revealedWinners(draw).length : 0) +
+      (watched && watched.target === reward.target && watchedKey === watched.key ? 1 : 0)
+  const savedWinners = allWinners.slice(0, shownCount)
   const winners = pendingId ? savedWinners.filter((uid) => uid !== pendingId) : savedWinners
   const winnerSet = new Set(winners)
   const pool = candidates.filter((uid) => !savedWinners.includes(uid))
@@ -259,6 +314,61 @@ export function ChallengeDrawPage() {
     }
   }
 
+  const confirmedText = (
+    <>
+      <BadgeCheck size={18} aria-hidden /> Đã xác nhận kết quả {reward.target}
+    </>
+  )
+
+  const viewerActions = (
+    <span className="draw-confirmed">
+      {confirmed
+        ? confirmedText
+        : phase === 'spinning'
+          ? 'Admin đang quay…'
+          : phase === 'done'
+            ? 'Chờ Admin xác nhận kết quả'
+            : 'Chờ Admin quay số'}
+    </span>
+  )
+
+  const adminActions = (
+    <>
+      {confirmed ? (
+        <>
+          <span className="draw-confirmed">{confirmedText}</span>
+          {nextReward && (
+            <button
+              type="button"
+              className="draw-go"
+              onClick={() => selectReward(nextReward.target)}
+            >
+              Quay mục tiêu {nextReward.target} →
+            </button>
+          )}
+        </>
+      ) : phase === 'done' ? (
+        <button type="button" className="draw-go" disabled={busy} onClick={() => void confirmDraw()}>
+          Xác nhận kết quả {reward.target}
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="draw-go"
+          disabled={busy || totalRounds === 0}
+          onClick={() => void runRound()}
+        >
+          {busy ? 'Đang quay…' : round === 0 ? 'Quay số' : 'Quay tiếp'}
+        </button>
+      )}
+      {draw && !busy && !confirmed && (
+        <button type="button" className="draw-reset" onClick={() => void resetDraw()}>
+          <RotateCcw size={16} aria-hidden /> Quay lại từ đầu
+        </button>
+      )}
+    </>
+  )
+
   return (
     <div className="page draw-test">
       {header}
@@ -271,6 +381,7 @@ export function ChallengeDrawPage() {
           <div className="filter-row draw-tier-chips">
             {rewards.map((r) => {
               const d = drawOf(r.target)
+              const won = d ? (isAdmin ? d.winners : revealedWinners(d)).length : 0
               return (
                 <button
                   key={r.target}
@@ -282,8 +393,8 @@ export function ChallengeDrawPage() {
                   {r.target}
                   {d?.confirmedAt ? (
                     <BadgeCheck size={14} aria-label="Đã xác nhận" />
-                  ) : d && d.winners.length > 0 ? (
-                    ` · ${d.winners.length} đã trúng`
+                  ) : won > 0 ? (
+                    ` · ${won} đã trúng`
                   ) : null}
                 </button>
               )
@@ -307,52 +418,10 @@ export function ChallengeDrawPage() {
           lastWin={stageWinners[stageWinners.length - 1]}
           winners={stageWinners}
           tools={<FullscreenButton {...fullscreen} />}
-          actions={
-            <>
-              {confirmed ? (
-                <>
-                  <span className="draw-confirmed">
-                    <BadgeCheck size={18} aria-hidden /> Đã xác nhận kết quả {reward.target}
-                  </span>
-                  {nextReward && (
-                    <button
-                      type="button"
-                      className="draw-go"
-                      onClick={() => selectReward(nextReward.target)}
-                    >
-                      Quay mục tiêu {nextReward.target} →
-                    </button>
-                  )}
-                </>
-              ) : phase === 'done' ? (
-                <button
-                  type="button"
-                  className="draw-go"
-                  disabled={busy}
-                  onClick={() => void confirmDraw()}
-                >
-                  Xác nhận kết quả {reward.target}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="draw-go"
-                  disabled={busy || totalRounds === 0}
-                  onClick={() => void runRound()}
-                >
-                  {busy ? 'Đang quay…' : round === 0 ? 'Quay số' : 'Quay tiếp'}
-                </button>
-              )}
-              {draw && !busy && !confirmed && (
-                <button type="button" className="draw-reset" onClick={() => void resetDraw()}>
-                  <RotateCcw size={16} aria-hidden /> Quay lại từ đầu
-                </button>
-              )}
-            </>
-          }
+          actions={isAdmin ? adminActions : viewerActions}
         />
         {error && <p className="form-error">{error}</p>}
-        {listChanged && !confirmed && (
+        {isAdmin && listChanged && !confirmed && (
           <p className="tiny form-error">
             Danh sách đủ điều kiện đã thay đổi so với lúc bắt đầu quay ({liveIds.length} người hiện
             tại). Muốn quay theo danh sách mới thì bấm "Quay lại từ đầu".

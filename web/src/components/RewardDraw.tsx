@@ -204,6 +204,16 @@ function RewardDrawCard({
           </Link>
         </div>
       )}
+      {!isAdmin && finished && !confirmed && (candidates.length > 0 || draw) && (
+        <div className="btn-row">
+          <Link
+            className={spinningNow ? 'btn primary compact' : 'btn ghost compact'}
+            to={`/challenges/${challenge.id}/draw?target=${encodeURIComponent(reward.target)}`}
+          >
+            {spinningNow ? '🔴 Xem trực tiếp: Admin đang quay' : 'Xem quay số trực tiếp'}
+          </Link>
+        </div>
+      )}
     </div>
   )
 }

@@ -12,7 +12,9 @@ const HOLD_MS = 1200
 const MUSIC_URL = `${import.meta.env.BASE_URL}sounds/quayso.mp3`
 
 type Candidate = { id: string; name: string; paid: boolean }
-type TestTier = { target: string; items: RewardItem[] }
+type TestTier = { target: string; offset: number; count: number; items: RewardItem[] }
+/** Kết quả riêng của từng mốc; chuyển mốc không làm mất kết quả mốc khác */
+type TierResult = { count: number; winners: string[]; confirmed: boolean }
 /** won: vừa công bố người trúng một phần quà, chờ quay phần tiếp theo */
 type Phase = 'idle' | 'spinning' | 'won' | 'done'
 type Confetti = { id: number; left: number; delay: number; duration: number; color: string; size: number }
@@ -67,17 +69,24 @@ const SAMPLE: Candidate[] = SAMPLE_NAMES.map((name, i) => ({
   paid: i % 5 === 4,
 }))
 
+/** offset/count: mỗi mốc lấy một đoạn khác nhau trong danh sách mẫu, như người về các mốc khác nhau */
 const TEST_TIERS: TestTier[] = [
   {
     target: '300 km',
+    offset: 0,
+    count: 10,
     items: [
       { name: 'Áo QTR', quantity: 1 },
       { name: 'Tất xỏ ngón', quantity: 2 },
     ],
   },
-  { target: '200 km', items: [{ name: 'Tất xỏ ngón', quantity: 3 }] },
-  { target: '100 km', items: [{ name: 'Băng đô chạy bộ', quantity: 2 }] },
+  { target: '200 km', offset: 10, count: 14, items: [{ name: 'Tất xỏ ngón', quantity: 3 }] },
+  { target: '100 km', offset: 24, count: 16, items: [{ name: 'Băng đô chạy bộ', quantity: 2 }] },
 ]
+
+function tierCandidates(tier: TestTier, count: number): Candidate[] {
+  return Array.from({ length: count }, (_, i) => SAMPLE[(tier.offset + i) % SAMPLE.length])
+}
 
 const CONFETTI_COLORS = ['#ffd54a', '#ff4d6d', '#ffffff', '#4dd0e1', '#ffb300', '#7cff6b']
 
@@ -102,11 +111,11 @@ function nowMs(): number {
 
 export function DrawTestPage() {
   const [tierIndex, setTierIndex] = useState(0)
-  const [count, setCount] = useState(24)
-  const [phase, setPhase] = useState<Phase>('idle')
+  const [results, setResults] = useState<TierResult[]>(() =>
+    TEST_TIERS.map((t) => ({ count: t.count, winners: [], confirmed: false })),
+  )
+  const [spinning, setSpinning] = useState(false)
   const [spinName, setSpinName] = useState<string | null>(null)
-  const [winners, setWinners] = useState<string[]>([])
-  const [confirmed, setConfirmed] = useState(false)
   const [confetti, setConfetti] = useState<Confetti[]>([])
   const [muted, setMuted] = useState(false)
   const timers = useRef<ReturnType<typeof setTimeout>[]>([])
@@ -118,7 +127,8 @@ export function DrawTestPage() {
   const slots = tier.items.flatMap((it) =>
     Array<string>(it.quantity).fill(rewardItemLabel(it.name)),
   )
-  const candidates = SAMPLE.slice(0, count)
+  const { count, winners, confirmed } = results[tierIndex]
+  const candidates = tierCandidates(tier, count)
   const byId = new Map(SAMPLE.map((c) => [c.id, c]))
   const winnerSet = new Set(winners)
   /** Người đã trúng bị loại khỏi các lượt sau */
@@ -127,9 +137,15 @@ export function DrawTestPage() {
   const round = winners.length
   const nextPrize = slots[round] ?? ''
   const lastWinner = winners.length ? byId.get(winners[winners.length - 1]) : undefined
-  const busy = phase === 'spinning'
-  /** Đã xác nhận thì khóa kết quả: không quay lại, không đổi mốc hay số người */
-  const locked = busy || confirmed
+  const busy = spinning
+  const phase: Phase = spinning
+    ? 'spinning'
+    : round === 0
+      ? 'idle'
+      : round >= totalRounds
+        ? 'done'
+        : 'won'
+  const nextTierIndex = TEST_TIERS.findIndex((_, i) => i !== tierIndex && !results[i].confirmed)
 
   useEffect(
     () => () => {
@@ -161,15 +177,28 @@ export function DrawTestPage() {
     void a.play().catch(() => {})
   }
 
-  function reset() {
+  function updateResult(index: number, update: (r: TierResult) => TierResult) {
+    setResults((list) => list.map((r, i) => (i === index ? update(r) : r)))
+  }
+
+  function stopSpin() {
     runId.current += 1
     for (const t of timers.current) clearTimeout(t)
     timers.current = []
     stopMusic()
-    setPhase('idle')
+    setSpinning(false)
     setSpinName(null)
-    setWinners([])
     setConfetti([])
+  }
+
+  function selectTier(index: number) {
+    stopSpin()
+    setTierIndex(index)
+  }
+
+  function resetTier() {
+    stopSpin()
+    updateResult(tierIndex, (r) => ({ ...r, winners: [] }))
   }
 
   async function spin(ids: string[], finalId: string, run: number) {
@@ -192,21 +221,32 @@ export function DrawTestPage() {
 
   /** Quay một phần quà trong số người chưa trúng */
   async function runRound() {
-    if (busy || round >= totalRounds || !pool.length) return
+    if (busy || confirmed || round >= totalRounds || !pool.length) return
     runId.current += 1
     const run = runId.current
+    const index = tierIndex
     const ids = pool.map((c) => c.id)
     const picked = pickRandom(ids)
     if (!picked) return
     setConfetti([])
-    setPhase('spinning')
+    setSpinning(true)
     playMusic()
     if (ids.length > 1) await spin(ids, picked, run)
     if (runId.current !== run) return
     setSpinName(null)
-    setWinners((list) => [...list, picked])
+    updateResult(index, (r) => ({ ...r, winners: [...r.winners, picked] }))
     setConfetti(makeConfetti())
-    setPhase(round + 1 >= totalRounds ? 'done' : 'won')
+    setSpinning(false)
+  }
+
+  function confirmTier() {
+    if (
+      !window.confirm(
+        `Xác nhận kết quả mốc ${tier.target} (${winners.length} người trúng thưởng)? Sau khi xác nhận sẽ không thể quay lại mốc này.`,
+      )
+    )
+      return
+    updateResult(tierIndex, (r) => ({ ...r, confirmed: true }))
   }
 
   function toggleMute() {
@@ -227,34 +267,42 @@ export function DrawTestPage() {
 
       <section className="section panel draw-setup">
         <div className="filter-row">
-          {TEST_TIERS.map((t, i) => (
-            <button
-              key={t.target}
-              type="button"
-              className={tierIndex === i ? 'chip active' : 'chip'}
-              disabled={locked}
-              onClick={() => {
-                reset()
-                setTierIndex(i)
-              }}
-            >
-              {t.target}
-            </button>
-          ))}
+          {TEST_TIERS.map((t, i) => {
+            const r = results[i]
+            return (
+              <button
+                key={t.target}
+                type="button"
+                className={tierIndex === i ? 'chip active' : 'chip'}
+                disabled={busy}
+                onClick={() => selectTier(i)}
+              >
+                {t.target}
+                {r.confirmed ? (
+                  <BadgeCheck size={14} aria-label="Đã xác nhận" />
+                ) : r.winners.length > 0 ? (
+                  ` · ${r.winners.length} đã trúng`
+                ) : null}
+              </button>
+            )
+          })}
         </div>
         <label className="draw-count">
           <span>
             Số người được quay: <strong>{count}</strong>
+            {winners.length > 0 && !confirmed && (
+              <small className="muted"> (quay lại từ đầu để đổi số người)</small>
+            )}
           </span>
           <input
             type="range"
             min={1}
             max={SAMPLE.length}
             value={count}
-            disabled={locked}
+            disabled={busy || winners.length > 0}
             onChange={(e) => {
-              reset()
-              setCount(Number(e.target.value))
+              const next = Number(e.target.value)
+              updateResult(tierIndex, (r) => ({ ...r, count: next }))
             }}
           />
         </label>
@@ -324,23 +372,23 @@ export function DrawTestPage() {
 
         <div className="draw-actions">
           {confirmed ? (
-            <span className="draw-confirmed">
-              <BadgeCheck size={18} aria-hidden /> Kết quả đã được xác nhận
-            </span>
+            <>
+              <span className="draw-confirmed">
+                <BadgeCheck size={18} aria-hidden /> Đã xác nhận kết quả mốc {tier.target}
+              </span>
+              {nextTierIndex >= 0 && (
+                <button
+                  type="button"
+                  className="draw-go"
+                  onClick={() => selectTier(nextTierIndex)}
+                >
+                  Quay mốc {TEST_TIERS[nextTierIndex].target} →
+                </button>
+              )}
+            </>
           ) : phase === 'done' ? (
-            <button
-              type="button"
-              className="draw-go"
-              onClick={() => {
-                if (
-                  window.confirm(
-                    `Xác nhận kết quả ${winners.length} người trúng thưởng? Sau khi xác nhận sẽ không thể quay lại.`,
-                  )
-                )
-                  setConfirmed(true)
-              }}
-            >
-              Xác nhận kết quả
+            <button type="button" className="draw-go" onClick={confirmTier}>
+              Xác nhận kết quả {tier.target}
             </button>
           ) : (
             <button
@@ -359,10 +407,10 @@ export function DrawTestPage() {
               onClick={() => {
                 if (
                   window.confirm(
-                    `Xóa kết quả ${winners.length} người đã trúng và quay lại từ đầu?`,
+                    `Xóa kết quả ${winners.length} người đã trúng mốc ${tier.target} và quay lại từ đầu?`,
                   )
                 )
-                  reset()
+                  resetTier()
               }}
             >
               <RotateCcw size={16} aria-hidden /> Quay lại từ đầu

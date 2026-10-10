@@ -3481,6 +3481,12 @@ code {
   cursor: pointer;
 }
 
+.draw-setup .chip svg {
+  margin-left: 4px;
+  vertical-align: -2px;
+  color: #2e9d4f;
+}
+
 .draw-confirmed {
   display: inline-flex;
   align-items: center;

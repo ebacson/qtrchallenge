@@ -25,8 +25,10 @@ import {
 import { useAuth } from '../context/AuthContext'
 import { brandLogoSrc, brandTitle } from '../lib/brand'
 import { reloadApp } from '../lib/pwa'
+import { LUCKY_MENU_PATH, parseLuckyMenu } from '../lib/luckyDraw'
 import { formatBadgeCount, useUnreadNotificationCount } from '../lib/notifications'
 import { canViewFinance } from '../lib/permissions'
+import { useSharedValue } from '../lib/sharedValue'
 import type { UserProfile } from '../types'
 
 type MenuItem = {
@@ -93,11 +95,18 @@ export function Layout() {
   const menuRef = useRef<HTMLDivElement>(null)
   const menuId = useId()
   const unreadNotifications = useUnreadNotificationCount()
+  const luckyItems: MenuItem[] = parseLuckyMenu(
+    useSharedValue(profile ? LUCKY_MENU_PATH : null),
+  ).map((d) => ({ to: `/lucky-draw/${d.id}`, label: d.name, icon: Dices }))
 
-  const navGroups = (profile?.admin ? [...menuGroups, adminGroup] : menuGroups).map((group) => ({
-    ...group,
-    items: group.items.filter((item) => !item.visible || item.visible(profile)),
-  }))
+  const navGroups = (profile?.admin ? [...menuGroups, adminGroup] : menuGroups).map((group) => {
+    const items = group.items.filter((item) => !item.visible || item.visible(profile))
+    if (group.key === 'club' && luckyItems.length) {
+      const at = items.findIndex((item) => item.to === '/gifts') + 1
+      items.splice(at || items.length, 0, ...luckyItems)
+    }
+    return { ...group, items }
+  })
 
   useEffect(() => {
     setMenuOpen(false)

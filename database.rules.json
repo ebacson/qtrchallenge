@@ -100,10 +100,14 @@
         ".write": "auth != null && root.child('users').child(auth.uid).child('admin').val() === true",
         "participants": {
           "$key": {
-            ".write": "auth != null && $key === auth.uid && root.child('lucky_draws').child($drawId).child('status').val() === 'open' && (!newData.exists() || (newData.child('uid').val() === auth.uid && newData.child('source').val() === 'self' && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 100))"
+            ".write": "auth != null && $key === auth.uid && root.child('lucky_draws').child($drawId).child('status').val() === 'open' && (!newData.exists() || (root.child('lucky_draw_menu').child($drawId).exists() && newData.child('uid').val() === auth.uid && newData.child('source').val() === 'self' && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 100))"
           }
         }
       }
+    },
+    "lucky_draw_menu": {
+      ".read": "auth != null",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('admin').val() === true"
     },
     "EVENT": {
       ".read": "auth != null",

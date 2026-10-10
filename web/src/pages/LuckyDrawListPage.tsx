@@ -4,7 +4,13 @@ import { push, ref, set } from 'firebase/database'
 import { Plus } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
-import { LUCKY_DRAWS_PATH, LUCKY_STATUS_LABELS, parseLuckyDraws } from '../lib/luckyDraw'
+import {
+  LUCKY_DRAWS_PATH,
+  LUCKY_MENU_PATH,
+  LUCKY_STATUS_LABELS,
+  parseLuckyDraws,
+  parseLuckyMenu,
+} from '../lib/luckyDraw'
 import { rewardItemsSummary } from '../lib/rewardPenalty'
 import { useSharedValue } from '../lib/sharedValue'
 
@@ -79,8 +85,10 @@ export function LuckyDrawListPage() {
   const { user, profile } = useAuth()
   const isAdmin = profile?.admin === true
   const raw = useSharedValue<Record<string, unknown>>(LUCKY_DRAWS_PATH)
+  const menuRaw = useSharedValue(LUCKY_MENU_PATH)
   const [creating, setCreating] = useState(false)
-  const draws = parseLuckyDraws(raw)
+  const publishedIds = new Set(parseLuckyMenu(menuRaw).map((d) => d.id))
+  const draws = parseLuckyDraws(raw).filter((d) => isAdmin || publishedIds.has(d.id))
 
   return (
     <div className="page">
@@ -98,7 +106,7 @@ export function LuckyDrawListPage() {
       )}
       {isAdmin && creating && <CreateForm onClose={() => setCreating(false)} />}
 
-      {raw === undefined ? (
+      {raw === undefined || menuRaw === undefined ? (
         <p className="empty">Đang tải…</p>
       ) : draws.length === 0 ? (
         <p className="empty">Chưa có chương trình quay số nào.</p>
@@ -113,6 +121,11 @@ export function LuckyDrawListPage() {
                   <span className={`lucky-status lucky-status-${d.status}`}>
                     {LUCKY_STATUS_LABELS[d.status]}
                   </span>
+                  {isAdmin && (
+                    <span className="tiny muted">
+                      {publishedIds.has(d.id) ? '✓ Đang hiện ở menu Câu lạc bộ' : 'Chưa hiện ở menu'}
+                    </span>
+                  )}
                   <strong>{d.name}</strong>
                   <span className="tiny muted">
                     {d.participants.length} người tham gia

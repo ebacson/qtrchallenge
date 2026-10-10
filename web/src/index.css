@@ -4274,7 +4274,8 @@ code {
   font-weight: 600;
 }
 
-.lucky-join {
+.lucky-join,
+.lucky-publish {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -4282,7 +4283,14 @@ code {
   gap: 10px;
 }
 
-.lucky-join p {
+.lucky-publish {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.lucky-join p,
+.lucky-publish p {
   margin: 0;
 }
 

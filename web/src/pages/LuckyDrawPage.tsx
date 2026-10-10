@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { push, ref, remove, runTransaction, set } from 'firebase/database'
+import { push, ref, remove, runTransaction, set, update } from 'firebase/database'
 import { ArrowDown, ArrowUp, BadgeCheck, Plus, RotateCcw, Trash2, X } from 'lucide-react'
 import { DrawStage, FullscreenButton } from '../components/DrawStage'
 import { useAuth } from '../context/AuthContext'
@@ -15,6 +15,7 @@ import { db } from '../lib/firebase'
 import {
   asList,
   LUCKY_DRAWS_PATH,
+  LUCKY_MENU_PATH,
   LUCKY_STATUS_LABELS,
   parseLuckyDraw,
   type LuckyParticipant,
@@ -151,6 +152,7 @@ export function LuckyDrawPage() {
   const { user, profile } = useAuth()
   const isAdmin = profile?.admin === true
   const raw = useSharedValue<Row>(id ? `${LUCKY_DRAWS_PATH}/${id}` : null)
+  const menuRaw = useSharedValue<Row>(id ? `${LUCKY_MENU_PATH}/${id}` : null)
   const spinner = useDrawSpinner()
   const { ref: screenRef, ...fullscreen } = useFullscreen<HTMLDivElement>()
   const [busy, setBusy] = useState(false)
@@ -179,6 +181,8 @@ export function LuckyDrawPage() {
   }
 
   const path = `${LUCKY_DRAWS_PATH}/${id}`
+  const menuPath = `${LUCKY_MENU_PATH}/${id}`
+  const published = menuRaw != null
   const byKey = new Map(draw.participants.map((p) => [p.key, p]))
   const isOpen = draw.status === 'open'
   const confirmed = draw.status === 'done'
@@ -416,9 +420,23 @@ export function LuckyDrawPage() {
     if (!draw || !window.confirm(`Xóa chương trình "${draw.name}" cùng toàn bộ danh sách và kết quả?`))
       return
     void run(async () => {
-      await remove(ref(db, path))
+      await update(ref(db), { [path]: null, [menuPath]: null })
       navigate('/lucky-draw')
     })
+  }
+
+  function togglePublish() {
+    if (!draw) return
+    if (published) {
+      if (!window.confirm(`Ẩn "${draw.name}" khỏi menu Câu lạc bộ? Thành viên sẽ không tự tham gia được nữa.`))
+        return
+      void run(() => remove(ref(db, menuPath)), 'Đã ẩn khỏi menu Câu lạc bộ.')
+      return
+    }
+    void run(
+      () => set(ref(db, menuPath), { name: draw.name, publishedAt: nowMs() }),
+      'Đã hiện ở menu Câu lạc bộ, thành viên có thể vào tham gia.',
+    )
   }
 
   const participantList = (keys: string[]) => (
@@ -480,7 +498,7 @@ export function LuckyDrawPage() {
       </header>
 
       {message && <p className="form-info">{message}</p>}
-      {error && !(isAdmin && !confirmed) && <p className="form-error">{error}</p>}
+      {error && !isAdmin && <p className="form-error">{error}</p>}
 
       {isOpen && (
         <section className="section panel lucky-join">
@@ -493,13 +511,15 @@ export function LuckyDrawPage() {
                 Rời chương trình
               </button>
             </>
-          ) : (
+          ) : published || isAdmin ? (
             <>
               <p>Bấm tham gia để có tên trong danh sách quay số.</p>
               <button type="button" className="btn primary" disabled={busy} onClick={join}>
                 Tham gia
               </button>
             </>
+          ) : (
+            <p>Chương trình chưa mở cho thành viên tham gia.</p>
           )}
         </section>
       )}
@@ -542,9 +562,24 @@ export function LuckyDrawPage() {
         )}
       </section>
 
-      {isAdmin && !confirmed && (
+      {isAdmin && (
         <section className="section panel lucky-admin">
           <h2>Quản lý</h2>
+          <div className="lucky-publish">
+            <p>
+              {published
+                ? '✓ Đang hiện ở menu Câu lạc bộ, thành viên có thể vào tham gia.'
+                : 'Chưa hiện ở menu Câu lạc bộ: thành viên chưa thấy và chưa tự tham gia được.'}
+            </p>
+            <button
+              type="button"
+              className={published ? 'btn ghost compact' : 'btn primary compact'}
+              disabled={busy || menuRaw === undefined}
+              onClick={togglePublish}
+            >
+              {published ? 'Ẩn khỏi menu Câu lạc bộ' : 'Hiện ở menu Câu lạc bộ'}
+            </button>
+          </div>
           {isOpen && (
             <form className="lucky-manual" onSubmit={addManual}>
               <input
@@ -559,22 +594,24 @@ export function LuckyDrawPage() {
               </button>
             </form>
           )}
-          <div className="btn-row">
-            {isOpen ? (
-              <button type="button" className="btn primary" disabled={busy || !!lockBlocker} onClick={lock}>
-                Chốt danh sách
-              </button>
-            ) : (
-              savedWinners.length === 0 && (
-                <button type="button" className="btn ghost" disabled={working} onClick={unlock}>
-                  Mở lại danh sách
+          {!confirmed && (
+            <div className="btn-row">
+              {isOpen ? (
+                <button type="button" className="btn primary" disabled={busy || !!lockBlocker} onClick={lock}>
+                  Chốt danh sách
                 </button>
-              )
-            )}
-            <button type="button" className="btn ghost danger" disabled={working} onClick={deleteDraw}>
-              Xóa chương trình
-            </button>
-          </div>
+              ) : (
+                savedWinners.length === 0 && (
+                  <button type="button" className="btn ghost" disabled={working} onClick={unlock}>
+                    Mở lại danh sách
+                  </button>
+                )
+              )}
+              <button type="button" className="btn ghost danger" disabled={working} onClick={deleteDraw}>
+                Xóa chương trình
+              </button>
+            </div>
+          )}
           {isOpen && lockBlocker && <p className="muted">{lockBlocker}</p>}
           {error && <p className="form-error">{error}</p>}
         </section>

@@ -6,6 +6,24 @@ import type { RewardItem } from '../types'
  */
 export const LUCKY_DRAWS_PATH = 'lucky_draws'
 
+/**
+ * `lucky_draw_menu/{id}`: các chương trình Admin cho hiện ở menu Câu lạc bộ (chỉ tên, để menu
+ * không phải tải danh sách người tham gia). Thành viên chỉ tự tham gia được chương trình có ở đây.
+ */
+export const LUCKY_MENU_PATH = 'lucky_draw_menu'
+
+export type LuckyMenuEntry = { id: string; name: string; publishedAt: number }
+
+export function parseLuckyMenu(raw: unknown): LuckyMenuEntry[] {
+  return Object.entries(asDict(raw) ?? {})
+    .flatMap(([id, v]) => {
+      const row = asDict(v)
+      const name = text(row?.name)
+      return name ? [{ id, name, publishedAt: Number(row?.publishedAt) || 0 }] : []
+    })
+    .sort((a, b) => b.publishedAt - a.publishedAt)
+}
+
 /** open: đang nhận người tham gia; locked: đã chốt danh sách, đang quay; done: đã xác nhận kết quả */
 export type LuckyDrawStatus = 'open' | 'locked' | 'done'
 

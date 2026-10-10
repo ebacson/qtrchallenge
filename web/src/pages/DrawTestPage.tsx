@@ -331,7 +331,18 @@ export function DrawTestPage() {
             </button>
           )}
           {(winners.length > 0 || phase === 'done') && !busy && (
-            <button type="button" className="draw-reset" onClick={reset}>
+            <button
+              type="button"
+              className="draw-reset"
+              onClick={() => {
+                if (
+                  window.confirm(
+                    `Xóa kết quả ${winners.length} người đã trúng và quay lại từ đầu?`,
+                  )
+                )
+                  reset()
+              }}
+            >
               <RotateCcw size={16} aria-hidden /> Quay lại từ đầu
             </button>
           )}

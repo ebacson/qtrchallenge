@@ -144,7 +144,7 @@ function GiftRulesView({ config }: { config: GiftConfig }) {
       ))}
       {config.notes.length > 0 && (
         <section className="section panel gift-notes">
-          <h2>Ghi chú</h2>
+          <h2>Ghi chú (Theo quy chế)</h2>
           <ul>
             {config.notes.map((n, i) => (
               <li key={i}>{n}</li>

@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
 import {
   duesPaymentFields,
+  duesWaiverFields,
   FINANCE_PATH,
   msToDay,
   type DuesYear,
@@ -13,7 +14,7 @@ import {
 import { formatVnd } from '../lib/rewardPenalty'
 
 type Member = { uid: string; name: string; avatar: string; member: boolean }
-type DuesFilter = 'all' | 'unpaid' | 'paid'
+type DuesFilter = 'all' | 'unpaid' | 'paid' | 'waived'
 
 function foldText(value: string): string {
   return value
@@ -47,6 +48,7 @@ export function FinanceDues({
   const [filter, setFilter] = useState<DuesFilter>('all')
   const [search, setSearch] = useState('')
   const [busyUid, setBusyUid] = useState<string | null>(null)
+  const [waiving, setWaiving] = useState<{ uid: string; reason: string } | null>(null)
   const [error, setError] = useState('')
   const base = `${FINANCE_PATH}/dues/${year}`
 
@@ -65,14 +67,16 @@ export function FinanceDues({
           },
       ),
   ]
-  const paidCount = rows.filter((m) => paidMap[m.uid]).length
-  const paidTotal = Object.values(paidMap).reduce((s, p) => s + p.amount, 0)
+  const paidCount = rows.filter((m) => paidMap[m.uid] && !paidMap[m.uid].waived).length
+  const waivedCount = rows.filter((m) => paidMap[m.uid]?.waived).length
+  const paidTotal = Object.values(paidMap).reduce((s, p) => s + (p.waived ? 0 : p.amount), 0)
   const unpaidCount = rows.filter((m) => m.member && !paidMap[m.uid]).length
   const query = foldText(search)
   const visible = rows.filter((m) => {
-    const paid = Boolean(paidMap[m.uid])
-    if (filter === 'paid' && !paid) return false
-    if (filter === 'unpaid' && (paid || !m.member)) return false
+    const record = paidMap[m.uid]
+    if (filter === 'paid' && (!record || record.waived)) return false
+    if (filter === 'waived' && !record?.waived) return false
+    if (filter === 'unpaid' && (record || !m.member)) return false
     return !query || foldText(m.name).includes(query)
   })
 
@@ -112,8 +116,29 @@ export function FinanceDues({
     }
   }
 
+  async function confirmWaiver(e: FormEvent, m: Member) {
+    e.preventDefault()
+    if (!user || !waiving) return
+    const reason = waiving.reason.trim()
+    if (!reason) {
+      setError('Nhập lý do miễn.')
+      return
+    }
+    setBusyUid(m.uid)
+    setError('')
+    try {
+      await set(ref(db, `${base}/members/${m.uid}`), duesWaiverFields(user.uid, m.name, reason))
+      setWaiving(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không lưu được')
+    } finally {
+      setBusyUid(null)
+    }
+  }
+
   async function undo(m: Member) {
-    if (!window.confirm(`Hủy xác nhận quỹ ${year} của ${m.name}?`)) return
+    const label = paidMap[m.uid]?.waived ? 'miễn quỹ' : 'xác nhận quỹ'
+    if (!window.confirm(`Hủy ${label} ${year} của ${m.name}?`)) return
     setBusyUid(m.uid)
     setError('')
     try {
@@ -191,6 +216,12 @@ export function FinanceDues({
           <strong>{unpaidCount}</strong>
           <span>Chưa đóng</span>
         </div>
+        {waivedCount > 0 && (
+          <div className="stat">
+            <strong>{waivedCount}</strong>
+            <span>Được miễn</span>
+          </div>
+        )}
         <div className="stat">
           <strong className="stat-money stat-paid">{formatVnd(paidTotal)}</strong>
           <span>Đã thu</span>
@@ -203,17 +234,20 @@ export function FinanceDues({
             ['all', `Tất cả (${rows.length})`],
             ['unpaid', `Chưa đóng (${unpaidCount})`],
             ['paid', `Đã đóng (${paidCount})`],
+            ['waived', `Miễn (${waivedCount})`],
           ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            className={filter === value ? 'chip active' : 'chip'}
-            onClick={() => setFilter(value)}
-          >
-            {label}
-          </button>
-        ))}
+        )
+          .filter(([value]) => value !== 'waived' || waivedCount > 0 || filter === 'waived')
+          .map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              className={filter === value ? 'chip active' : 'chip'}
+              onClick={() => setFilter(value)}
+            >
+              {label}
+            </button>
+          ))}
       </div>
       <div className="reward-search finance-dues-search">
         <Search size={16} aria-hidden="true" />
@@ -251,19 +285,24 @@ export function FinanceDues({
                   <strong>{m.name}</strong>
                   {paid ? (
                     <span className="tiny muted">
-                      Đóng {formatVnd(paid.amount)} ngày {msToDay(paid.paidAt)} · xác nhận bởi{' '}
-                      {nameOf(paid.confirmedBy)}
+                      {paid.waived ? 'Miễn' : `Đóng ${formatVnd(paid.amount)}`} ngày{' '}
+                      {msToDay(paid.paidAt)} · xác nhận bởi {nameOf(paid.confirmedBy)}
                       {!m.member && ' · không còn là thành viên chính thức'}
                     </span>
                   ) : null}
                   <span className="penalty-pay">
-                    {!canEdit ? (
+                    {paid?.waived ? (
+                      <span className="penalty-pay-badge waived">
+                        Miễn{paid.waiveReason ? `: ${paid.waiveReason}` : ''}
+                      </span>
+                    ) : (
                       <span className={`penalty-pay-badge ${paid ? 'paid' : 'unpaid'}`}>
                         {paid ? '✓ Đã đóng' : 'Chưa đóng'}
                       </span>
-                    ) : paid ? (
-                      <>
-                        <span className="penalty-pay-badge paid">✓ Đã đóng</span>
+                    )}
+                    {canEdit &&
+                      waiving?.uid !== m.uid &&
+                      (paid ? (
                         <button
                           type="button"
                           className="btn ghost compact"
@@ -272,21 +311,60 @@ export function FinanceDues({
                         >
                           Hủy
                         </button>
-                      </>
-                    ) : (
-                      <>
-                        <span className="penalty-pay-badge unpaid">Chưa đóng</span>
-                        <button
-                          type="button"
-                          className="btn primary compact"
-                          disabled={busyUid === m.uid || amount == null}
-                          onClick={() => void markPaid(m)}
-                        >
-                          {busyUid === m.uid ? 'Đang lưu…' : 'Xác nhận đã đóng'}
-                        </button>
-                      </>
-                    )}
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            className="btn primary compact"
+                            disabled={busyUid === m.uid || amount == null}
+                            onClick={() => void markPaid(m)}
+                          >
+                            {busyUid === m.uid ? 'Đang lưu…' : 'Xác nhận đã đóng'}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn ghost compact"
+                            disabled={busyUid === m.uid}
+                            onClick={() => {
+                              setError('')
+                              setWaiving({ uid: m.uid, reason: '' })
+                            }}
+                          >
+                            Miễn
+                          </button>
+                        </>
+                      ))}
                   </span>
+                  {canEdit && waiving?.uid === m.uid && (
+                    <form
+                      className="finance-dues-waive"
+                      onSubmit={(e) => void confirmWaiver(e, m)}
+                    >
+                      <input
+                        value={waiving.reason}
+                        onChange={(e) => setWaiving({ uid: m.uid, reason: e.target.value })}
+                        placeholder="Lý do miễn"
+                        aria-label={`Lý do miễn quỹ cho ${m.name}`}
+                        maxLength={200}
+                        autoFocus
+                      />
+                      <button
+                        type="submit"
+                        className="btn primary compact"
+                        disabled={busyUid === m.uid || !waiving.reason.trim()}
+                      >
+                        {busyUid === m.uid ? 'Đang lưu…' : 'Xác nhận miễn'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn ghost compact"
+                        disabled={busyUid === m.uid}
+                        onClick={() => setWaiving(null)}
+                      >
+                        Hủy
+                      </button>
+                    </form>
+                  )}
                 </div>
               </li>
             )

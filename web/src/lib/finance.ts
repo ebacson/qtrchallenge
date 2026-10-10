@@ -168,6 +168,9 @@ export type DuesPayment = {
   paidAt: number
   confirmedBy: string
   memberName?: string
+  /** Được miễn nộp quỹ năm đó (`amount` = 0) */
+  waived?: boolean
+  waiveReason?: string
 }
 
 /** `amount` null khi năm đó chưa đặt mức quỹ (0đ là mức hợp lệ) */
@@ -179,6 +182,14 @@ export function duesPaymentFields(
   memberName: string,
 ): DuesPayment {
   return { amount, paidAt: Date.now(), confirmedBy, memberName }
+}
+
+export function duesWaiverFields(
+  confirmedBy: string,
+  memberName: string,
+  reason: string,
+): DuesPayment {
+  return { amount: 0, paidAt: Date.now(), confirmedBy, memberName, waived: true, waiveReason: reason }
 }
 
 /** `finance/dues/{year}`: `settings/amount` và `members/{uid}` (ai đã đóng). */
@@ -198,6 +209,9 @@ export function parseDues(value: unknown): Record<number, DuesYear> {
         paidAt: Number(row.paidAt) || 0,
         confirmedBy: String(row.confirmedBy ?? ''),
         ...(row.memberName ? { memberName: String(row.memberName) } : {}),
+        ...(row.waived === true
+          ? { waived: true, waiveReason: String(row.waiveReason ?? '') }
+          : {}),
       }
     }
     const setting = Number(asDict(dict.settings)?.amount)
@@ -214,7 +228,7 @@ export function duesIncomeEntries(
   const out: FinanceEntry[] = []
   for (const [year, info] of Object.entries(dues)) {
     for (const [uid, p] of Object.entries(info.members)) {
-      if (!(p.amount > 0)) continue
+      if (p.waived || !(p.amount > 0)) continue
       const date = msToDay(p.paidAt)
       out.push({
         id: `dues-${year}-${uid}`,

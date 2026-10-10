@@ -3922,6 +3922,25 @@ code {
   margin-bottom: 12px;
 }
 
+.finance-dues-waive {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.finance-dues-waive input {
+  flex: 1;
+  min-width: 10rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 7px 10px;
+  background: #fff;
+  font: inherit;
+  font-size: 0.9rem;
+}
+
 .finance-before {
   opacity: 0.65;
 }

@@ -104,7 +104,7 @@ export function ChallengeDrawPage() {
   useEffect(() => {
     if (!watched) return
     let finished = false
-    void spinner.spin(watched.people, watched.winner, { music: false }).then((ok) => {
+    void spinner.spin(watched.people, watched.winner).then((ok) => {
       finished = true
       if (!ok) return
       setWatchedKey(watched.key)

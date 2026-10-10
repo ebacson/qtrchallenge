@@ -90,7 +90,18 @@ export function useDrawSpinner() {
     a.muted = muted
     a.currentTime = 0
     a.volume = 1
-    void a.play().catch(() => {})
+    const run = runId.current
+    const startedAt = nowMs()
+    void a.play().catch(() => {
+      // Trình duyệt chặn tự phát khi người xem chưa chạm vào trang: phát ở lần chạm đầu nếu còn đang quay
+      document.addEventListener(
+        'pointerdown',
+        () => {
+          if (runId.current === run && nowMs() - startedAt < SPIN_MS) void a.play().catch(() => {})
+        },
+        { once: true },
+      )
+    })
   }
 
   /** Dừng mọi hiệu ứng đang chạy */
@@ -105,16 +116,12 @@ export function useDrawSpinner() {
   }
 
   /** Quay qua các tên trong `people` rồi dừng ở `winner`; false nếu bị dừng giữa chừng */
-  async function spin(
-    people: StagePerson[],
-    winner: StagePerson,
-    { music = true }: { music?: boolean } = {},
-  ): Promise<boolean> {
+  async function spin(people: StagePerson[], winner: StagePerson): Promise<boolean> {
     runId.current += 1
     const run = runId.current
     setConfetti([])
     setSpinning(true)
-    if (music) playMusic()
+    playMusic()
     if (people.length > 1) {
       const startedAt = nowMs()
       let last = ''

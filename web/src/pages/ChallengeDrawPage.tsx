@@ -325,7 +325,7 @@ export function ChallengeDrawPage() {
       {confirmed
         ? confirmedText
         : phase === 'spinning'
-          ? 'Admin đang quay…'
+          ? 'Đang quay…'
           : phase === 'done'
             ? 'Chờ Admin xác nhận kết quả'
             : 'Chờ Admin quay số'}

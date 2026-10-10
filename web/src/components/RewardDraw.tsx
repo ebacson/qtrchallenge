@@ -210,7 +210,7 @@ function RewardDrawCard({
             className={spinningNow ? 'btn primary compact' : 'btn ghost compact'}
             to={`/challenges/${challenge.id}/draw?target=${encodeURIComponent(reward.target)}`}
           >
-            {spinningNow ? '🔴 Xem trực tiếp: Admin đang quay' : 'Xem quay số trực tiếp'}
+            {spinningNow ? '🔴 Đang quay · Xem trực tiếp' : 'Xem quay số trực tiếp'}
           </Link>
         </div>
       )}

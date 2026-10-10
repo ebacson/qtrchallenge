@@ -706,7 +706,7 @@ export function LuckyDrawPage() {
               ) : !isAdmin ? (
                 <span className="draw-confirmed">
                   {phase === 'spinning'
-                    ? 'Admin đang quay…'
+                    ? 'Đang quay…'
                     : phase === 'done'
                       ? 'Chờ Admin xác nhận kết quả'
                       : 'Chờ Admin quay số'}

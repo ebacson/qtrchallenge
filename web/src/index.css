@@ -3227,6 +3227,326 @@ code {
   }
 }
 
+/* Trang quay số thử */
+.draw-setup .filter-row {
+  margin-bottom: 10px;
+}
+
+.draw-count {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.draw-count input {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.draw-stage {
+  position: relative;
+  overflow: hidden;
+  margin: 0 0 20px;
+  padding: 34px 18px 26px;
+  border-radius: 24px;
+  text-align: center;
+  color: #fff;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 213, 74, 0.35), transparent 55%),
+    radial-gradient(circle at 50% 120%, rgba(255, 77, 109, 0.45), transparent 60%),
+    linear-gradient(160deg, #7a0916, #c8102e 45%, #5b0610);
+  box-shadow: 0 24px 50px rgba(122, 9, 22, 0.35), inset 0 0 0 3px rgba(255, 213, 74, 0.55);
+}
+
+.draw-lights {
+  position: absolute;
+  inset: 8px;
+  border-radius: 18px;
+  pointer-events: none;
+  background:
+    radial-gradient(circle, #ffe082 0 3px, transparent 4px) 0 0 / 22px 22px repeat-x,
+    radial-gradient(circle, #ffe082 0 3px, transparent 4px) 0 100% / 22px 22px repeat-x,
+    radial-gradient(circle, #ffe082 0 3px, transparent 4px) 0 0 / 22px 22px repeat-y,
+    radial-gradient(circle, #ffe082 0 3px, transparent 4px) 100% 0 / 22px 22px repeat-y;
+  opacity: 0.55;
+}
+
+.draw-spinning .draw-lights,
+.draw-reveal .draw-lights {
+  animation: draw-blink 0.35s steps(2) infinite;
+}
+
+@keyframes draw-blink {
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 6px #ffd54a);
+  }
+}
+
+.draw-mute {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.draw-kicker {
+  margin: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: #ffe082;
+}
+
+.draw-title {
+  margin: 4px 0 6px;
+  font-family: var(--display);
+  font-size: clamp(1.9rem, 6vw, 3rem);
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: linear-gradient(180deg, #fff6c8, #ffd54a 55%, #f0a500);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 2px 18px rgba(255, 213, 74, 0.25);
+}
+
+.draw-target {
+  margin: 0 0 18px;
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.draw-slot {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  min-height: 108px;
+  margin: 0 auto 20px;
+  max-width: 34rem;
+  padding: 14px 18px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #1c0306, #3a0710 50%, #1c0306);
+  box-shadow:
+    inset 0 0 0 3px #ffd54a,
+    inset 0 0 0 7px rgba(255, 213, 74, 0.25),
+    inset 0 10px 24px rgba(0, 0, 0, 0.6),
+    0 0 30px rgba(255, 213, 74, 0.25);
+}
+
+.draw-slot-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--display);
+  font-size: clamp(1.7rem, 6vw, 2.6rem);
+  font-weight: 700;
+  color: #fff6c8;
+  animation: draw-roll 0.16s ease-out;
+}
+
+.draw-slot-win {
+  color: #ffd54a;
+  animation: draw-zoom 0.5s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+.draw-slot-idle {
+  font-family: var(--display);
+  font-size: 1.4rem;
+  color: rgba(255, 246, 200, 0.75);
+  letter-spacing: 0.05em;
+}
+
+@keyframes draw-roll {
+  from {
+    opacity: 0.2;
+    transform: translateY(-60%);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+@keyframes draw-zoom {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.draw-slot-avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 1.6em;
+  height: 1.6em;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ffd54a, #f08a00);
+  color: #5b0610;
+  font-size: 0.7em;
+  font-weight: 800;
+}
+
+.draw-actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.draw-go {
+  min-width: 180px;
+  padding: 16px 34px;
+  border: 0;
+  border-radius: 999px;
+  font-family: var(--display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5b0610;
+  background: linear-gradient(180deg, #fff3b0, #ffd54a 45%, #f0a500);
+  box-shadow: 0 6px 0 #b36b00, 0 14px 28px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.draw-go:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.draw-go:not(:disabled):active {
+  transform: translateY(5px);
+  box-shadow: 0 1px 0 #b36b00, 0 6px 14px rgba(0, 0, 0, 0.35);
+}
+
+.draw-go:disabled {
+  cursor: default;
+  opacity: 0.85;
+  animation: draw-pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes draw-pulse {
+  50% {
+    box-shadow: 0 6px 0 #b36b00, 0 0 34px rgba(255, 213, 74, 0.8);
+  }
+}
+
+.draw-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.draw-winners {
+  position: relative;
+  z-index: 1;
+  list-style: none;
+  margin: 22px auto 0;
+  padding: 0;
+  max-width: 34rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+
+.draw-winners li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(255, 213, 74, 0.45);
+  font-size: 1.05rem;
+  animation: draw-zoom 0.45s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+.draw-winners strong {
+  flex: 1;
+  min-width: 0;
+}
+
+.draw-winner-rank {
+  font-family: var(--display);
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #ffd54a;
+  width: 1.4em;
+  text-align: center;
+}
+
+.draw-winner-prize {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #ffd54a;
+  color: #5b0610;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.draw-confetti {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.draw-confetti span {
+  position: absolute;
+  top: -12px;
+  border-radius: 2px;
+  opacity: 0;
+  animation-name: draw-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: 2;
+}
+
+@keyframes draw-fall {
+  0% {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg);
+  }
+  100% {
+    opacity: 0.9;
+    transform: translateY(560px) rotate(720deg);
+  }
+}
+
 .reward-candidates-wrap {
   margin: 8px 0;
 }

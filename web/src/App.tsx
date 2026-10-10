@@ -52,6 +52,7 @@ const AdminUsersPage = lazyPage(() => import('./pages/AdminUsersPage'), 'AdminUs
 const AdminRecordsPage = lazyPage(() => import('./pages/AdminRecordsPage'), 'AdminRecordsPage')
 const FinancePage = lazyPage(() => import('./pages/FinancePage'), 'FinancePage')
 const GiftsPage = lazyPage(() => import('./pages/GiftsPage'), 'GiftsPage')
+const DrawTestPage = lazyPage(() => import('./pages/DrawTestPage'), 'DrawTestPage')
 
 function BootScreen() {
   return (
@@ -121,6 +122,14 @@ function AppRoutes() {
           }
         />
         <Route path="admin/gifts" element={<Navigate to="/gifts" replace />} />
+        <Route
+          path="admin/draw-test"
+          element={
+            <RequireAdmin>
+              <DrawTestPage />
+            </RequireAdmin>
+          }
+        />
         <Route
           path="finance"
           element={

@@ -193,6 +193,13 @@ export function LuckyDrawPage() {
   const phase = drawPhase(spinner.spinning, round, totalRounds)
   const working = busy || spinner.spinning
   const canEditPrizes = isAdmin && !confirmed && savedWinners.length === 0
+  const lockBlocker = !slots.length
+    ? 'Cần nhập danh sách quà (mục Phần quà) trước khi chốt.'
+    : !draw.participants.length
+      ? 'Cần có ít nhất một người tham gia trước khi chốt.'
+      : editingPrizes
+        ? 'Lưu danh sách quà đang sửa trước khi chốt.'
+        : ''
   const me = user ? byKey.get(user.uid) : undefined
 
   const toPerson = (key: string, index = -1): StagePerson => ({
@@ -273,11 +280,7 @@ export function LuckyDrawPage() {
 
   /** Chụp danh sách tham gia ngay trên RTDB để không sót người vừa bấm tham gia */
   function lock() {
-    if (!user || !draw) return
-    if (!draw.participants.length || !slots.length) {
-      setError('Cần có người tham gia và danh sách quà trước khi chốt.')
-      return
-    }
+    if (!user || !draw || lockBlocker) return
     if (
       !window.confirm(
         `Chốt danh sách ${draw.participants.length} người tham gia, ${slots.length} phần quà?\n\nSau khi chốt, mọi người không thể tham gia hoặc rời chương trình nữa.`,
@@ -477,7 +480,7 @@ export function LuckyDrawPage() {
       </header>
 
       {message && <p className="form-info">{message}</p>}
-      {error && <p className="form-error">{error}</p>}
+      {error && !(isAdmin && !confirmed) && <p className="form-error">{error}</p>}
 
       {isOpen && (
         <section className="section panel lucky-join">
@@ -558,7 +561,7 @@ export function LuckyDrawPage() {
           )}
           <div className="btn-row">
             {isOpen ? (
-              <button type="button" className="btn primary" disabled={busy} onClick={lock}>
+              <button type="button" className="btn primary" disabled={busy || !!lockBlocker} onClick={lock}>
                 Chốt danh sách
               </button>
             ) : (
@@ -572,6 +575,8 @@ export function LuckyDrawPage() {
               Xóa chương trình
             </button>
           </div>
+          {isOpen && lockBlocker && <p className="muted">{lockBlocker}</p>}
+          {error && <p className="form-error">{error}</p>}
         </section>
       )}
 

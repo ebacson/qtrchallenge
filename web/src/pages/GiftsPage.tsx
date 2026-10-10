@@ -4,7 +4,7 @@ import { Plus, Search, Trash2, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
 import { useSharedValue } from '../lib/sharedValue'
-import { useUserProfiles } from '../lib/userWrites'
+import { USER_PROFILES_PATH } from '../lib/userProfile'
 import { formatVnd } from '../lib/rewardPenalty'
 import { dayToInputDate, dayYear, inputDateToDay, msToDay } from '../lib/finance'
 import { formatRankTime, parsePersonalRecord } from '../lib/prRanking'
@@ -624,10 +624,12 @@ function AwardForm({
   )
 }
 
-export function AdminGiftsPage() {
-  const { user } = useAuth()
+export function GiftsPage() {
+  const { user, profile } = useAuth()
+  const canEdit = profile?.admin === true
   const giftsValue = useSharedValue<Record<string, unknown>>(GIFTS_PATH)
-  const profiles = useUserProfiles()
+  // Tên người nhận đã lưu kèm bản ghi; chỉ Admin cần cả danh sách thành viên để ghi nhận
+  const profiles = useSharedValue<Profiles>(canEdit ? USER_PROFILES_PATH : null, 24 * 60 * 60_000)
   const loading = giftsValue === undefined
 
   const [tab, setTab] = useState<Tab>('rules')
@@ -727,7 +729,7 @@ export function AdminGiftsPage() {
   return (
     <div className="page">
       <header className="page-header">
-        <p className="eyebrow">Admin</p>
+        <p className="eyebrow">Câu lạc bộ</p>
         <h1>Quà tặng</h1>
         <p className="lede">
           Quà tặng cho thành tích cao trong race và khen thưởng cuối năm, áp dụng từ ngày{' '}
@@ -760,22 +762,24 @@ export function AdminGiftsPage() {
           {error && <p className="form-error">{error}</p>}
 
           {tab === 'rules' ? (
-            editingRules ? (
+            canEdit && editingRules ? (
               <GiftRulesEditor config={config} onDone={done} />
             ) : (
               <>
-                <div className="finance-toolbar gift-toolbar">
-                  <button
-                    type="button"
-                    className="btn ghost"
-                    onClick={() => {
-                      setMessage('')
-                      setEditingRules(true)
-                    }}
-                  >
-                    Sửa quy định
-                  </button>
-                </div>
+                {canEdit && (
+                  <div className="finance-toolbar gift-toolbar">
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      onClick={() => {
+                        setMessage('')
+                        setEditingRules(true)
+                      }}
+                    >
+                      Sửa quy định
+                    </button>
+                  </div>
+                )}
                 <GiftRulesView config={config} />
               </>
             )
@@ -793,19 +797,21 @@ export function AdminGiftsPage() {
                     ))}
                   </select>
                 </label>
-                <button
-                  type="button"
-                  className="btn primary"
-                  onClick={() => {
-                    setMessage('')
-                    setEditing('new')
-                  }}
-                >
-                  <Plus size={16} aria-hidden /> Ghi nhận quà
-                </button>
+                {canEdit && (
+                  <button
+                    type="button"
+                    className="btn primary"
+                    onClick={() => {
+                      setMessage('')
+                      setEditing('new')
+                    }}
+                  >
+                    <Plus size={16} aria-hidden /> Ghi nhận quà
+                  </button>
+                )}
               </div>
 
-              {editing && (
+              {canEdit && editing && (
                 <AwardForm
                   key={editing === 'new' ? 'new' : editing.id}
                   award={editing === 'new' ? null : editing}
@@ -917,35 +923,37 @@ export function AdminGiftsPage() {
                                 {a.status === 'given' ? 'Đã trao' : 'Chờ trao'}
                               </span>
                               {a.status === 'given' && a.givenDate ? ` ngày ${a.givenDate}` : ''}
-                              {a.note ? ` · ${a.note}` : ''}
+                              {canEdit && a.note ? ` · ${a.note}` : ''}
                             </span>
-                            <span className="finance-row-actions">
-                              <button
-                                type="button"
-                                className="btn ghost compact"
-                                onClick={() => void toggleGiven(a)}
-                              >
-                                {a.status === 'given' ? 'Chưa trao' : 'Đã trao'}
-                              </button>
-                              <button
-                                type="button"
-                                className="btn ghost compact"
-                                onClick={() => {
-                                  setMessage('')
-                                  setEditing(a)
-                                  window.scrollTo({ top: 0, behavior: 'smooth' })
-                                }}
-                              >
-                                Sửa
-                              </button>
-                              <button
-                                type="button"
-                                className="btn ghost compact danger"
-                                onClick={() => void removeAward(a)}
-                              >
-                                Xóa
-                              </button>
-                            </span>
+                            {canEdit && (
+                              <span className="finance-row-actions">
+                                <button
+                                  type="button"
+                                  className="btn ghost compact"
+                                  onClick={() => void toggleGiven(a)}
+                                >
+                                  {a.status === 'given' ? 'Chưa trao' : 'Đã trao'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn ghost compact"
+                                  onClick={() => {
+                                    setMessage('')
+                                    setEditing(a)
+                                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                                  }}
+                                >
+                                  Sửa
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn ghost compact danger"
+                                  onClick={() => void removeAward(a)}
+                                >
+                                  Xóa
+                                </button>
+                              </span>
+                            )}
                           </div>
                           <span className="reward-amount">{formatVnd(awardTotal(a))}</span>
                         </li>

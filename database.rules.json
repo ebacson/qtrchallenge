@@ -91,7 +91,7 @@
       ".write": "auth != null && root.child('users').child(auth.uid).child('admin').val() === true"
     },
     "gifts": {
-      ".read": "auth != null && root.child('users').child(auth.uid).child('admin').val() === true",
+      ".read": "auth != null",
       ".write": "auth != null && root.child('users').child(auth.uid).child('admin').val() === true"
     },
     "EVENT": {

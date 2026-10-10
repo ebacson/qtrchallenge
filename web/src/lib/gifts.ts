@@ -1,6 +1,6 @@
 import { timeToSeconds } from './prRanking'
 
-/** `gifts/config` (quy định) và `gifts/awards/{id}` (người nhận quà); chỉ Admin đọc/ghi. */
+/** `gifts/config` (quy định) và `gifts/awards/{id}` (người nhận quà); thành viên đọc, Admin ghi. */
 export const GIFTS_PATH = 'gifts'
 
 export type GiftSection = 'race' | 'yearEnd'

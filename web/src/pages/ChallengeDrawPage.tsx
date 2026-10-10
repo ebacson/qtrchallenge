@@ -327,8 +327,8 @@ export function ChallengeDrawPage() {
         : phase === 'spinning'
           ? 'Đang quay…'
           : phase === 'done'
-            ? 'Chờ Admin xác nhận kết quả'
-            : 'Chờ Admin quay số'}
+            ? 'Chờ xác nhận kết quả'
+            : 'Chờ quay số'}
     </span>
   )
 

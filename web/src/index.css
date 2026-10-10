@@ -4218,6 +4218,11 @@ code {
   min-width: 10rem;
 }
 
+.gift-table .gift-cash {
+  font-weight: 700;
+  color: var(--ok);
+}
+
 .gift-toolbar {
   justify-content: flex-end;
   margin-bottom: 12px;

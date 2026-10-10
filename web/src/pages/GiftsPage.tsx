@@ -58,8 +58,11 @@ function parseMoney(value: string): number {
   return Number.isFinite(n) && n > 0 ? n : 0
 }
 
-function giftValueText(t: Pick<GiftTier, 'value' | 'cash'>): string {
-  return t.cash ? `${formatVnd(t.value)} + ${formatVnd(t.cash)} tiền mặt` : formatVnd(t.value)
+/** "Kỷ niệm chương (500.000đ) + 2.000.000đ tiền mặt" */
+function prizeText(t: Pick<GiftTier, 'gift' | 'value' | 'cash'>): string {
+  const goods = t.gift ? `${t.gift}${t.value ? ` (${formatVnd(t.value)})` : ''}` : ''
+  const cash = t.cash ? `${formatVnd(t.cash)} tiền mặt` : ''
+  return [goods, cash].filter(Boolean).join(' + ') || '—'
 }
 
 function GiftRulesView({ config }: { config: GiftConfig }) {
@@ -89,8 +92,9 @@ function GiftRulesView({ config }: { config: GiftConfig }) {
                           ) : (
                             <th>Nội dung</th>
                           )}
-                          <th>Quà tặng</th>
-                          <th>Giá trị</th>
+                          <th>Hiện vật</th>
+                          <th>Giá trị hiện vật</th>
+                          <th>Tiền mặt</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -105,7 +109,10 @@ function GiftRulesView({ config }: { config: GiftConfig }) {
                               <td>{t.label || '—'}</td>
                             )}
                             <td className="gift-name">{t.gift || '—'}</td>
-                            <td>{giftValueText(t)}</td>
+                            <td>{t.gift && t.value ? formatVnd(t.value) : '—'}</td>
+                            <td className={t.cash ? 'gift-cash' : undefined}>
+                              {t.cash ? formatVnd(t.cash) : '—'}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -172,9 +179,19 @@ function GiftRulesEditor({
       return
     }
     for (const c of draft.categories) {
-      const missing = c.tiers.find((t) => !t.gift.trim() || (c.timed ? !t.male.trim() && !t.female.trim() : !t.label.trim()))
+      const missing = c.tiers.find(
+        (t) =>
+          (!t.gift.trim() && !t.cash) ||
+          (c.timed ? !t.male.trim() && !t.female.trim() : !t.label.trim()),
+      )
       if (missing) {
-        setError(`${c.title}: mỗi mức cần có ${c.timed ? 'mốc thời gian' : 'nội dung'} và tên quà.`)
+        setError(
+          `${c.title}: mỗi mức cần có ${c.timed ? 'mốc thời gian' : 'nội dung'} và hiện vật hoặc tiền mặt.`,
+        )
+        return
+      }
+      if (c.tiers.some((t) => !t.gift.trim() && t.value > 0)) {
+        setError(`${c.title}: có giá trị hiện vật thì cần nhập tên hiện vật.`)
         return
       }
     }
@@ -257,15 +274,16 @@ function GiftRulesEditor({
                   </label>
                 )}
                 <label className="gift-tier-wide">
-                  Quà tặng
+                  Hiện vật
                   <input
                     value={t.gift}
                     maxLength={200}
+                    placeholder="Để trống nếu chỉ thưởng tiền mặt"
                     onChange={(e) => patchTier(c.id, i, { gift: e.target.value })}
                   />
                 </label>
                 <label>
-                  Giá trị (đ)
+                  Giá trị hiện vật (đ)
                   <input
                     inputMode="numeric"
                     value={t.value ? String(t.value) : ''}
@@ -550,7 +568,7 @@ function AwardForm({
                     ? thresholdOf(t, gender)
                     : `${t.male} / ${t.female}`
                   : t.label}{' '}
-                · {t.gift} · {giftValueText(t)}
+                · {prizeText(t)}
               </option>
             ))}
           </select>
@@ -688,7 +706,8 @@ export function GiftsPage() {
         foldText(`${nameOf(a)} ${a.raceName} ${a.gift} ${a.tierLabel} ${c?.title ?? ''}`).includes(query))
     )
   })
-  const totalValue = filtered.reduce((s, a) => s + awardTotal(a), 0)
+  const goodsValue = filtered.reduce((s, a) => s + (a.gift ? a.value : 0), 0)
+  const cashValue = filtered.reduce((s, a) => s + a.cash, 0)
   const pendingCount = filtered.filter((a) => a.status === 'pending').length
 
   function done(text: string) {
@@ -715,7 +734,7 @@ export function GiftsPage() {
   }
 
   async function removeAward(a: GiftAward) {
-    if (!window.confirm(`Xóa quà "${a.gift}" của ${nameOf(a)}?`)) return
+    if (!window.confirm(`Xóa quà "${prizeText(a)}" của ${nameOf(a)}?`)) return
     setMessage('')
     setError('')
     try {
@@ -833,8 +852,12 @@ export function GiftsPage() {
                   <span>Chờ trao</span>
                 </div>
                 <div className="stat">
-                  <strong className="stat-money">{formatVnd(totalValue)}</strong>
-                  <span>Tổng giá trị</span>
+                  <strong className="stat-money">{formatVnd(goodsValue)}</strong>
+                  <span>Giá trị hiện vật</span>
+                </div>
+                <div className="stat">
+                  <strong className="stat-money">{formatVnd(cashValue)}</strong>
+                  <span>Tiền mặt</span>
                 </div>
               </div>
 
@@ -914,10 +937,15 @@ export function GiftsPage() {
                                   .join(' · ')}
                               </span>
                             )}
-                            <span className="tiny">
-                              🎁 {a.gift}
-                              {a.cash ? ` + ${formatVnd(a.cash)} tiền mặt` : ''}
-                            </span>
+                            {a.gift && (
+                              <span className="tiny">
+                                🎁 Hiện vật: {a.gift}
+                                {a.value ? ` (${formatVnd(a.value)})` : ''}
+                              </span>
+                            )}
+                            {a.cash > 0 && (
+                              <span className="tiny">💵 Tiền mặt: {formatVnd(a.cash)}</span>
+                            )}
                             <span className="tiny">
                               <span className={`penalty-pay-badge${a.status === 'given' ? ' paid' : ''}`}>
                                 {a.status === 'given' ? 'Đã trao' : 'Chờ trao'}

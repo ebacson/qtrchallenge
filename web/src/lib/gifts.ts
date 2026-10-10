@@ -106,7 +106,7 @@ export const DEFAULT_GIFT_CONFIG: GiftConfig = {
         tier('fm4', 'sub3h15', 'sub3h45', 'Bảng gỗ', 400_000),
         tier('fm5', 'sub3h10', 'sub3h30', 'Bảng gỗ', 400_000),
         tier('fm6', 'sub3h05', 'sub3h20', 'Bảng gỗ', 500_000),
-        tier('fm7', 'sub3h00', 'sub3h15', 'Kỷ niệm chương + tiền mặt', 500_000, 2_000_000),
+        tier('fm7', 'sub3h00', 'sub3h15', 'Kỷ niệm chương', 500_000, 2_000_000),
       ],
     },
     {
@@ -131,7 +131,7 @@ export const DEFAULT_GIFT_CONFIG: GiftConfig = {
       tiers: [
         tier('pr1', 'sub3h30', 'sub4h00', 'Kỷ niệm chương', 200_000),
         tier('pr2', 'sub3h15', 'sub3h45', 'Kỷ niệm chương', 300_000),
-        tier('pr3', 'sub3h00', 'sub3h15', 'Kỷ niệm chương + tiền mặt', 500_000, 1_000_000),
+        tier('pr3', 'sub3h00', 'sub3h15', 'Kỷ niệm chương', 500_000, 1_000_000),
       ],
     },
     {
@@ -188,17 +188,24 @@ function money(value: unknown): number {
   return Number.isFinite(n) && n > 0 ? n : 0
 }
 
+/** Hiện vật tách riêng khỏi tiền mặt: bỏ đuôi "+ tiền mặt" của tên quà nhập theo cách cũ */
+function goodsName(gift: unknown, cash: number): string {
+  const name = text(gift)
+  return cash > 0 ? name.replace(/\s*\+\s*tiền mặt\s*$/i, '') : name
+}
+
 function parseTier(raw: unknown, index: number): GiftTier | null {
   const row = asDict(raw)
   if (!row) return null
+  const cash = money(row.cash)
   return {
     id: text(row.id) || `t${index + 1}`,
     label: text(row.label),
     male: text(row.male),
     female: text(row.female),
-    gift: text(row.gift),
+    gift: goodsName(row.gift, cash),
     value: money(row.value),
-    cash: money(row.cash),
+    cash,
   }
 }
 
@@ -263,7 +270,7 @@ export function parseAwards(raw: unknown): GiftAward[] {
       category: text(row.category),
       tierId: text(row.tierId),
       tierLabel: text(row.tierLabel),
-      gift: text(row.gift),
+      gift: goodsName(row.gift, money(row.cash)),
       value: money(row.value),
       cash: money(row.cash),
       year: Number(row.year) || 0,
@@ -300,7 +307,7 @@ export function thresholdOf(t: GiftTier, gender: string): string {
 
 /** Tên mức để hiển thị và lưu kèm bản ghi, ví dụ "sub3h30 (Nam)" */
 export function tierLabel(category: GiftCategory, t: GiftTier, gender: string): string {
-  if (!category.timed) return t.label || t.gift
+  if (!category.timed) return t.label || t.gift || 'Tiền mặt'
   const threshold = thresholdOf(t, gender)
   return gender === 'Nam' || gender === 'Nữ' ? `${threshold} (${gender})` : `${t.male} / ${t.female}`
 }

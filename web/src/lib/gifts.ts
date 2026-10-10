@@ -169,9 +169,9 @@ export const DEFAULT_GIFT_CONFIG: GiftConfig = {
   notes: [
     'Thành tích được tính từ các giải sau khi tham gia TVCT.',
     'Thành tích tính theo Chiptime của BTC.',
-    'Các phần thưởng hiện vật cá nhân có thể tự chọn mẫu theo sở thích, nếu giá trị > số tiền quy định thì cá nhân phải đóng thêm chi phí sản xuất.',
+    'Các phần thưởng hiện vật cá nhân có thể tự chọn mẫu theo sở thích, nếu giá trị lớn hơn số tiền quy định thì cá nhân phải đóng thêm chi phí sản xuất.',
     'Sub3 yêu cầu mang áo QTR khi đi race.',
-    'Mục 5 yêu cầu mang áo QTR khi nhận thưởng.',
+    'Yêu cầu mang áo QTR khi nhận thưởng.',
     'Nếu trong 1 race đủ điều kiện nhận từ 2 phần thưởng thì chỉ được nhận phần thưởng cao nhất.',
   ],
 }

@@ -53,6 +53,10 @@ const AdminRecordsPage = lazyPage(() => import('./pages/AdminRecordsPage'), 'Adm
 const FinancePage = lazyPage(() => import('./pages/FinancePage'), 'FinancePage')
 const GiftsPage = lazyPage(() => import('./pages/GiftsPage'), 'GiftsPage')
 const DrawTestPage = lazyPage(() => import('./pages/DrawTestPage'), 'DrawTestPage')
+const ChallengeDrawPage = lazyPage(
+  () => import('./pages/ChallengeDrawPage'),
+  'ChallengeDrawPage',
+)
 
 function BootScreen() {
   return (
@@ -102,6 +106,14 @@ function AppRoutes() {
           element={
             <RequireAdmin>
               <EditChallengePage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="admin/challenges/:id/draw"
+          element={
+            <RequireAdmin>
+              <ChallengeDrawPage />
             </RequireAdmin>
           }
         />

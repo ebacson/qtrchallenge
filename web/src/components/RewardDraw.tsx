@@ -1,25 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
-import { get, ref, set, update } from 'firebase/database'
+import { Link } from 'react-router-dom'
 import { Gift } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { STATUS_FINISHED } from '../lib/challengeRules'
-import { db } from '../lib/firebase'
 import {
-  assignPrizes,
-  drawWinners,
-  pickRandom,
   rewardCandidates,
   rewardItemsSummary,
   type RewardCandidate,
 } from '../lib/rewardPenalty'
 import type { Challenge, RewardTier } from '../types'
-
-/** Tổng thời gian quay; tên đổi nhanh lúc đầu rồi chậm dần */
-const SPIN_MS = 7000
-const TICK_START_MS = 90
-const TICK_END_MS = 650
-/** Dừng lại trên tên người trúng đầu tiên trước khi hiện kết quả */
-const HOLD_MS = 1500
 
 type Names = Record<string, { name: string; avatar: string }>
 
@@ -110,130 +98,20 @@ function RewardDrawCard({
   const candidates = candidateList.map((c) => c.uid)
   const paidUids = new Set(candidateList.filter((c) => c.via === 'paid').map((c) => c.uid))
   const completedCount = candidates.length - paidUids.size
-  const { user, profile } = useAuth()
+  const { profile } = useAuth()
   const draw = challenge.rewardDraws?.find((d) => d.target === reward.target)
-  const [spinName, setSpinName] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([])
-
-  useEffect(
-    () => () => {
-      for (const t of timers.current) clearTimeout(t)
-    },
-    [],
-  )
-
-  function wait(ms: number) {
-    return new Promise<void>((resolve) => {
-      timers.current.push(setTimeout(resolve, ms))
-    })
-  }
-
-  /** Đổi tên ngẫu nhiên, khoảng cách giữa các lần đổi tăng dần (ease-out) */
-  async function spin(finalUid: string) {
-    const startedAt = Date.now()
-    let last = ''
-    for (;;) {
-      const progress = Math.min(1, (Date.now() - startedAt) / SPIN_MS)
-      if (progress >= 1) break
-      let uid = pickRandom(candidates) ?? ''
-      if (candidates.length > 1) while (uid === last) uid = pickRandom(candidates) ?? ''
-      last = uid
-      setSpinName(displayName(names, uid))
-      const eased = progress * progress
-      await wait(TICK_START_MS + (TICK_END_MS - TICK_START_MS) * eased)
-    }
-    setSpinName(displayName(names, finalUid))
-    await wait(HOLD_MS)
-  }
 
   const isAdmin = Boolean(profile?.admin)
   const finished = challenge.status === STATUS_FINISHED
-  const targetIndex = challenge.targetDistances.indexOf(reward.target)
   const confirmed = Boolean(draw?.confirmedAt)
-  const drawPath = `challenges/${challenge.id}/rewardDraws/${targetIndex}`
+  /** Quay từng phần quà: chưa đủ lượt là đang quay dở */
+  const totalRounds = draw ? Math.min(draw.gifts, draw.candidates.length) : 0
+  const inProgress = draw != null && draw.winners.length < totalRounds
   const listChanged =
     draw != null &&
     (draw.candidates.length !== candidates.length ||
       draw.candidates.some((uid) => !candidates.includes(uid)))
-
-  /** Đọc lại từ RTDB phòng Admin khác vừa xác nhận */
-  async function lockedNow(): Promise<boolean> {
-    const snap = await get(ref(db, `${drawPath}/confirmedAt`))
-    if (!(Number(snap.val()) > 0)) return false
-    setError('Kết quả đã được xác nhận — không thể quay lại hoặc xóa.')
-    return true
-  }
-
-  async function runDraw() {
-    if (!user || targetIndex < 0 || !candidates.length || confirmed) return
-    if (await lockedNow()) return
-    if (
-      draw &&
-      !window.confirm('Đã có kết quả quay số. Quay lại sẽ thay kết quả cũ, tiếp tục?')
-    ) {
-      return
-    }
-    setBusy(true)
-    setError('')
-    const winners = drawWinners(candidates, reward.gifts)
-    const prizes = assignPrizes(winners, reward.items)
-    try {
-      if (candidates.length > reward.gifts && winners.length) await spin(winners[0])
-      await set(ref(db, drawPath), {
-        target: reward.target,
-        gifts: reward.gifts,
-        prize: reward.prize,
-        candidates,
-        winners,
-        prizes,
-        drawnAt: Date.now(),
-        drawnBy: user.uid,
-      })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không lưu được kết quả')
-    } finally {
-      setSpinName(null)
-      setBusy(false)
-    }
-  }
-
-  async function clearDraw() {
-    if (targetIndex < 0 || confirmed) return
-    if (!window.confirm('Xóa kết quả quay số của mục tiêu này?')) return
-    setBusy(true)
-    setError('')
-    try {
-      if (await lockedNow()) return
-      await set(ref(db, drawPath), null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không xóa được')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function confirmDraw() {
-    if (!user || targetIndex < 0 || !draw || confirmed) return
-    if (
-      !window.confirm(
-        `Xác nhận kết quả quay thưởng mục tiêu "${reward.target}"?\n\n` +
-          'Sau khi xác nhận sẽ không thể quay lại hoặc xóa kết quả nữa.',
-      )
-    ) {
-      return
-    }
-    setBusy(true)
-    setError('')
-    try {
-      await update(ref(db, drawPath), { confirmedAt: Date.now(), confirmedBy: user.uid })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không xác nhận được')
-    } finally {
-      setBusy(false)
-    }
-  }
+  const drawScreen = `/admin/challenges/${challenge.id}/draw?target=${encodeURIComponent(reward.target)}`
 
   return (
     <div className="reward-draw-card">
@@ -249,8 +127,7 @@ function RewardDrawCard({
         </div>
       </div>
 
-      {spinName == null &&
-        !(confirmed && winnersOnlyWhenConfirmed) &&
+      {!(confirmed && winnersOnlyWhenConfirmed) &&
         (draw ? draw.candidates.length > 0 : candidates.length > 0) && (
         <div className="reward-candidates-wrap">
           <p className="tiny muted">
@@ -265,15 +142,12 @@ function RewardDrawCard({
         </div>
       )}
 
-      {spinName != null ? (
-        <div className="reward-draw-spin" aria-live="polite">
-          <span key={spinName}>{spinName}</span>
-        </div>
-      ) : draw ? (
+      {draw ? (
         <>
           <p className="tiny muted">
-            Đã quay lúc {formatDrawTime(draw.drawnAt)} trong {draw.candidates.length} người
-            {draw.candidates.length <= draw.gifts ? ' (đủ quà cho tất cả)' : ''}.
+            {inProgress
+              ? `Đang quay: ${draw.winners.length}/${totalRounds} phần quà đã có người nhận (lượt gần nhất lúc ${formatDrawTime(draw.drawnAt)}).`
+              : `Đã quay xong lúc ${formatDrawTime(draw.drawnAt)} trong ${draw.candidates.length} người${draw.candidates.length <= draw.gifts ? ' (đủ quà cho tất cả)' : ''}.`}
           </p>
           <ol className="reward-winners">
             {draw.winners.map((uid, i) => (
@@ -299,7 +173,7 @@ function RewardDrawCard({
             </p>
           ) : (
             isAdmin && (
-              <p className="tiny muted">Chưa xác nhận — Admin có thể quay lại hoặc xóa kết quả.</p>
+              <p className="tiny muted">Chưa xác nhận — Admin có thể quay tiếp hoặc quay lại từ đầu.</p>
             )
           )}
           {isAdmin && !confirmed && listChanged && (
@@ -321,45 +195,11 @@ function RewardDrawCard({
 
       {isAdmin && finished && !confirmed && (candidates.length > 0 || draw) && (
         <div className="btn-row">
-          {draw && (
-            <button
-              type="button"
-              className="btn primary compact"
-              disabled={busy}
-              onClick={() => void confirmDraw()}
-            >
-              Xác nhận kết quả
-            </button>
-          )}
-          {candidates.length > 0 && (
-            <button
-              type="button"
-              className={`btn compact ${draw ? 'ghost' : 'primary'}`}
-              disabled={busy}
-              onClick={() => void runDraw()}
-            >
-              {busy
-                ? 'Đang xử lý…'
-                : candidates.length <= reward.gifts
-                  ? 'Trao thưởng cho tất cả'
-                  : draw
-                    ? 'Quay lại'
-                    : 'Quay số'}
-            </button>
-          )}
-          {draw && (
-            <button
-              type="button"
-              className="btn ghost compact danger"
-              disabled={busy}
-              onClick={() => void clearDraw()}
-            >
-              Xóa kết quả
-            </button>
-          )}
+          <Link className="btn primary compact" to={drawScreen}>
+            {draw ? 'Mở màn hình quay số' : 'Quay số'}
+          </Link>
         </div>
       )}
-      {error && <p className="form-error">{error}</p>}
     </div>
   )
 }
@@ -392,8 +232,9 @@ export function RewardDrawSection({
       )}
       <p className="tiny muted">
         Mỗi mục tiêu quay ngẫu nhiên trong số thành viên chính thức hoàn thành mục tiêu đó hoặc
-        chưa hoàn thành nhưng đã nộp phạt, trao lần lượt từng món theo thứ tự quà đã đặt; số
-        người được quay không vượt số quà thì tất cả đều nhận.
+        chưa hoàn thành nhưng đã nộp phạt. Mỗi phần quà quay một lượt theo thứ tự quà đã đặt,
+        người đã trúng không được quay ở lượt sau; số người được quay không vượt số quà thì tất cả
+        đều nhận, quay để chọn ai nhận phần quà nào.
       </p>
       <div className="reward-draw-list">
         {rewards.map((r) => (

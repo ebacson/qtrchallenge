@@ -87,10 +87,6 @@ export function LuckyDrawListPage() {
       <header className="page-header">
         <p className="eyebrow">Câu lạc bộ</p>
         <h1>Quay số may mắn</h1>
-        <p className="lede">
-          Tham gia các chương trình quay số của câu lạc bộ. Mỗi người trúng tối đa một phần quà
-          trong một chương trình.
-        </p>
       </header>
 
       {isAdmin && !creating && (

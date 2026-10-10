@@ -83,7 +83,6 @@ const adminGroup: MenuGroup = {
     { to: '/admin/challenges/new', label: 'Tạo thử thách', icon: CirclePlus },
     { to: '/admin/users', label: 'Quản lý thành viên', icon: UserCog },
     { to: '/admin/records', label: 'Xác thực thành tích', icon: ShieldCheck },
-    { to: '/lucky-draw', label: 'Quay số may mắn', icon: Dices },
   ],
 }
 

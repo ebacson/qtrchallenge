@@ -645,24 +645,23 @@ export function LuckyDrawPage() {
               </button>
             </form>
           )}
-          {!confirmed && (
-            <div className="btn-row">
-              {isOpen ? (
-                <button type="button" className="btn primary" disabled={busy || !!lockBlocker} onClick={lock}>
-                  Chốt danh sách
-                </button>
-              ) : (
-                savedWinners.length === 0 && (
-                  <button type="button" className="btn ghost" disabled={working} onClick={unlock}>
-                    Mở lại danh sách
-                  </button>
-                )
-              )}
-              <button type="button" className="btn ghost danger" disabled={working} onClick={deleteDraw}>
-                Xóa chương trình
+          <div className="btn-row">
+            {isOpen ? (
+              <button type="button" className="btn primary" disabled={busy || !!lockBlocker} onClick={lock}>
+                Chốt danh sách
               </button>
-            </div>
-          )}
+            ) : (
+              !confirmed &&
+              savedWinners.length === 0 && (
+                <button type="button" className="btn ghost" disabled={working} onClick={unlock}>
+                  Mở lại danh sách
+                </button>
+              )
+            )}
+            <button type="button" className="btn ghost danger" disabled={working} onClick={deleteDraw}>
+              <Trash2 size={16} aria-hidden /> Xóa chương trình
+            </button>
+          </div>
           {isOpen && lockBlocker && <p className="muted">{lockBlocker}</p>}
           {error && <p className="form-error">{error}</p>}
         </section>

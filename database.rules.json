@@ -94,6 +94,17 @@
       ".read": "auth != null",
       ".write": "auth != null && root.child('users').child(auth.uid).child('admin').val() === true"
     },
+    "lucky_draws": {
+      ".read": "auth != null",
+      "$drawId": {
+        ".write": "auth != null && root.child('users').child(auth.uid).child('admin').val() === true",
+        "participants": {
+          "$key": {
+            ".write": "auth != null && $key === auth.uid && root.child('lucky_draws').child($drawId).child('status').val() === 'open' && (!newData.exists() || (newData.child('uid').val() === auth.uid && newData.child('source').val() === 'self' && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 100))"
+          }
+        }
+      }
+    },
     "EVENT": {
       ".read": "auth != null",
       ".write": "auth != null && root.child('users').child(auth.uid).child('admin').val() === true"

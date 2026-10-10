@@ -197,6 +197,7 @@ export function LuckyDrawPage() {
       if (!finished) spinner.stop()
     }
     // Chỉ chạy lại khi sang lượt khác; watched/spinner đổi object mỗi lần render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchKey])
 
   if (raw === undefined) {

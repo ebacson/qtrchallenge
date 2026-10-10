@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { BadgeCheck, RotateCcw } from 'lucide-react'
-import { DrawStage } from '../components/DrawStage'
-import { drawPhase, prizeSlots, useDrawSpinner } from '../lib/drawSpinner'
+import { DrawStage, FullscreenButton } from '../components/DrawStage'
+import { drawPhase, prizeSlots, useDrawSpinner, useFullscreen } from '../lib/drawSpinner'
 import { pickRandom, rewardItemsSummary } from '../lib/rewardPenalty'
 import type { RewardItem } from '../types'
 
@@ -87,6 +87,7 @@ export function DrawTestPage() {
     TEST_TIERS.map((t) => ({ count: t.count, winners: [], confirmed: false })),
   )
   const spinner = useDrawSpinner()
+  const { ref: screenRef, ...fullscreen } = useFullscreen<HTMLDivElement>()
 
   const tier = TEST_TIERS[tierIndex]
   const slots = prizeSlots(tier.items)
@@ -150,6 +151,10 @@ export function DrawTestPage() {
         </p>
       </header>
 
+      <div
+        ref={screenRef}
+        className={fullscreen.isFull ? 'draw-screen full' : 'draw-screen'}
+      >
       <section className="section panel draw-setup">
         <div className="filter-row">
           {TEST_TIERS.map((t, i) => {
@@ -206,6 +211,7 @@ export function DrawTestPage() {
         idleText={`${candidates.length} người · ${slots.length} phần quà`}
         lastWin={stageWinners[stageWinners.length - 1]}
         winners={stageWinners}
+        tools={<FullscreenButton {...fullscreen} />}
         actions={
           <>
             {confirmed ? (
@@ -293,6 +299,7 @@ export function DrawTestPage() {
           ))}
         </ol>
       </section>
+      </div>
     </div>
   )
 }

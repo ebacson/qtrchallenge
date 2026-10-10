@@ -145,3 +145,27 @@ export function useDrawSpinner() {
 }
 
 export type DrawSpinner = ReturnType<typeof useDrawSpinner>
+
+const canFullscreen = typeof document !== 'undefined' && Boolean(document.fullscreenEnabled)
+
+/** Chiếu toàn màn hình một khối (không hỗ trợ trên iPhone) */
+export function useFullscreen<T extends HTMLElement>() {
+  const ref = useRef<T>(null)
+  const [isFull, setIsFull] = useState(false)
+
+  useEffect(() => {
+    const onChange = () => setIsFull(document.fullscreenElement === ref.current)
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
+
+  function toggle() {
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})
+    else void ref.current?.requestFullscreen().catch(() => {})
+  }
+
+  return { ref, isFull, supported: canFullscreen, toggle }
+}
+
+export type Fullscreen = ReturnType<typeof useFullscreen>
+

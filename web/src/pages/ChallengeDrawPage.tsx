@@ -1,19 +1,23 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { get, ref, runTransaction, set, update } from 'firebase/database'
-import { BadgeCheck, Maximize2, Minimize2, RotateCcw } from 'lucide-react'
-import { DrawStage } from '../components/DrawStage'
+import { BadgeCheck, RotateCcw } from 'lucide-react'
+import { DrawStage, FullscreenButton } from '../components/DrawStage'
 import { useAuth } from '../context/AuthContext'
 import { parseChallenge, STATUS_FINISHED } from '../lib/challengeRules'
-import { drawPhase, prizeSlots, useDrawSpinner, type StagePerson } from '../lib/drawSpinner'
+import {
+  drawPhase,
+  prizeSlots,
+  useDrawSpinner,
+  useFullscreen,
+  type StagePerson,
+} from '../lib/drawSpinner'
 import { db } from '../lib/firebase'
 import { pickRandom, rewardCandidates, rewardItemsSummary } from '../lib/rewardPenalty'
 import { useSharedValue } from '../lib/sharedValue'
 import { useUserProfiles } from '../lib/userWrites'
 
 const SYSTEM_EMAIL = 'echiptime@gmail.com'
-
-const canFullscreen = typeof document !== 'undefined' && Boolean(document.fullscreenEnabled)
 
 function nowMs(): number {
   return Date.now()
@@ -38,14 +42,7 @@ export function ChallengeDrawPage() {
   /** Người vừa trúng đã lưu nhưng còn đang quay: chưa hiện ra */
   const [pendingId, setPendingId] = useState<string | null>(null)
   const [error, setError] = useState('')
-  const [isFull, setIsFull] = useState(false)
-  const screenRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const onChange = () => setIsFull(document.fullscreenElement === screenRef.current)
-    document.addEventListener('fullscreenchange', onChange)
-    return () => document.removeEventListener('fullscreenchange', onChange)
-  }, [])
+  const { ref: screenRef, ...fullscreen } = useFullscreen<HTMLDivElement>()
 
   const challenge = useMemo(
     () => (raw && user ? parseChallenge(id, raw, user.uid) : null),
@@ -253,16 +250,14 @@ export function ChallengeDrawPage() {
     }
   }
 
-  function toggleFullscreen() {
-    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})
-    else void screenRef.current?.requestFullscreen().catch(() => {})
-  }
-
   return (
     <div className="page draw-test">
       {header}
 
-      <div ref={screenRef} className={isFull ? 'draw-screen full' : 'draw-screen'}>
+      <div
+        ref={screenRef}
+        className={fullscreen.isFull ? 'draw-screen full' : 'draw-screen'}
+      >
         {rewards.length > 1 && (
           <div className="filter-row draw-tier-chips">
             {rewards.map((r) => {
@@ -302,19 +297,7 @@ export function ChallengeDrawPage() {
           idleText={`${candidates.length} người · ${slots.length} phần quà`}
           lastWin={stageWinners[stageWinners.length - 1]}
           winners={stageWinners}
-          tools={
-            canFullscreen && (
-              <button
-                type="button"
-                className="draw-mute"
-                onClick={toggleFullscreen}
-                aria-label={isFull ? 'Thoát toàn màn hình' : 'Toàn màn hình'}
-                title={isFull ? 'Thoát toàn màn hình' : 'Toàn màn hình'}
-              >
-                {isFull ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-              </button>
-            )
-          }
+          tools={<FullscreenButton {...fullscreen} />}
           actions={
             <>
               {confirmed ? (

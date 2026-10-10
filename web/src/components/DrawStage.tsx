@@ -1,6 +1,22 @@
 import type { ReactNode } from 'react'
-import { Gift, Volume2, VolumeX } from 'lucide-react'
-import type { DrawPhase, DrawSpinner, StagePerson, StageWinner } from '../lib/drawSpinner'
+import { Gift, Maximize2, Minimize2, Volume2, VolumeX } from 'lucide-react'
+import type {
+  DrawPhase,
+  DrawSpinner,
+  Fullscreen,
+  StagePerson,
+  StageWinner,
+} from '../lib/drawSpinner'
+
+export function FullscreenButton({ isFull, supported, toggle }: Omit<Fullscreen, 'ref'>) {
+  if (!supported) return null
+  const label = isFull ? 'Thoát toàn màn hình' : 'Toàn màn hình'
+  return (
+    <button type="button" className="draw-mute" onClick={toggle} aria-label={label} title={label}>
+      {isFull ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+    </button>
+  )
+}
 
 export function StageAvatar({ person }: { person: StagePerson }) {
   return (

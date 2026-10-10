@@ -92,29 +92,44 @@ function GiftRulesView({ config }: { config: GiftConfig }) {
                           ) : (
                             <th>Nội dung</th>
                           )}
-                          <th>Hiện vật</th>
-                          <th>Giá trị hiện vật</th>
-                          <th>Tiền mặt</th>
+                          <th>Quà tặng</th>
+                          <th>Giá trị</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {c.tiers.map((t) => (
-                          <tr key={t.id}>
-                            {c.timed ? (
-                              <>
-                                <td>{t.male || '—'}</td>
-                                <td>{t.female || '—'}</td>
-                              </>
-                            ) : (
-                              <td>{t.label || '—'}</td>
-                            )}
-                            <td className="gift-name">{t.gift || '—'}</td>
-                            <td>{t.gift && t.value ? formatVnd(t.value) : '—'}</td>
-                            <td className={t.cash ? 'gift-cash' : undefined}>
-                              {t.cash ? formatVnd(t.cash) : '—'}
-                            </td>
-                          </tr>
-                        ))}
+                        {c.tiers.flatMap((t) => {
+                          // Hiện vật và tiền mặt mỗi thứ một dòng, chung ô mốc/nội dung
+                          const lines = [
+                            ...(t.gift || !t.cash
+                              ? [{ key: 'goods', name: t.gift || '—', value: t.value, cash: false }]
+                              : []),
+                            ...(t.cash
+                              ? [{ key: 'cash', name: 'Tiền mặt', value: t.cash, cash: true }]
+                              : []),
+                          ]
+                          return lines.map((line, i) => (
+                            <tr
+                              key={`${t.id}-${line.key}`}
+                              className={i < lines.length - 1 ? 'gift-row-joined' : undefined}
+                            >
+                              {i === 0 &&
+                                (c.timed ? (
+                                  <>
+                                    <td rowSpan={lines.length}>{t.male || '—'}</td>
+                                    <td rowSpan={lines.length}>{t.female || '—'}</td>
+                                  </>
+                                ) : (
+                                  <td rowSpan={lines.length}>{t.label || '—'}</td>
+                                ))}
+                              <td className={line.cash ? 'gift-name gift-cash' : 'gift-name'}>
+                                {line.name}
+                              </td>
+                              <td className={line.cash ? 'gift-cash' : undefined}>
+                                {line.value ? formatVnd(line.value) : '—'}
+                              </td>
+                            </tr>
+                          ))
+                        })}
                       </tbody>
                     </table>
                   </div>

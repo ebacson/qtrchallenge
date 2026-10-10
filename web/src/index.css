@@ -4208,14 +4208,23 @@ code {
   text-align: left;
 }
 
+.gift-table td {
+  white-space: normal;
+  vertical-align: middle;
+}
+
 .gift-table th:last-child,
 .gift-table td:last-child {
   text-align: right;
+  white-space: nowrap;
 }
 
 .gift-table .gift-name {
-  white-space: normal;
-  min-width: 10rem;
+  min-width: 7rem;
+}
+
+.gift-table tr.gift-row-joined td:not([rowspan]) {
+  border-bottom-style: dashed;
 }
 
 .gift-table .gift-cash {

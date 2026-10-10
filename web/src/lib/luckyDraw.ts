@@ -46,6 +46,8 @@ export type LuckyDraw = {
   /** Danh sách được quay, chụp lại lúc chốt */
   candidates: string[]
   winners: string[]
+  /** Số người trúng đã quay xong hiệu ứng; người sau đó Admin đang quay, chưa công bố */
+  revealed: number
   /** Tên và quà của từng người trúng, cùng thứ tự với winners */
   winnerNames: string[]
   winnerPrizes: string[]
@@ -110,6 +112,11 @@ export function parseLuckyDraw(id: string, raw: unknown): LuckyDraw | null {
     .sort((a, b) => a.addedAt - b.addedAt || a.name.localeCompare(b.name, 'vi'))
   const status: LuckyDrawStatus =
     row.status === 'done' ? 'done' : row.status === 'locked' ? 'locked' : 'open'
+  const winners = asList(row.winners).map(String)
+  const revealed =
+    status === 'done' || row.revealed == null
+      ? winners.length
+      : Math.min(winners.length, Math.max(0, Math.floor(Number(row.revealed) || 0)))
   return {
     id,
     name: text(row.name) || 'Quay số may mắn',
@@ -118,7 +125,8 @@ export function parseLuckyDraw(id: string, raw: unknown): LuckyDraw | null {
     prizes: parsePrizes(row.prizes),
     participants,
     candidates: asList(row.candidates).map(String),
-    winners: asList(row.winners).map(String),
+    winners,
+    revealed,
     winnerNames: asList(row.winnerNames).map(text),
     winnerPrizes: asList(row.winnerPrizes).map(text),
     createdAt: Number(row.createdAt) || 0,

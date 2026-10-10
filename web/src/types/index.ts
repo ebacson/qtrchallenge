@@ -90,6 +90,8 @@ export interface RewardDraw {
   prizes: string[]
   drawnAt: number
   drawnBy: string
+  /** Số người trúng đã quay xong hiệu ứng (người sau đó đang quay, chưa công bố); thiếu = tất cả */
+  revealed?: number
   /** Admin xác nhận kết quả: từ đó không được quay lại hay xóa */
   confirmedAt?: number
   confirmedBy?: string

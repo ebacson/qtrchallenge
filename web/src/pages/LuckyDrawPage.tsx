@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { push, ref, remove, runTransaction, set, update } from 'firebase/database'
 import { ArrowDown, ArrowUp, BadgeCheck, Plus, RotateCcw, Trash2, X } from 'lucide-react'
@@ -18,6 +18,7 @@ import {
   LUCKY_MENU_PATH,
   LUCKY_STATUS_LABELS,
   parseLuckyDraw,
+  type LuckyDraw,
   type LuckyParticipant,
 } from '../lib/luckyDraw'
 import { pickRandom, rewardItemsSummary } from '../lib/rewardPenalty'
@@ -32,6 +33,23 @@ function nowMs(): number {
 
 function sameName(a: string, b: string): boolean {
   return a.trim().toLocaleLowerCase('vi') === b.trim().toLocaleLowerCase('vi')
+}
+
+function stagePerson(draw: LuckyDraw, key: string, index = -1): StagePerson {
+  const p = draw.participants.find((x) => x.key === key)
+  return { id: key, name: p?.name || draw.winnerNames[index] || 'Người tham gia', avatar: p?.avatar }
+}
+
+/** Lượt Admin đang quay (đã lưu người trúng, chưa công bố): người xem quay theo trên máy mình */
+function watchedRound(draw: LuckyDraw): { key: string; people: StagePerson[]; winner: StagePerson } | null {
+  if (draw.status !== 'locked' || draw.winners.length <= draw.revealed) return null
+  const i = draw.revealed
+  const before = new Set(draw.winners.slice(0, i))
+  return {
+    key: `${i}:${draw.winners[i]}`,
+    people: draw.candidates.filter((k) => !before.has(k)).map((k) => stagePerson(draw, k)),
+    winner: stagePerson(draw, draw.winners[i], i),
+  }
 }
 
 function PrizeEditor({
@@ -162,6 +180,24 @@ export function LuckyDrawPage() {
   const [manualName, setManualName] = useState('')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  /** Lượt người xem đã quay xong trên máy mình (có thể trước khi Admin công bố vài trăm ms) */
+  const [watchedKey, setWatchedKey] = useState('')
+  const draw = raw == null ? null : parseLuckyDraw(id, raw)
+  const watched = !isAdmin && draw ? watchedRound(draw) : null
+  const watchKey = watched?.key ?? ''
+
+  useEffect(() => {
+    if (!watched) return
+    let finished = false
+    void spinner.spin(watched.people, watched.winner, { music: false }).then((ok) => {
+      finished = true
+      if (ok) setWatchedKey(watched.key)
+    })
+    return () => {
+      if (!finished) spinner.stop()
+    }
+    // Chỉ chạy lại khi sang lượt khác; watched/spinner đổi object mỗi lần render
+  }, [watchKey])
 
   if (raw === undefined) {
     return (
@@ -170,7 +206,6 @@ export function LuckyDrawPage() {
       </div>
     )
   }
-  const draw = parseLuckyDraw(id, raw)
   if (!draw) {
     return (
       <div className="page">
@@ -189,7 +224,11 @@ export function LuckyDrawPage() {
   const candidates = isOpen ? draw.participants.map((p) => p.key) : draw.candidates
   const slots = prizeSlots(draw.prizes)
   const savedWinners = draw.winners
-  const winners = pendingId ? savedWinners.filter((k) => k !== pendingId) : savedWinners
+  const shownCount = isAdmin
+    ? savedWinners.length
+    : draw.revealed + (watched && watchedKey === watched.key ? 1 : 0)
+  const shownWinners = savedWinners.slice(0, shownCount)
+  const winners = pendingId ? shownWinners.filter((k) => k !== pendingId) : shownWinners
   const winnerSet = new Set(winners)
   const pool = candidates.filter((k) => !savedWinners.includes(k))
   const totalRounds = Math.min(slots.length, candidates.length)
@@ -206,11 +245,7 @@ export function LuckyDrawPage() {
         : ''
   const me = user ? byKey.get(user.uid) : undefined
 
-  const toPerson = (key: string, index = -1): StagePerson => ({
-    id: key,
-    name: byKey.get(key)?.name || draw.winnerNames[index] || 'Người tham gia',
-    avatar: byKey.get(key)?.avatar,
-  })
+  const toPerson = (key: string, index = -1): StagePerson => stagePerson(draw, key, index)
   const stageWinners = winners.map((k, i) => ({
     person: toPerson(k, i),
     prize: draw.winnerPrizes[i] || slots[i] || '',
@@ -349,6 +384,7 @@ export function LuckyDrawPage() {
             winners: [...curWinners, picked],
             winnerNames: [...asList(cur.winnerNames).slice(0, expected), name],
             winnerPrizes: [...asList(cur.winnerPrizes).slice(0, expected), prize],
+            revealed: expected,
             drawnAt: nowMs(),
             drawnBy: uid,
           }
@@ -369,6 +405,14 @@ export function LuckyDrawPage() {
     }
     await spinner.spin(pool.map((k) => toPerson(k)), toPerson(picked))
     setPendingId(null)
+    void runTransaction(
+      ref(db, path),
+      (cur: Row | null) => {
+        if (!cur || cur.status !== 'locked' || asList(cur.winners).length !== expected + 1) return undefined
+        return { ...cur, revealed: expected + 1 }
+      },
+      { applyLocally: false },
+    ).catch(() => {})
   }
 
   function confirmResult() {
@@ -385,7 +429,13 @@ export function LuckyDrawPage() {
         ref(db, path),
         (cur: Row | null) => {
           if (!cur || cur.status !== 'locked') return undefined
-          return { ...cur, status: 'done', confirmedAt: nowMs(), confirmedBy: uid }
+          return {
+            ...cur,
+            status: 'done',
+            revealed: asList(cur.winners).length,
+            confirmedAt: nowMs(),
+            confirmedBy: uid,
+          }
         },
         { applyLocally: false },
       )
@@ -406,6 +456,7 @@ export function LuckyDrawPage() {
             winners: null,
             winnerNames: null,
             winnerPrizes: null,
+            revealed: null,
             drawnAt: null,
             drawnBy: null,
           }
@@ -654,7 +705,11 @@ export function LuckyDrawPage() {
                 </span>
               ) : !isAdmin ? (
                 <span className="draw-confirmed">
-                  {phase === 'done' ? 'Chờ Admin xác nhận kết quả' : 'Chờ Admin quay số'}
+                  {phase === 'spinning'
+                    ? 'Admin đang quay…'
+                    : phase === 'done'
+                      ? 'Chờ Admin xác nhận kết quả'
+                      : 'Chờ Admin quay số'}
                 </span>
               ) : (
                 <>

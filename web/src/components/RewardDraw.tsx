@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Gift } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { STATUS_FINISHED } from '../lib/challengeRules'
+import { revealedWinners, STATUS_FINISHED } from '../lib/challengeRules'
 import {
   rewardCandidates,
   rewardItemsSummary,
@@ -106,7 +106,9 @@ function RewardDrawCard({
   const confirmed = Boolean(draw?.confirmedAt)
   /** Quay từng phần quà: chưa đủ lượt là đang quay dở */
   const totalRounds = draw ? Math.min(draw.gifts, draw.candidates.length) : 0
-  const inProgress = draw != null && draw.winners.length < totalRounds
+  const shown = draw ? revealedWinners(draw) : []
+  const spinningNow = draw != null && shown.length < draw.winners.length
+  const inProgress = draw != null && shown.length < totalRounds
   const listChanged =
     draw != null &&
     (draw.candidates.length !== candidates.length ||
@@ -136,7 +138,7 @@ function RewardDrawCard({
           <CandidateList
             uids={draw ? draw.candidates : candidates}
             paidUids={paidUids}
-            winners={new Set(draw?.winners ?? [])}
+            winners={new Set(shown)}
             names={names}
           />
         </div>
@@ -145,12 +147,14 @@ function RewardDrawCard({
       {draw ? (
         <>
           <p className="tiny muted">
-            {inProgress
-              ? `Đang quay: ${draw.winners.length}/${totalRounds} phần quà đã có người nhận (lượt gần nhất lúc ${formatDrawTime(draw.drawnAt)}).`
+            {spinningNow
+              ? `Đang quay phần quà thứ ${shown.length + 1}/${totalRounds}…`
+              : inProgress
+              ? `Đang quay: ${shown.length}/${totalRounds} phần quà đã có người nhận (lượt gần nhất lúc ${formatDrawTime(draw.drawnAt)}).`
               : `Đã quay xong lúc ${formatDrawTime(draw.drawnAt)} trong ${draw.candidates.length} người${draw.candidates.length <= draw.gifts ? ' (đủ quà cho tất cả)' : ''}.`}
           </p>
           <ol className="reward-winners">
-            {draw.winners.map((uid, i) => (
+            {shown.map((uid, i) => (
               <li key={uid}>
                 <span className="hof-avatar">
                   {names[uid]?.avatar ? (

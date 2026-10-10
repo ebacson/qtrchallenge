@@ -186,6 +186,7 @@ export function ChallengeDrawPage() {
             candidates: cur ? asList(cur.candidates) : snapshot,
             winners: [...curWinners, picked],
             prizes: [...curWinners.map((_, i) => String(curPrizes[i] ?? slots[i] ?? '')), prize],
+            revealed: expected,
             drawnAt: at,
             drawnBy: uid,
           }
@@ -206,6 +207,14 @@ export function ChallengeDrawPage() {
     }
     await spinner.spin(pool.map(toPerson), toPerson(picked))
     setPendingId(null)
+    void runTransaction(
+      ref(db, drawPath),
+      (cur: Record<string, unknown> | null) => {
+        if (!cur || asList(cur.winners).length !== expected + 1) return undefined
+        return { ...cur, revealed: expected + 1 }
+      },
+      { applyLocally: false },
+    ).catch(() => {})
   }
 
   async function confirmDraw() {

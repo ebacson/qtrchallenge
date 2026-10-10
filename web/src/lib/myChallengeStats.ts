@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import {
   parseChallenge,
   parseChallengeDay,
+  revealedWinners,
   STATUS_FINISHED,
   STATUS_UPCOMING,
 } from './challengeRules'
@@ -88,7 +89,7 @@ export function useMyChallengeEntries(): MyChallengeEntry[] | null {
 
       const prizes: MyPrize[] = []
       for (const draw of challenge.rewardDraws ?? []) {
-        draw.winners.forEach((uid, i) => {
+        revealedWinners(draw).forEach((uid, i) => {
           if (uid === user.uid) prizes.push({ target: draw.target, prize: draw.prizes[i] ?? '' })
         })
       }

@@ -105,12 +105,16 @@ export function useDrawSpinner() {
   }
 
   /** Quay qua các tên trong `people` rồi dừng ở `winner`; false nếu bị dừng giữa chừng */
-  async function spin(people: StagePerson[], winner: StagePerson): Promise<boolean> {
+  async function spin(
+    people: StagePerson[],
+    winner: StagePerson,
+    { music = true }: { music?: boolean } = {},
+  ): Promise<boolean> {
     runId.current += 1
     const run = runId.current
     setConfetti([])
     setSpinning(true)
-    playMusic()
+    if (music) playMusic()
     if (people.length > 1) {
       const startedAt = nowMs()
       let last = ''

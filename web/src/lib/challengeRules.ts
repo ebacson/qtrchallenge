@@ -668,6 +668,12 @@ export function parseRewardTiers(raw: unknown): RewardTier[] | undefined {
   return list.length ? list : undefined
 }
 
+/** Người trúng đã công bố: bỏ người Admin vừa quay nhưng hiệu ứng quay chưa dừng */
+export function revealedWinners(draw: RewardDraw): string[] {
+  if (draw.confirmedAt || draw.revealed == null) return draw.winners
+  return draw.winners.slice(0, draw.revealed)
+}
+
 export function parseRewardDraws(raw: unknown): RewardDraw[] | undefined {
   const list = listValues(raw).flatMap((o) => {
     const target = String(o.target ?? '')
@@ -682,6 +688,7 @@ export function parseRewardDraws(raw: unknown): RewardDraw[] | undefined {
         prizes: Array.isArray(o.prizes) ? o.prizes.map((p) => String(p ?? '')) : [],
         drawnAt: Number(o.drawnAt) || 0,
         drawnBy: String(o.drawnBy ?? ''),
+        ...(o.revealed != null ? { revealed: Math.max(0, Math.floor(Number(o.revealed) || 0)) } : {}),
         ...(Number(o.confirmedAt) > 0
           ? { confirmedAt: Number(o.confirmedAt), confirmedBy: String(o.confirmedBy ?? '') }
           : {}),

@@ -114,7 +114,7 @@ export function LuckyDrawListPage() {
         <ul className="lucky-list">
           {draws.map((d) => {
             const joined = user ? d.participants.some((p) => p.uid === user.uid) : false
-            const won = user ? d.winners.includes(user.uid) : false
+            const won = user ? d.winners.slice(0, d.revealed).includes(user.uid) : false
             return (
               <li key={d.id}>
                 <Link to={`/lucky-draw/${d.id}`} className="lucky-card panel">

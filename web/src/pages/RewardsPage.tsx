@@ -6,6 +6,7 @@ import { useUserProfiles } from '../lib/userWrites'
 import {
   parseChallenge,
   parseChallengeDay,
+  revealedWinners,
   STATUS_FINISHED,
   STATUS_ONGOING,
   STATUS_UPCOMING,
@@ -580,7 +581,7 @@ function SummaryView({
     const map = new Map<string, RewardRecipient>()
     for (const report of finished) {
       for (const draw of report.challenge.rewardDraws ?? []) {
-        draw.winners.forEach((uid, i) => {
+        revealedWinners(draw).forEach((uid, i) => {
           const person = people.get(uid)
           const entry = map.get(uid) ?? {
             uid,

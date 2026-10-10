@@ -101,6 +101,22 @@ export function Layout() {
     setMenuOpen(false)
   }, [location.pathname])
 
+  // Số trên icon app (chỉ app đã cài trên trình duyệt hỗ trợ Badging API)
+  useEffect(() => {
+    if (!('setAppBadge' in navigator)) return
+    const result = unreadNotifications > 0
+      ? navigator.setAppBadge(unreadNotifications)
+      : navigator.clearAppBadge()
+    result.catch(() => {})
+  }, [unreadNotifications])
+
+  useEffect(
+    () => () => {
+      if ('clearAppBadge' in navigator) navigator.clearAppBadge().catch(() => {})
+    },
+    [],
+  )
+
   useEffect(() => {
     if (!menuOpen) return
 

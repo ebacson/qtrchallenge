@@ -11,9 +11,10 @@ export type BankInfo = {
   momoUrl: string
 }
 
+/** Tài khoản `PSG…` là tài khoản định danh Quỹ MoMo, nhận tiền qua mã BIN của MoMo (971025) */
 export const DEFAULT_BANK: BankInfo = {
-  bin: '970454',
-  bankName: 'BVBank',
+  bin: '971025',
+  bankName: 'MoMo (Quỹ QTR)',
   accountNo: 'PSG2627316100000032',
   accountName: '',
   momoUrl: 'https://quy.momo.vn/v2/HOkA0tigzT?cover=6749',

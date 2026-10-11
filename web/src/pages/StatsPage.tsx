@@ -1,5 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { QrCode } from 'lucide-react'
+import { PenaltyPayDialog } from '../components/PenaltyPayDialog'
 import { useAuth } from '../context/AuthContext'
 import { useSharedValue } from '../lib/sharedValue'
 import { timeToSeconds } from '../lib/prRanking'
@@ -40,6 +42,30 @@ function PenaltyBadge({ entry }: { entry: ChallengeEntry }) {
   if (entry.waived) return <span className="penalty-pay-badge waived">Miễn phạt</span>
   if (entry.paid) return <span className="penalty-pay-badge paid">✓ Đã nộp</span>
   return <span className="penalty-pay-badge unpaid">Chưa nộp</span>
+}
+
+function PayPenaltyButton({ entry }: { entry: ChallengeEntry }) {
+  const { user, profile } = useAuth()
+  const [open, setOpen] = useState(false)
+  const close = useCallback(() => setOpen(false), [])
+  if (!user || entry.challenge.status !== STATUS_FINISHED) return null
+  if (!(entry.penalty > 0) || entry.paid || entry.waived) return null
+  return (
+    <>
+      <button type="button" className="btn primary compact" onClick={() => setOpen(true)}>
+        <QrCode size={14} aria-hidden /> Nộp phạt
+      </button>
+      {open && (
+        <PenaltyPayDialog
+          challenge={entry.challenge}
+          uid={user.uid}
+          name={profile?.fullName || user.displayName || 'Thành viên'}
+          amount={entry.penalty}
+          onClose={close}
+        />
+      )}
+    </>
+  )
 }
 
 function ChallengeStats() {
@@ -179,6 +205,7 @@ function ChallengeStats() {
                       </span>
                       <span className="penalty-pay">
                         <PenaltyBadge entry={e} />
+                        {isMember && <PayPenaltyButton entry={e} />}
                         {e.prizes.map((p, i) => (
                           <span key={i} className="reward-winner-prize">
                             🎁 {p.prize || 'Trúng thưởng'}

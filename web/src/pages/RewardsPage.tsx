@@ -29,6 +29,7 @@ import {
   type AbsentPenalty,
   type ParticipantCompletion,
 } from '../lib/rewardPenalty'
+import { codeMatchesQuery, penaltyCode } from '../lib/payment'
 import { PenaltyPaymentControl } from '../components/PenaltyPaymentControl'
 import { RewardDrawSection } from '../components/RewardDraw'
 import type { Challenge } from '../types'
@@ -93,6 +94,18 @@ function foldText(value: string): string {
 
 function matchesQuery(name: string, folded: string): boolean {
   return !folded || foldText(name).includes(folded)
+}
+
+/** Tìm theo tên hoặc mã nộp phạt (nội dung chuyển khoản) của thành viên trong thử thách */
+function matchesPenalty(
+  person: { name: string; uid: string },
+  challenge: Challenge,
+  folded: string,
+): boolean {
+  return (
+    matchesQuery(person.name, folded) ||
+    codeMatchesQuery(penaltyCode(challenge, person.uid), folded)
+  )
 }
 
 function formatAmount(value: number, unit: ParticipantCompletion['unit']): string {
@@ -185,7 +198,7 @@ function ChallengeReportView({
 }) {
   const { challenge, rows, absent } = report
   const searching = query !== ''
-  const visibleAbsent = absent.filter((a) => matchesQuery(a.name, query))
+  const visibleAbsent = absent.filter((a) => matchesPenalty(a, challenge, query))
   const completed = rows.filter((r) => r.completion.tier === 'completed').length
   const failed = rows.length - completed
   // Người phải nộp: không hoàn thành + không tham gia (sau khi miễn)
@@ -298,13 +311,13 @@ function ChallengeReportView({
 
       {searching &&
         visibleAbsent.length === 0 &&
-        !rows.some((r) => matchesQuery(r.name, query)) && (
+        !rows.some((r) => matchesPenalty(r, challenge, query)) && (
           <p className="empty">Không tìm thấy thành viên phù hợp trong thử thách này.</p>
         )}
 
       {sections.map(({ key, index, title, hint }) => {
         const all = rows.filter((r) => r.completion.tierIndex === index)
-        const list = all.filter((r) => matchesQuery(r.name, query))
+        const list = all.filter((r) => matchesPenalty(r, challenge, query))
         const tier = tierStyle(index, tiers.length)
         if (searching && list.length === 0) return null
         return (
@@ -613,7 +626,8 @@ function SummaryView({
   }
   const visibleMembers = members.filter(
     (m) =>
-      matchesQuery(m.name, query) &&
+      (matchesQuery(m.name, query) ||
+        m.entries.some((e) => codeMatchesQuery(penaltyCode(e.challenge, m.uid), query))) &&
       (paymentFilter === 'all' || paymentStatusOf(m) === paymentFilter),
   )
   const membersFiltered = query !== '' || paymentFilter !== 'all'
@@ -922,8 +936,8 @@ export function RewardsPage() {
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Tìm nhanh thành viên"
-                aria-label="Tìm nhanh thành viên"
+                placeholder="Tìm thành viên hoặc mã nộp phạt"
+                aria-label="Tìm thành viên hoặc mã nộp phạt"
               />
               {search && (
                 <button type="button" aria-label="Xóa tìm kiếm" onClick={() => setSearch('')}>

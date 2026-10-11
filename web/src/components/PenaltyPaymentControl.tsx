@@ -1,10 +1,13 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { ref, set } from 'firebase/database'
+import { QrCode } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { STATUS_FINISHED } from '../lib/challengeRules'
 import { db } from '../lib/firebase'
+import { penaltyCode } from '../lib/payment'
 import { formatVnd } from '../lib/rewardPenalty'
 import type { Challenge } from '../types'
+import { PenaltyPayDialog } from './PenaltyPayDialog'
 
 const REASON_MAX = 120
 
@@ -26,11 +29,16 @@ export function PenaltyPaymentControl({
   const { user, profile } = useAuth()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [paying, setPaying] = useState(false)
+  const closePay = useCallback(() => setPaying(false), [])
   const payment = challenge.penaltyPayments?.[uid]
   const isAdmin = Boolean(profile?.admin)
   const finished = challenge.status === STATUS_FINISHED
   const path = `challenges/${challenge.id}/penaltyPayments/${uid}`
   const label = challenge.name || 'thử thách'
+  const code = penaltyCode(challenge, uid)
+  const unpaid = finished && amount > 0 && !payment
+  const canPay = unpaid && (isAdmin || user?.uid === uid)
 
   if (!(amount > 0) && !payment) return null
 
@@ -49,7 +57,7 @@ export function PenaltyPaymentControl({
   function confirmPaid() {
     if (!user) return
     if (!window.confirm(`Xác nhận ${name} đã nộp ${formatVnd(amount)} phạt "${label}"?`)) return
-    void write({ amount, confirmedAt: Date.now(), confirmedBy: user.uid, memberName: name })
+    void write({ amount, code, confirmedAt: Date.now(), confirmedBy: user.uid, memberName: name })
   }
 
   function waive() {
@@ -108,12 +116,35 @@ export function PenaltyPaymentControl({
       ) : finished ? (
         <span className="penalty-pay-badge unpaid">Chưa nộp</span>
       ) : null}
+      {canPay && (
+        <button
+          type="button"
+          className={`btn compact ${isAdmin ? 'ghost' : 'primary'}`}
+          onClick={() => setPaying(true)}
+        >
+          <QrCode size={14} aria-hidden /> {isAdmin ? 'Mã QR' : 'Nộp phạt'}
+        </button>
+      )}
       {payment && isAdmin && (
         <button type="button" className="btn ghost compact" disabled={busy} onClick={undo}>
           Hủy
         </button>
       )}
+      {isAdmin && finished && !payment?.waived && (
+        <code className="penalty-code" title="Mã nộp phạt (nội dung chuyển khoản)">
+          {payment?.code || code}
+        </code>
+      )}
       {error && <span className="tiny form-error">{error}</span>}
+      {paying && (
+        <PenaltyPayDialog
+          challenge={challenge}
+          uid={uid}
+          name={name}
+          amount={amount}
+          onClose={closePay}
+        />
+      )}
     </span>
   )
 }

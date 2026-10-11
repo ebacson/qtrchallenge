@@ -45,9 +45,9 @@ function fnv1a(text: string): number {
 }
 
 /**
- * Mã nộp phạt cố định cho một thành viên trong một thử thách, dạng `QTR P2610 AB12C`
+ * Mã nộp phạt cố định cho một thành viên trong một thử thách, dạng `QTRP2610AB12C`
  * (P + năm/tháng bắt đầu thử thách + 5 ký tự băm từ id thử thách và uid).
- * Dùng khoảng trắng thay gạch nối vì một số ngân hàng bỏ ký tự đặc biệt trong nội dung chuyển khoản.
+ * Viết liền, không ký tự đặc biệt vì một số ngân hàng bỏ ký tự đặc biệt trong nội dung chuyển khoản.
  */
 export function penaltyCode(challenge: Pick<Challenge, 'id' | 'startDate'>, uid: string): string {
   const [, month = '', year = ''] = challenge.startDate.trim().split('-')
@@ -58,7 +58,7 @@ export function penaltyCode(challenge: Pick<Challenge, 'id' | 'startDate'>, uid:
     suffix += CODE_ALPHABET[hash % CODE_ALPHABET.length]
     hash = Math.floor(hash / CODE_ALPHABET.length)
   }
-  return `QTR P${period} ${suffix}`
+  return `QTRP${period}${suffix}`
 }
 
 function compactCode(value: string): string {

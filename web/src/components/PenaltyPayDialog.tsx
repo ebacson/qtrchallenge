@@ -205,7 +205,7 @@ export function PenaltyPayDialog({
             <a
               className="btn ghost compact"
               href={qrUrl}
-              download={`nop-phat-${code.replace(/^QTR /, '').replace(/\s+/g, '-')}.png`}
+              download={`nop-phat-${code}.png`}
             >
               <Download size={14} aria-hidden /> Lưu ảnh QR
             </a>

@@ -4,6 +4,14 @@ import { ArrowDown, ArrowUp, ExternalLink, Link2, Phone, Plus, Trash2 } from 'lu
 import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
 import { useSharedValue } from '../lib/sharedValue'
+import {
+  DEFAULT_FUND_LINKS,
+  FUND_PATH,
+  hostOf,
+  isMomoUrl,
+  parseLinks,
+  type SupportLink,
+} from '../lib/supportLinks'
 import { USER_PROFILES_PATH } from '../lib/userProfile'
 
 type Contact = { uid?: string; name: string; role: string; phone: string; avatar?: string }
@@ -24,17 +32,9 @@ const DEFAULT_IT: Contact[] = [{ name: 'Tạ Bắc Sơn', role: '', phone: '0913
 
 const PHONE_RE = /^[0-9+().\s-]{6,20}$/
 
-type SupportLink = { label: string; url: string }
-
-/** Lưu dạng `{ items, updatedAt, updatedBy }`; chưa có node thì dùng danh sách mặc định. */
-const FUND_PATH = 'settings/support/fundLinks'
 const GROUPS_PATH = 'settings/support/groupLinks'
 /** Link Zalo đơn lẻ của bản trước, gộp vào danh sách group nếu Admin đã nhập */
 const LEGACY_ZALO_PATH = 'settings/support/zaloGroupUrl'
-
-const DEFAULT_FUND_LINKS: SupportLink[] = [
-  { label: 'Quỹ CLB (MoMo)', url: 'https://quy.momo.vn/v2/HOkA0tigzT?cover=6749' },
-]
 
 const DEFAULT_GROUP_LINKS: SupportLink[] = [
   { label: 'Group TVCT', url: 'https://zalo.me/g/8ks3ctezjpj7gsz2yzlv' },
@@ -50,20 +50,12 @@ function initials(name: string): string {
   return name.split(' ').pop()?.charAt(0).toUpperCase() ?? '?'
 }
 
-function hostOf(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '')
-  } catch {
-    return ''
-  }
-}
-
 type Brand = 'zalo' | 'momo' | 'facebook' | 'strava' | 'other'
 
 function brandOf(url: string): Brand {
   const host = hostOf(url)
   if (/(^|\.)zalo\.(me|vn)$/.test(host)) return 'zalo'
-  if (/(^|\.)momo\.vn$/.test(host)) return 'momo'
+  if (isMomoUrl(url)) return 'momo'
   if (/(^|\.)(facebook\.com|fb\.com|fb\.me|m\.me)$/.test(host)) return 'facebook'
   if (/(^|\.)strava\.(com|app\.link)$/.test(host)) return 'strava'
   return 'other'
@@ -94,21 +86,6 @@ function BrandIcon({ url }: { url: string }) {
       {brand === 'other' && <Link2 size={18} />}
     </span>
   )
-}
-
-function parseLinks(raw: unknown): SupportLink[] {
-  if (raw == null || typeof raw !== 'object') return []
-  const values = Array.isArray(raw)
-    ? raw
-    : Object.entries(raw as Record<string, unknown>)
-        .sort(([a], [b]) => Number(a) - Number(b))
-        .map(([, v]) => v)
-  return values
-    .map((v) => {
-      const row = (v ?? {}) as Record<string, unknown>
-      return { label: String(row.label ?? '').trim(), url: String(row.url ?? '').trim() }
-    })
-    .filter((l) => l.url)
 }
 
 function parseContacts(raw: unknown): Contact[] {

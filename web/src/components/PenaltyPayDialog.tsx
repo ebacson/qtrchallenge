@@ -7,6 +7,7 @@ import { db } from '../lib/firebase'
 import { BANK_PATH, parseBank, penaltyCode, vietQrPayload, type BankInfo } from '../lib/payment'
 import { formatVnd } from '../lib/rewardPenalty'
 import { useSharedValue } from '../lib/sharedValue'
+import { FUND_PATH, momoFundUrl } from '../lib/supportLinks'
 import type { Challenge } from '../types'
 
 function CopyButton({ value, label }: { value: string; label: string }) {
@@ -56,14 +57,10 @@ function BankEditor({ bank }: { bank: BankInfo }) {
       bankName: form.bankName.trim(),
       accountNo: form.accountNo.replace(/\s+/g, ''),
       accountName: form.accountName.trim().toUpperCase(),
-      momoUrl: form.momoUrl.trim(),
     }
     if (!/^\d{6}$/.test(next.bin)) return setMessage('Mã BIN ngân hàng gồm 6 chữ số.')
     if (!/^[A-Za-z0-9]{1,19}$/.test(next.accountNo)) {
       return setMessage('Số tài khoản chỉ gồm chữ và số, tối đa 19 ký tự.')
-    }
-    if (next.momoUrl && !/^https:\/\//.test(next.momoUrl)) {
-      return setMessage('Link Quỹ MoMo phải bắt đầu bằng https://')
     }
     setBusy(true)
     setMessage('')
@@ -85,7 +82,7 @@ function BankEditor({ bank }: { bank: BankInfo }) {
         {field('bin', 'Mã BIN ngân hàng (6 số)')}
         {field('accountNo', 'Số tài khoản')}
         {field('accountName', 'Chủ tài khoản', 'Để trống nếu không hiển thị')}
-        {field('momoUrl', 'Link Quỹ MoMo')}
+        <p className="tiny muted">Link Quỹ MoMo lấy từ mục Quỹ CLB ở trang Liên hệ hỗ trợ.</p>
         <button type="submit" className="btn primary compact" disabled={busy}>
           {busy ? 'Đang lưu…' : 'Lưu'}
         </button>
@@ -113,6 +110,7 @@ export function PenaltyPayDialog({
   const isAdmin = Boolean(profile?.admin)
   const bankRaw = useSharedValue<unknown>(BANK_PATH)
   const bank = parseBank(bankRaw)
+  const momoUrl = momoFundUrl(useSharedValue<{ items?: unknown }>(FUND_PATH))
   const code = penaltyCode(challenge, uid)
   const payload = vietQrPayload({ bin: bank.bin, accountNo: bank.accountNo, amount, memo: code })
   const [qr, setQr] = useState<{ payload: string; url: string } | null>(null)
@@ -212,15 +210,19 @@ export function PenaltyPayDialog({
               <Download size={14} aria-hidden /> Lưu ảnh QR
             </a>
           )}
-          {bank.momoUrl && (
-            <a className="btn ghost compact" href={bank.momoUrl} target="_blank" rel="noreferrer">
+          {momoUrl && (
+            <a className="btn ghost compact" href={momoUrl} target="_blank" rel="noreferrer">
               <Wallet size={14} aria-hidden /> Nộp qua Quỹ MoMo
             </a>
           )}
         </div>
         <p className="tiny muted">
-          Nộp qua link Quỹ MoMo thì nhập đúng số tiền và dán nội dung <strong>{code}</strong>. Thủ
-          quỹ sẽ xác nhận sau khi đối chiếu.
+          {momoUrl && (
+            <>
+              Nộp qua link Quỹ MoMo thì nhập đúng số tiền và dán nội dung <strong>{code}</strong>.{' '}
+            </>
+          )}
+          Thủ quỹ sẽ xác nhận sau khi đối chiếu.
         </p>
 
         {isAdmin && <BankEditor key={JSON.stringify(bank)} bank={bank} />}

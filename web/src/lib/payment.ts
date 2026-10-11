@@ -1,6 +1,6 @@
 import type { Challenge } from '../types'
 
-/** Thông tin tài khoản nhận tiền phạt; admin sửa được, lưu ở `settings/bank` */
+/** Tài khoản nhận tiền phạt; admin sửa được, lưu ở `settings/bank`. Link Quỹ MoMo lấy từ `supportLinks` */
 export const BANK_PATH = 'settings/bank'
 
 export type BankInfo = {
@@ -8,7 +8,6 @@ export type BankInfo = {
   bankName: string
   accountNo: string
   accountName: string
-  momoUrl: string
 }
 
 /** Tài khoản `PSG…` là tài khoản định danh Quỹ MoMo, nhận tiền qua mã BIN của MoMo (971025) */
@@ -17,7 +16,6 @@ export const DEFAULT_BANK: BankInfo = {
   bankName: 'MoMo (Quỹ QTR)',
   accountNo: 'PSG2627316100000032',
   accountName: '',
-  momoUrl: 'https://quy.momo.vn/v2/HOkA0tigzT?cover=6749',
 }
 
 export function parseBank(raw: unknown): BankInfo {
@@ -31,7 +29,6 @@ export function parseBank(raw: unknown): BankInfo {
     bankName: pick('bankName'),
     accountNo: pick('accountNo'),
     accountName: typeof row.accountName === 'string' ? row.accountName.trim() : '',
-    momoUrl: pick('momoUrl'),
   }
 }
 

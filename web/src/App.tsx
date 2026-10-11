@@ -18,6 +18,7 @@ function lazyPage<M extends Record<string, unknown>>(
 }
 
 const RegisterPage = lazyPage(() => import('./pages/RegisterPage'), 'RegisterPage')
+const AuthActionPage = lazyPage(() => import('./pages/AuthActionPage'), 'AuthActionPage')
 const ChallengesPage = lazyPage(() => import('./pages/ChallengesPage'), 'ChallengesPage')
 const ChallengeDetailPage = lazyPage(
   () => import('./pages/ChallengeDetailPage'),
@@ -84,6 +85,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/auth/action" element={<AuthActionPage />} />
       <Route
         path="/"
         element={

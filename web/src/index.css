@@ -1619,6 +1619,7 @@ select {
   justify-content: center;
   gap: 6px;
   color: var(--ink-soft);
+  text-decoration: none;
 }
 
 .auth-submit {

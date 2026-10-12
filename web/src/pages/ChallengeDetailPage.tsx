@@ -828,7 +828,9 @@ export function ChallengeDetailPage() {
             ) : (
               <>
                 {myUpgradedFrom && (
-                  <p className="tiny muted">Đã tăng mục tiêu từ {myUpgradedFrom}.</p>
+                  <p className="tiny muted">
+                    Tăng từ {myUpgradedFrom} lên {challenge.userTarget}.
+                  </p>
                 )}
                 {upgradeOptions.length > 0 &&
                   (upgrading ? (

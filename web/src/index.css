@@ -4498,6 +4498,22 @@ code {
   margin-top: 2px;
 }
 
+.target-upgrade {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.target-upgrade .search-field {
+  margin-bottom: 0;
+  min-width: 12rem;
+}
+
+.target-upgrade p {
+  margin: 0;
+}
+
 .penalty-pay .btn {
   display: inline-flex;
   align-items: center;

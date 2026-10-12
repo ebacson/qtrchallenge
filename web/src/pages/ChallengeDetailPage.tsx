@@ -7,7 +7,7 @@ import { useUserProfiles } from '../lib/userWrites'
 import { Pencil } from 'lucide-react'
 import { AdminParticipantEditor } from '../components/AdminParticipantEditor'
 import { RewardDrawSection } from '../components/RewardDraw'
-import { dayQuotaJoinFields } from '../lib/challengeProgress'
+import { dayQuotaJoinFields, recomputeUserChallenge } from '../lib/challengeProgress'
 import {
   formatVnd,
   isRewardEligible,
@@ -30,6 +30,8 @@ import {
   STATUS_FINISHED,
   STATUS_UPCOMING,
   statusClass,
+  TARGET_UPGRADE_LAST_DAY,
+  upgradeTargetOptions,
   userDayQuotaProgress,
 } from '../lib/challengeRules'
 import type { Challenge } from '../types'
@@ -40,6 +42,8 @@ type Participant = {
   avatar: string
   progress: string
   userTarget: string
+  /** Mục tiêu trước khi thành viên tự tăng */
+  upgradedFrom: string
   totalactiviti: string
   progressKm: number
   targetKm: number
@@ -110,6 +114,8 @@ export function ChallengeDetailPage() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [editingParticipant, setEditingParticipant] = useState<string | null>(null)
+  const [upgrading, setUpgrading] = useState(false)
+  const [upgradeTarget, setUpgradeTarget] = useState('')
   const [participantNotice, setParticipantNotice] = useState('')
 
   useEffect(() => {
@@ -213,6 +219,7 @@ export function ChallengeDetailPage() {
           avatar: profile?.avatar || '',
           progress,
           userTarget,
+          upgradedFrom: row.upgradedFrom ? String(row.upgradedFrom) : '',
           totalactiviti: String(row.totalactiviti ?? ''),
           progressKm,
           targetKm,
@@ -408,6 +415,52 @@ export function ChallengeDetailPage() {
     }
   }
 
+  const myRow = user ? rawUserChallenges[user.uid] : undefined
+  const myUpgradedFrom = myRow?.upgradedFrom ? String(myRow.upgradedFrom) : ''
+  const upgradeOptions = upgradeTargetOptions(challenge, myRow)
+  const chosenUpgrade = upgradeOptions.includes(upgradeTarget)
+    ? upgradeTarget
+    : (upgradeOptions[0] ?? '')
+  const [, startMonth = '', startYear = ''] = challenge.startDate.split('-')
+  const upgradeDeadlineText = `${TARGET_UPGRADE_LAST_DAY}/${startMonth}/${startYear}`
+
+  async function onUpgradeTarget() {
+    if (!user || !id || !challenge) return
+    const options = upgradeTargetOptions(challenge, rawUserChallenges[user.uid])
+    if (!options.includes(chosenUpgrade)) {
+      setError('Không thể tăng mục tiêu nữa (đã quá hạn hoặc đã tăng rồi).')
+      setUpgrading(false)
+      return
+    }
+    const from = String(rawUserChallenges[user.uid]?.userTarget ?? '')
+    if (
+      !window.confirm(
+        `Tăng mục tiêu từ ${from} lên ${chosenUpgrade}?\n\n` +
+          `Kết quả và mức phạt (nếu có) sẽ tính theo mục tiêu mới: cuối thử thách không đạt ${chosenUpgrade} là không hoàn thành.\n` +
+          'Chỉ được tăng một lần và không hạ lại được.',
+      )
+    ) {
+      return
+    }
+    setBusy(true)
+    setError('')
+    setMessage('')
+    try {
+      await update(ref(db, `challenges/${id}/user_challenges/${user.uid}`), {
+        userTarget: chosenUpgrade,
+        upgradedFrom: from,
+        upgradedAt: Date.now(),
+      })
+      await recomputeUserChallenge(id, user.uid)
+      setUpgrading(false)
+      setMessage(`Đã tăng mục tiêu lên ${chosenUpgrade}.`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không tăng được mục tiêu')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const isAdmin = Boolean(profile?.admin)
   const canManageParticipants = isAdmin && challenge.status !== STATUS_FINISHED
   const leaderboard = (
@@ -454,6 +507,7 @@ export function ChallengeDetailPage() {
                   ) : (
                     <span className="tiny muted">
                       Hoàn thành: {p.progress} / {p.userTarget || '—'}
+                      {p.upgradedFrom && ` (↑ từ ${p.upgradedFrom})`}
                       {p.totalactiviti ? ` · ${p.totalactiviti} hoạt động` : ''}
                     </span>
                   )}
@@ -772,9 +826,67 @@ export function ChallengeDetailPage() {
                 </button>
               </>
             ) : (
-              <p className="tiny muted">
-                Thử thách đã diễn ra — không thể rời nữa.
-              </p>
+              <>
+                {myUpgradedFrom && (
+                  <p className="tiny muted">Đã tăng mục tiêu từ {myUpgradedFrom}.</p>
+                )}
+                {upgradeOptions.length > 0 &&
+                  (upgrading ? (
+                    <div className="option-edit target-upgrade">
+                      <label className="search-field">
+                        Mục tiêu mới
+                        <select
+                          value={chosenUpgrade}
+                          onChange={(e) => setUpgradeTarget(e.target.value)}
+                        >
+                          {upgradeOptions.map((t) => (
+                            <option key={t} value={t}>
+                              {t}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <p className="tiny muted">
+                        Kết quả và mức phạt (nếu có) sẽ tính theo mục tiêu mới. Chỉ được tăng một
+                        lần, không hạ lại được.
+                      </p>
+                      <div className="btn-row">
+                        <button
+                          type="button"
+                          className="btn primary"
+                          disabled={busy}
+                          onClick={() => void onUpgradeTarget()}
+                        >
+                          {busy ? 'Đang lưu…' : `Tăng lên ${chosenUpgrade}`}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn ghost"
+                          disabled={busy}
+                          onClick={() => setUpgrading(false)}
+                        >
+                          Hủy
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="target-upgrade">
+                      <p className="form-info">
+                        🎉 Bạn đã hoàn thành mục tiêu {challenge.userTarget}! Có thể tăng mục tiêu
+                        đến hết ngày {upgradeDeadlineText} (một lần).
+                      </p>
+                      <button
+                        type="button"
+                        className="btn primary"
+                        disabled={busy}
+                        onClick={() => setUpgrading(true)}
+                      >
+                        Tăng mục tiêu
+                      </button>
+                    </div>
+                  ))}
+                <p className="tiny muted">Thử thách đã diễn ra — không thể rời nữa.</p>
+              </>
             )}
           </section>
 

@@ -852,3 +852,41 @@ export function challengeProgressPercent(challenge: Challenge): number {
   }
   return progressPercent(challenge.progress, challenge.userTarget)
 }
+
+/** Thành viên tự tăng mục tiêu được đến hết ngày này (giờ VN) của tháng bắt đầu thử thách */
+export const TARGET_UPGRADE_LAST_DAY = 23
+
+function kmOf(value: unknown): number {
+  const n = Number(String(value ?? '').replace(/[^0-9.]/g, ''))
+  return Number.isFinite(n) ? n : 0
+}
+
+/** Mốc (ms) hết hạn tự tăng mục tiêu; null nếu thử thách bắt đầu sau ngày đó */
+export function targetUpgradeDeadlineMs(startDate: string): number | null {
+  const p = parseDayParts(startDate)
+  if (!p || p.d > TARGET_UPGRADE_LAST_DAY) return null
+  return parseChallengeDayEndInclusiveMs(`${TARGET_UPGRADE_LAST_DAY}-${p.m}-${p.y}`)
+}
+
+/**
+ * Các mục tiêu lớn hơn mà thành viên được tự tăng lên: thử thách tính km đang diễn ra, chưa hết
+ * hạn, đã đạt 100% mục tiêu hiện tại và chưa tăng lần nào (`upgradedFrom`).
+ */
+export function upgradeTargetOptions(
+  challenge: Challenge,
+  row: Record<string, unknown> | null | undefined,
+  now = Date.now(),
+): string[] {
+  if (!row || row.upgradedFrom) return []
+  if (challenge.challengeMode === 'day_quota' || challenge.challengeMode === 'activity_count') {
+    return []
+  }
+  if (calculateStatus(challenge.startDate, challenge.endDate, now) !== STATUS_ONGOING) return []
+  const deadline = targetUpgradeDeadlineMs(challenge.startDate)
+  if (deadline == null || now >= deadline) return []
+  const current = kmOf(row.userTarget)
+  if (!(current > 0) || kmOf(row.progress) < current) return []
+  return challenge.targetDistances
+    .filter((t) => kmOf(t) > current)
+    .sort((a, b) => kmOf(a) - kmOf(b))
+}

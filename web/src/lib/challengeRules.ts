@@ -869,8 +869,9 @@ export function targetUpgradeDeadlineMs(startDate: string): number | null {
 }
 
 /**
- * Các mục tiêu lớn hơn mà thành viên được tự tăng lên: thử thách tính km đang diễn ra, chưa hết
- * hạn, đã đạt 100% mục tiêu hiện tại và chưa tăng lần nào (`upgradedFrom`).
+ * Các mục tiêu thành viên được tự tăng lên: thử thách tính km đang diễn ra, chưa hết hạn, đã đạt
+ * 100% mục tiêu hiện tại và chưa tăng lần nào (`upgradedFrom`). Chỉ các mức cao hơn số km đã chạy,
+ * để mục tiêu mới luôn còn phải chạy thêm.
  */
 export function upgradeTargetOptions(
   challenge: Challenge,
@@ -885,8 +886,9 @@ export function upgradeTargetOptions(
   const deadline = targetUpgradeDeadlineMs(challenge.startDate)
   if (deadline == null || now >= deadline) return []
   const current = kmOf(row.userTarget)
-  if (!(current > 0) || kmOf(row.progress) < current) return []
+  const done = kmOf(row.progress)
+  if (!(current > 0) || done < current) return []
   return challenge.targetDistances
-    .filter((t) => kmOf(t) > current)
+    .filter((t) => kmOf(t) > done)
     .sort((a, b) => kmOf(a) - kmOf(b))
 }

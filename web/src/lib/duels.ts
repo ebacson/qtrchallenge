@@ -309,13 +309,14 @@ export function duelGoalText(duel: Duel): string {
 /** Cách xác định người thắng, dùng cho luật chơi và gợi ý trên form */
 export function duelWinRule(duel: Pick<Duel, 'kind' | 'metric' | 'winnerCount'>): string {
   const who = duel.winnerCount > 1 ? `${duel.winnerCount} người` : 'người'
+  const others = ' Người đạt mục tiêu khác không thua; chỉ người không đạt phải thực hiện cam kết.'
   if (duel.metric === 'best_effort') {
     return duel.kind === 'target'
-      ? `Trong những người đạt mục tiêu, ${who} nhanh nhất thắng; cùng pace thì ai chạy xong sớm hơn xếp trên.`
+      ? `Trong những người đạt mục tiêu, ${who} nhanh nhất thắng; cùng pace thì ai chạy xong sớm hơn xếp trên.${others}`
       : `Hết ngày xếp hạng theo pace, ${who} nhanh nhất thắng; cùng pace thì ai chạy xong sớm hơn xếp trên.`
   }
   return duel.kind === 'target'
-    ? `${who.charAt(0).toUpperCase()}${who.slice(1)} đạt mục tiêu sớm nhất thắng.`
+    ? `${who.charAt(0).toUpperCase()}${who.slice(1)} đạt mục tiêu sớm nhất thắng.${others}`
     : `Hết ngày xếp hạng, ${who} đứng đầu thắng; bằng thành tích thì ai đạt sớm hơn xếp trên.`
 }
 
@@ -397,6 +398,11 @@ function round2(n: number): number {
 export function duelReached(duel: Duel, value: number | null | undefined): boolean {
   if (duel.kind !== 'target' || value == null) return false
   return duel.metric === 'best_effort' ? value <= duel.target + 1e-9 : value >= duel.target - 1e-9
+}
+
+/** Thua (phải thực hiện cam kết): kiểu đạt mục tiêu là người không đạt, kiểu xếp hạng là người không thắng */
+export function duelLost(duel: Duel, row: { won: boolean; value: number | null | undefined }): boolean {
+  return !row.won && !duelReached(duel, row.value)
 }
 
 export function computeDuelScore(duel: Duel, activities: Record<string, unknown>[]): DuelScore {

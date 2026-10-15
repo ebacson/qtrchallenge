@@ -13,6 +13,7 @@ import {
   duelDateText,
   duelGoalText,
   duelPercent,
+  duelLost,
   duelPhase,
   duelReached,
   duelRules,
@@ -393,8 +394,9 @@ export function DuelDetailPage() {
   const editable = canManage && ['pending', 'rejected', 'expired'].includes(phase)
   const canCancel = isAdmin || (isCreator && (d.approval.status !== 'approved' || now < d.startAt))
   const stake = stakeSummary(d)
-  const losers = d.result ? rows.filter((r) => !r.won) : []
+  const losers = d.result ? rows.filter((r) => duelLost(d, r)) : []
   const winners = d.result ? rows.filter((r) => r.won) : []
+  const finishers = d.result ? rows.filter((r) => !r.won && !duelLost(d, r)) : []
   const canMarkStake = (target: string) =>
     isAdmin ||
     (isCreator && target !== uid) ||
@@ -610,7 +612,9 @@ export function DuelDetailPage() {
                     {d.result
                       ? r.won
                         ? '🏆 Thắng'
-                        : 'Không thắng'
+                        : duelLost(d, r)
+                          ? 'Thua'
+                          : 'Đạt mục tiêu · không thua'
                       : duelReached(d, r.value)
                         ? 'Đạt mục tiêu'
                         : d.kind === 'target'
@@ -638,11 +642,12 @@ export function DuelDetailPage() {
             {winners.length
               ? `Thắng: ${winners.map((w) => w.name).join(', ')}.`
               : 'Không ai thắng.'}
+            {finishers.length > 0 && ` Đạt mục tiêu (không thua): ${finishers.map((w) => w.name).join(', ')}.`}
           </p>
           {!stake ? (
             <p className="tiny muted">Thách đấu không có cam kết thưởng – phạt.</p>
           ) : losers.length === 0 ? (
-            <p className="tiny muted">Tất cả đều thắng, không ai phải thực hiện cam kết.</p>
+            <p className="tiny muted">Không ai thua, không ai phải thực hiện cam kết.</p>
           ) : (
             <ul className="duel-request-list">
               {losers.map((r) => {

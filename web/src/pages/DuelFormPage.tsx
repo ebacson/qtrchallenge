@@ -418,8 +418,8 @@ function DuelForm({ initial, editing }: { initial: Draft; editing: Duel | null }
         />
       </label>
       <p className="tiny muted">
-        {fund > 0 ? `${formatVnd(fund)} / người. ` : ''}Tiền góp chuyển vào quỹ CLB qua mã QR, thủ quỹ
-        xác nhận. Web không giữ tiền và không xử lý cược giữa cá nhân.
+        {fund > 0 ? `${formatVnd(fund)} / người. ` : ''}Tiền góp chuyển vào quỹ CLB, thủ quỹ xác nhận.
+        CLB không giữ tiền và không xử lý cược giữa cá nhân.
       </p>
 
       <h2>4. Mời người tham gia</h2>

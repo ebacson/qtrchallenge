@@ -144,6 +144,7 @@ function DuelForm({ initial, editing }: { initial: Draft; editing: Duel | null }
   const endDate = inputDateToChallengeDay(draft.endInput)
   const times = duelTimes(startDate, endDate)
   const totalDays = times ? countInclusiveDays(startDate, endDate) : 0
+  // Thách đấu 1 ngày chỉ cho đăng ký trước ngày đó
   const joinOptions = Array.from({ length: Math.max(1, Math.min(totalDays, 8)) }, (_, i) => i)
   const joinDays = Math.min(draft.joinDays, joinOptions.length - 1)
   const isBestEffort = draft.metric === 'best_effort'
@@ -157,6 +158,9 @@ function DuelForm({ initial, editing }: { initial: Draft; editing: Duel | null }
     if (!times) return setError('Chọn ngày bắt đầu và kết thúc hợp lệ.')
     if (times.startAt + DAY_MS <= nowMs()) return setError('Ngày bắt đầu phải từ hôm nay trở đi.')
     if (totalDays > MAX_DUEL_DAYS) return setError(`Thách đấu dài tối đa ${MAX_DUEL_DAYS} ngày.`)
+    if (joinUntilFor(times.startAt, times.endAt, joinDays) <= nowMs()) {
+      return setError('Hạn tham gia đã qua. Chọn ngày bắt đầu muộn hơn hoặc hạn tham gia dài hơn.')
+    }
 
     let target = 0
     if (draft.kind === 'target') {
@@ -390,13 +394,16 @@ function DuelForm({ initial, editing }: { initial: Draft; editing: Duel | null }
         <select value={joinDays} onChange={(e) => patch({ joinDays: Number(e.target.value) })}>
           {joinOptions.map((n) => (
             <option key={n} value={n}>
-              {times
-                ? `Đến ${formatJoinDeadline(joinUntilFor(times.startAt, times.endAt, n))}`
-                : `Ngày thứ ${n + 1}`}
+              {`${n === 0 ? 'Trước khi bắt đầu' : `Đến hết ngày thứ ${n}`}${
+                times ? ` (${formatJoinDeadline(joinUntilFor(times.startAt, times.endAt, n))})` : ''
+              }`}
             </option>
           ))}
         </select>
       </label>
+      {totalDays === 1 && (
+        <p className="tiny muted">Thách đấu 1 ngày: phải đăng ký trước ngày diễn ra.</p>
+      )}
 
       <h2>3. Cam kết thưởng – phạt</h2>
       <label>

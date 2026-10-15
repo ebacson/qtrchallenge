@@ -214,9 +214,9 @@ export function isJoinOpen(duel: Duel, now = Date.now()): boolean {
   return duel.approval.status === 'approved' && now < duel.joinUntil
 }
 
-/** Thời điểm hết hạn tham gia: hết ngày thứ `joinDays` tính từ ngày bắt đầu (0 = hết ngày đầu) */
+/** Thời điểm hết hạn tham gia: 0 = trước khi bắt đầu; n = hết ngày thứ n của thách đấu */
 export function joinUntilFor(startAt: number, endAt: number, joinDays: number): number {
-  return Math.min(endAt, startAt + (joinDays + 1) * DAY_MS)
+  return joinDays > 0 ? Math.min(endAt, startAt + joinDays * DAY_MS) : startAt
 }
 
 /** Khoảng thời gian dd-mm-yyyy → mốc ms (giờ VN) để quy tắc Firebase so với `now` */

@@ -1340,6 +1340,8 @@ select {
   position: relative;
   width: min(440px, 100%);
   display: grid;
+  /* Cột không được giãn theo bề rộng tự nhiên của ô nhập khi chữ hệ thống phóng to */
+  grid-template-columns: minmax(0, 1fr);
   border-radius: 28px;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.95);
@@ -1361,7 +1363,7 @@ select {
 
 .auth-hero {
   position: relative;
-  padding: 22px 24px;
+  padding: 22px clamp(16px, 6vw, 24px);
   color: #fff;
   background:
     radial-gradient(circle at 85% 15%, rgba(255, 255, 255, 0.18), transparent 45%),
@@ -1403,7 +1405,7 @@ select {
   margin: 0;
   font-family: var(--display);
   font-weight: 700;
-  font-size: 1.9rem;
+  font-size: clamp(1.5rem, 7.5vw, 1.9rem);
   letter-spacing: 0.05em;
   line-height: 1;
 }
@@ -1422,7 +1424,8 @@ select {
 }
 
 .auth-card {
-  padding: 26px 24px 24px;
+  min-width: 0;
+  padding: 26px clamp(16px, 6vw, 24px) 24px;
 }
 
 .auth-card-head {
@@ -1432,7 +1435,7 @@ select {
 .auth-card-head h1 {
   margin: 0;
   font-family: var(--display);
-  font-size: 2rem;
+  font-size: clamp(1.6rem, 8vw, 2rem);
   letter-spacing: 0.02em;
   line-height: 1.05;
 }
@@ -1447,7 +1450,7 @@ select {
 @media (min-width: 860px) {
   .auth-shell {
     width: min(920px, 100%);
-    grid-template-columns: 1fr 1.05fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
     min-height: 560px;
   }
 
@@ -1534,6 +1537,7 @@ select {
 .auth-input {
   display: flex;
   align-items: center;
+  min-width: 0;
   gap: 10px;
   padding: 0 12px;
   border: 1.5px solid rgba(200, 16, 46, 0.16);
@@ -1562,6 +1566,7 @@ select {
 
 .auth-form .auth-input input {
   flex: 1;
+  width: 100%;
   min-width: 0;
   border: none;
   border-radius: 0;

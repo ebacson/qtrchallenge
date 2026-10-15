@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   activityDayMs,
-  calculateProgress,
   convertPaceToMinutesPerKm,
   ELIGIBLE_ACTIVITY_TYPES,
   formatPaceMinutes,
   MAX_PACE,
+  MIN_DISTANCE_KM,
   MIN_PACE,
-  parseChallengeDay,
   parseChallengeDayEndInclusiveMs,
   parseChallengeDayStartMs,
 } from './challengeRules'
@@ -36,7 +35,7 @@ export type DuelApprovalStatus = 'pending' | 'approved' | 'rejected'
 /** expired: quá ngày bắt đầu mà chưa được duyệt */
 export type DuelPhase = 'pending' | 'rejected' | 'expired' | 'upcoming' | 'ongoing' | 'finished'
 
-export type DuelResultRow = { name: string; value: number | null; rank: number; won: boolean }
+export type DuelResultRow = { name: string; value: number | null; at: number | null; rank: number; won: boolean }
 
 export type Duel = {
   id: string
@@ -158,7 +157,8 @@ export function parseDuel(id: string, raw: unknown): Duel | null {
             const r = asDict(v)
             if (!r) return null
             const value = r.value == null ? null : num(r.value)
-            return { name: text(r.name), value, rank: num(r.rank), won: r.won === true }
+            const at = r.at == null ? null : num(r.at)
+            return { name: text(r.name), value, at, rank: num(r.rank), won: r.won === true }
           }),
         }
       : null,
@@ -240,6 +240,17 @@ export function formatDateTime(ms: number): string {
   }).format(ms)
 }
 
+/** Giờ hoàn thành: "06:42:10" (thách đấu 1 ngày) hoặc "06:42:10 17/10" */
+export function formatDuelTime(duel: Pick<Duel, 'startDate' | 'endDate'>, ms: number): string {
+  return new Intl.DateTimeFormat('vi-VN', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    ...(duel.startDate === duel.endDate ? {} : { day: '2-digit', month: '2-digit' }),
+  }).format(ms)
+}
+
 /** `joinUntil` là mốc 00:00 ngày kế tiếp (không tính), hiển thị thành 23:59 ngày cuối được tham gia */
 export function formatJoinDeadline(joinUntil: number): string {
   return formatDateTime(joinUntil - 60_000)
@@ -295,16 +306,26 @@ export function duelGoalText(duel: Duel): string {
   }
 }
 
+/** Cách xác định người thắng, dùng cho luật chơi và gợi ý trên form */
+export function duelWinRule(duel: Pick<Duel, 'kind' | 'metric' | 'winnerCount'>): string {
+  const who = duel.winnerCount > 1 ? `${duel.winnerCount} người` : 'người'
+  if (duel.metric === 'best_effort') {
+    return duel.kind === 'target'
+      ? `Trong những người đạt mục tiêu, ${who} nhanh nhất thắng; cùng pace thì ai chạy xong sớm hơn xếp trên.`
+      : `Hết ngày xếp hạng theo pace, ${who} nhanh nhất thắng; cùng pace thì ai chạy xong sớm hơn xếp trên.`
+  }
+  return duel.kind === 'target'
+    ? `${who.charAt(0).toUpperCase()}${who.slice(1)} đạt mục tiêu sớm nhất thắng.`
+    : `Hết ngày xếp hạng, ${who} đứng đầu thắng; bằng thành tích thì ai đạt sớm hơn xếp trên.`
+}
+
 export function duelRules(duel: Duel): string[] {
   const rules = [
     duel.startDate === duel.endDate
       ? `Ngày diễn ra: ${duel.startDate} (00:00–23:59).`
       : `Thời gian: ${duel.startDate} → ${duel.endDate}.`,
-    duel.kind === 'target'
-      ? 'Ai đạt mục tiêu là thắng; có thể nhiều người cùng thắng.'
-      : duel.winnerCount > 1
-        ? `Xếp hạng khi kết thúc: ${duel.winnerCount} người đứng đầu thắng, bằng thành tích thì cùng hạng.`
-        : 'Xếp hạng khi kết thúc: người đứng đầu thắng, bằng thành tích thì cùng hạng.',
+    duelWinRule(duel),
+    'Thời điểm hoàn thành = giờ bắt đầu + tổng thời gian của hoạt động trên Strava.',
     'Chỉ tính hoạt động chạy/đi bộ đồng bộ từ Strava trong thời gian thách đấu.',
   ]
   const [paceMin, paceMax] = duelPaceRange(duel)
@@ -323,46 +344,89 @@ export function duelRules(duel: Duel): string[] {
   return rules
 }
 
-/** Thành tích từ danh sách hoạt động Strava; `null` khi chưa có hoạt động hợp lệ (hoạt động nhanh nhất) */
-export function computeDuelValue(duel: Duel, activities: Record<string, unknown>[]): number | null {
-  const start = parseChallengeDay(duel.startDate)
-  const end = parseChallengeDay(duel.endDate)
-  if (!start || !end) return null
+/**
+ * Thành tích và thời điểm đạt được (ms, giờ kết thúc hoạt động). `at` là lúc đạt mục tiêu
+ * (kiểu đạt mục tiêu, khi đã đạt), còn lại là lúc đạt thành tích hiện tại.
+ * `value` null khi chưa có hoạt động hợp lệ (hoạt động nhanh nhất).
+ */
+export type DuelScore = { value: number | null; at: number | null }
+
+function clockSeconds(value: string): number {
+  const parts = value.trim().split(':').map(Number)
+  if (parts.length < 2 || parts.length > 3 || parts.some((n) => !Number.isFinite(n) || n < 0)) return 0
+  return parts.reduce((total, n) => total * 60 + n, 0)
+}
+
+/** `startDate` "dd-mm-yyyy HH:MM:SS" (giờ VN) + thời gian trôi qua (elapsed, thiếu thì moving) */
+function activityEndMs(activity: Record<string, unknown>): number | null {
+  const [day = '', time = ''] = String(activity.startDate ?? '').trim().split(' ')
+  const dayMs = parseChallengeDayStartMs(day)
+  if (dayMs == null) return null
+  const duration = clockSeconds(String(activity.elapsedTime ?? '')) || clockSeconds(String(activity.movingTime ?? ''))
+  return dayMs + (clockSeconds(time) + duration) * 1000
+}
+
+type DuelActivity = { distance: number; pace: number; endMs: number }
+
+/** Hoạt động hợp lệ trong thời gian thách đấu, sắp theo giờ kết thúc */
+function duelActivities(duel: Duel, activities: Record<string, unknown>[], minKm: number): DuelActivity[] {
+  const start = parseChallengeDayStartMs(duel.startDate)
+  const end = parseChallengeDayStartMs(duel.endDate)
+  if (start == null || end == null) return []
   const [paceMin, paceMax] = duelPaceRange(duel)
+  const out: DuelActivity[] = []
+  for (const a of activities) {
+    if (!ELIGIBLE_ACTIVITY_TYPES.has(String(a.type ?? ''))) continue
+    const distance = Number(a.distance)
+    if (!(distance > 0 && distance >= minKm)) continue
+    const dayMs = activityDayMs(String(a.startDate ?? ''))
+    if (dayMs == null || dayMs < start || dayMs > end) continue
+    const pace = convertPaceToMinutesPerKm(String(a.pace ?? ''))
+    if (pace < paceMin || pace > paceMax) continue
+    const endMs = activityEndMs(a)
+    if (endMs != null) out.push({ distance, pace, endMs })
+  }
+  return out.sort((a, b) => a.endMs - b.endMs)
+}
+
+function round2(n: number): number {
+  return Number(n.toFixed(2))
+}
+
+/** Đạt mục tiêu của kiểu "đạt mục tiêu" (hoạt động nhanh nhất: pace ≤ mục tiêu) */
+export function duelReached(duel: Duel, value: number | null | undefined): boolean {
+  if (duel.kind !== 'target' || value == null) return false
+  return duel.metric === 'best_effort' ? value <= duel.target + 1e-9 : value >= duel.target - 1e-9
+}
+
+export function computeDuelScore(duel: Duel, activities: Record<string, unknown>[]): DuelScore {
   if (duel.metric === 'best_effort') {
-    let best: number | null = null
-    for (const a of activities) {
-      if (!ELIGIBLE_ACTIVITY_TYPES.has(String(a.type ?? ''))) continue
-      const distance = Number(a.distance)
-      if (!(distance >= duel.minKm)) continue
-      const dayMs = activityDayMs(String(a.startDate ?? ''))
-      if (dayMs == null || dayMs < start.getTime() || dayMs > end.getTime()) continue
-      const pace = convertPaceToMinutesPerKm(String(a.pace ?? ''))
-      if (pace < paceMin || pace > paceMax) continue
-      if (best == null || pace < best) best = pace
+    let best: DuelActivity | null = null
+    for (const a of duelActivities(duel, activities, duel.minKm)) {
+      if (!best || a.pace < best.pace) best = a
     }
-    return best
+    return best ? { value: best.pace, at: best.endMs } : { value: null, at: null }
   }
   if (duel.single && duel.metric !== 'count') {
-    let longest = 0
-    for (const a of activities) {
-      if (!ELIGIBLE_ACTIVITY_TYPES.has(String(a.type ?? ''))) continue
-      const distance = Number(a.distance)
-      if (!(distance > longest)) continue
-      const dayMs = activityDayMs(String(a.startDate ?? ''))
-      if (dayMs == null || dayMs < start.getTime() || dayMs > end.getTime()) continue
-      const pace = convertPaceToMinutesPerKm(String(a.pace ?? ''))
-      if (pace < paceMin || pace > paceMax) continue
-      longest = distance
+    const list = duelActivities(duel, activities, 0)
+    let longest: DuelActivity | null = null
+    for (const a of list) {
+      if (!longest || a.distance > longest.distance) longest = a
     }
-    return Number(longest.toFixed(2))
+    if (!longest) return { value: 0, at: null }
+    const value = round2(longest.distance)
+    const done = duelReached(duel, value) ? list.find((a) => duelReached(duel, round2(a.distance))) : undefined
+    return { value, at: (done ?? longest).endMs }
   }
-  const result = calculateProgress(activities, start, end, {
-    minActivityDistanceKm: duel.minKm > 0 ? duel.minKm : undefined,
-    paceMin,
-    paceMax,
-  })
-  return duel.metric === 'count' ? result.totalActivities : Number(result.totalDistanceKm.toFixed(2))
+  let total = 0
+  let at: number | null = null
+  let doneAt: number | null = null
+  for (const a of duelActivities(duel, activities, duel.minKm > 0 ? duel.minKm : MIN_DISTANCE_KM)) {
+    total += duel.metric === 'count' ? 1 : a.distance
+    at = a.endMs
+    if (doneAt == null && duelReached(duel, round2(total))) doneAt = a.endMs
+  }
+  return { value: round2(total), at: doneAt ?? at }
 }
 
 export function formatDuelValue(duel: Duel, value: number | null | undefined): string {
@@ -379,28 +443,40 @@ export function duelPercent(duel: Duel, value: number | null | undefined): numbe
   return Math.max(0, Math.min(100, Math.round(pct)))
 }
 
-function better(duel: Duel, a: number | null, b: number | null): number {
-  if (a == null && b == null) return 0
+function earlier(a: number | null, b: number | null): number {
+  if (a === b) return 0
   if (a == null) return 1
   if (b == null) return -1
-  return duel.metric === 'best_effort' ? a - b : b - a
+  return a - b
 }
 
-export type RankedRow = { uid: string; value: number | null; rank: number; won: boolean }
+/**
+ * Âm khi `a` xếp trên `b`. Đạt mục tiêu xếp trên chưa đạt; cự ly đã đạt thì ai đạt sớm hơn xếp trên;
+ * còn lại so thành tích (km nhiều hơn / pace nhanh hơn), bằng nhau thì ai đạt sớm hơn xếp trên.
+ */
+function compareScores(duel: Duel, a: DuelScore, b: DuelScore): number {
+  const reachedA = duelReached(duel, a.value)
+  const reachedB = duelReached(duel, b.value)
+  if (reachedA !== reachedB) return reachedA ? -1 : 1
+  if (reachedA && duel.metric !== 'best_effort') return earlier(a.at, b.at)
+  if (a.value == null || b.value == null) return a.value == null ? (b.value == null ? 0 : 1) : -1
+  const diff = duel.metric === 'best_effort' ? a.value - b.value : b.value - a.value
+  return Math.abs(diff) > 1e-9 ? diff : earlier(a.at, b.at)
+}
 
-/** Xếp hạng (bằng thành tích thì cùng hạng) và xác định người thắng */
-export function rankDuel(duel: Duel, values: Record<string, number | null>): RankedRow[] {
-  const sorted = Object.entries(values).sort(([, a], [, b]) => better(duel, a, b))
+export type RankedRow = { uid: string; value: number | null; at: number | null; rank: number; won: boolean }
+
+/** Xếp hạng (cùng thành tích và cùng thời điểm thì cùng hạng); `winnerCount` người đứng đầu thắng */
+export function rankDuel(duel: Duel, scores: Record<string, DuelScore>): RankedRow[] {
+  const sorted = Object.entries(scores).sort(([, a], [, b]) => compareScores(duel, a, b))
   let rank = 0
-  return sorted.map(([uid, value], i) => {
-    if (i === 0 || better(duel, sorted[i - 1][1], value) !== 0) rank = i + 1
-    const hasValue = value != null && (duel.metric === 'best_effort' || value > 0)
-    const won =
+  return sorted.map(([uid, score], i) => {
+    if (i === 0 || compareScores(duel, sorted[i - 1][1], score) !== 0) rank = i + 1
+    const qualified =
       duel.kind === 'target'
-        ? value != null &&
-          (duel.metric === 'best_effort' ? value <= duel.target + 1e-9 : value >= duel.target - 1e-9)
-        : hasValue && rank <= duel.winnerCount
-    return { uid, value, rank, won }
+        ? duelReached(duel, score.value)
+        : score.value != null && (duel.metric === 'best_effort' || score.value > 0)
+    return { uid, value: score.value, at: score.at, rank, won: qualified && rank <= duel.winnerCount }
   })
 }
 
@@ -423,7 +499,7 @@ export function stakeSummary(duel: Duel): string {
  * Thành tích trực tiếp của từng người tham gia, tính từ `users/{uid}/strava_activities`
  * (thành viên chính thức đọc được hoạt động của nhau). `undefined` khi đang tải.
  */
-export function useDuelValues(duel: Duel | null, enabled: boolean): Record<string, number | null | undefined> {
+export function useDuelScores(duel: Duel | null, enabled: boolean): Record<string, DuelScore | undefined> {
   const key = enabled && duel ? Object.keys(duel.participants).sort().join(',') : ''
   const [activities, setActivities] = useState<Record<string, Record<string, unknown>[]>>({})
 
@@ -445,11 +521,11 @@ export function useDuelValues(duel: Duel | null, enabled: boolean): Record<strin
   }, [key])
 
   return useMemo(() => {
-    const out: Record<string, number | null | undefined> = {}
+    const out: Record<string, DuelScore | undefined> = {}
     if (!duel || !key) return out
     for (const uid of key.split(',')) {
       const list = activities[uid]
-      out[uid] = list ? computeDuelValue(duel, list) : undefined
+      out[uid] = list ? computeDuelScore(duel, list) : undefined
     }
     return out
   }, [duel, key, activities])

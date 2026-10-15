@@ -13,6 +13,7 @@ import {
   duelPaceRange,
   duelPhase,
   duelTimes,
+  duelWinRule,
   formatJoinDeadline,
   joinUntilFor,
   MAX_ACTIVE_DUELS,
@@ -173,7 +174,7 @@ function DuelForm({ initial, editing }: { initial: Draft; editing: Duel | null }
     if (!paceMin || !paceMax || paceMin >= paceMax || paceMax > 30) {
       return setError('Khoảng pace không hợp lệ (VD: 03:30 đến 15:00).')
     }
-    const winnerCount = draft.kind === 'ranking' ? Math.floor(toNumber(draft.winnerCount)) : 1
+    const winnerCount = Math.floor(toNumber(draft.winnerCount))
     if (!(winnerCount >= 1 && winnerCount <= 50)) return setError('Số người thắng từ 1 đến 50.')
     if (fund > MAX_DUEL_FUND) return setError(`Góp quỹ tối đa ${formatVnd(MAX_DUEL_FUND)} mỗi người.`)
     const password = draft.password.trim()
@@ -299,9 +300,11 @@ function DuelForm({ initial, editing }: { initial: Draft; editing: Duel | null }
         </button>
       </div>
       <p className="tiny muted">
-        {draft.kind === 'target'
-          ? 'Ai đạt mục tiêu là thắng, có thể nhiều người cùng thắng.'
-          : 'Hết ngày thì xếp hạng, người đứng đầu thắng.'}
+        {duelWinRule({
+          kind: draft.kind,
+          metric: draft.metric,
+          winnerCount: Math.max(1, Math.floor(toNumber(draft.winnerCount)) || 1),
+        })}
       </p>
 
       <h2>2. Mục tiêu và ngày diễn ra</h2>
@@ -336,18 +339,16 @@ function DuelForm({ initial, editing }: { initial: Draft; editing: Duel | null }
             />
           </label>
         )}
-        {draft.kind === 'ranking' && (
-          <label>
-            Số người thắng
-            <input
-              type="number"
-              min={1}
-              max={50}
-              value={draft.winnerCount}
-              onChange={(e) => patch({ winnerCount: e.target.value })}
-            />
-          </label>
-        )}
+        <label>
+          Số người thắng
+          <input
+            type="number"
+            min={1}
+            max={50}
+            value={draft.winnerCount}
+            onChange={(e) => patch({ winnerCount: e.target.value })}
+          />
+        </label>
         {(isBestEffort || !single) && (
           <label>
             {isBestEffort ? 'Cự ly hoạt động ≥ (km)' : 'Mỗi hoạt động tối thiểu (km)'}

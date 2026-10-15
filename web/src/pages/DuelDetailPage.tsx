@@ -14,9 +14,11 @@ import {
   duelGoalText,
   duelPercent,
   duelPhase,
+  duelReached,
   duelRules,
   formatDateTime,
   formatJoinDeadline,
+  formatDuelTime,
   formatDuelValue,
   isJoinOpen,
   MAX_ACTIVE_DUELS,
@@ -25,8 +27,9 @@ import {
   parseDuels,
   rankDuel,
   stakeSummary,
-  useDuelValues,
+  useDuelScores,
   type Duel,
+  type DuelScore,
 } from '../lib/duels'
 import { db } from '../lib/firebase'
 import { duelCode } from '../lib/payment'
@@ -35,7 +38,16 @@ import { useSharedValue } from '../lib/sharedValue'
 import { useUserProfiles } from '../lib/userWrites'
 import { DuelPhasePill } from './DuelsPage'
 
-type Row = { uid: string; name: string; value: number | null | undefined; rank: number; won: boolean }
+type Row = {
+  uid: string
+  name: string
+  value: number | null | undefined
+  at: number | null
+  rank: number
+  won: boolean
+}
+
+const NO_SCORE: DuelScore = { value: null, at: null }
 
 function fillTone(pct: number): string {
   if (pct >= 100) return 'fill-done'
@@ -84,7 +96,7 @@ export function DuelDetailPage() {
     duel && canManage ? `${DUEL_SECRETS_PATH}/${id}` : null,
   )
   const phase = duel ? duelPhase(duel, now) : 'pending'
-  const live = useDuelValues(duel, Boolean(duel && !duel.result && (phase === 'ongoing' || phase === 'finished')))
+  const live = useDuelScores(duel, Boolean(duel && !duel.result && (phase === 'ongoing' || phase === 'finished')))
 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -104,11 +116,11 @@ export function DuelDetailPage() {
     const uids = Object.keys(duel.participants)
     if (uids.some((u) => live[u] === undefined)) return
     locking.current = true
-    const ranked = rankDuel(duel, Object.fromEntries(uids.map((u) => [u, live[u] ?? null])))
+    const ranked = rankDuel(duel, Object.fromEntries(uids.map((u) => [u, live[u] ?? NO_SCORE])))
     const rows = Object.fromEntries(
       ranked.map((r) => [
         r.uid,
-        { name: duel.participants[r.uid].name, value: r.value, rank: r.rank, won: r.won },
+        { name: duel.participants[r.uid].name, value: r.value, at: r.at, rank: r.rank, won: r.won },
       ]),
     )
     set(ref(db, `${DUELS_PATH}/${id}/result`), {
@@ -154,15 +166,16 @@ export function DuelDetailPage() {
 
   const rows: Row[] = d.result
     ? Object.entries(d.result.rows)
-        .map(([u, r]) => ({ uid: u, name: r.name, value: r.value, rank: r.rank, won: r.won }))
+        .map(([u, r]) => ({ uid: u, name: r.name, value: r.value, at: r.at, rank: r.rank, won: r.won }))
         .sort((a, b) => a.rank - b.rank)
     : rankDuel(
         d,
-        Object.fromEntries(Object.keys(d.participants).map((u) => [u, live[u] ?? null])),
+        Object.fromEntries(Object.keys(d.participants).map((u) => [u, live[u] ?? NO_SCORE])),
       ).map((r) => ({
         ...r,
         name: nameOf(r.uid),
-        value: phase === 'upcoming' ? (d.metric === 'best_effort' ? null : 0) : live[r.uid],
+        value: phase === 'upcoming' ? (d.metric === 'best_effort' ? null : 0) : live[r.uid]?.value,
+        at: phase === 'upcoming' ? null : r.at,
       }))
 
   async function run(action: () => Promise<unknown>, done: string, fallback: string) {
@@ -594,7 +607,16 @@ export function DuelDetailPage() {
                   <span className="tiny muted">
                     {r.uid === d.createdBy && 'Người tạo · '}
                     {d.withdrawRequests[r.uid] && !d.result && 'Xin rút lui · '}
-                    {d.result ? (r.won ? '🏆 Thắng' : 'Không đạt') : d.kind === 'target' ? `${pct}% mục tiêu` : `Hạng ${r.rank}`}
+                    {d.result
+                      ? r.won
+                        ? '🏆 Thắng'
+                        : 'Không thắng'
+                      : duelReached(d, r.value)
+                        ? 'Đạt mục tiêu'
+                        : d.kind === 'target'
+                          ? `${pct}% mục tiêu`
+                          : `Hạng ${r.rank}`}
+                    {r.at != null && ` · lúc ${formatDuelTime(d, r.at)}`}
                   </span>
                   {d.kind === 'target' && (
                     <div className="progress-track">
@@ -620,7 +642,7 @@ export function DuelDetailPage() {
           {!stake ? (
             <p className="tiny muted">Thách đấu không có cam kết thưởng – phạt.</p>
           ) : losers.length === 0 ? (
-            <p className="tiny muted">Tất cả đều đạt, không ai phải thực hiện cam kết.</p>
+            <p className="tiny muted">Tất cả đều thắng, không ai phải thực hiện cam kết.</p>
           ) : (
             <ul className="duel-request-list">
               {losers.map((r) => {

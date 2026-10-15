@@ -254,11 +254,17 @@ function km(n: number): string {
   return `${Number(n.toFixed(2))} km`
 }
 
+/** Khoảng pace (phút/km) được tính; mặc định 03:30–15:00 như thử thách CLB */
+export function duelPaceRange(duel: Pick<Duel, 'paceMin' | 'paceMax'>): [number, number] {
+  return [duel.paceMin ?? MIN_PACE, duel.paceMax ?? MAX_PACE]
+}
+
 /** Một dòng tóm tắt mục tiêu: "Đạt 100 km" / "Ai chạy nhiều km nhất" */
 export function duelGoalText(duel: Duel): string {
+  const [paceMin, paceMax] = duelPaceRange(duel)
   const paceRange =
-    duel.paceMin && duel.paceMax
-      ? ` (pace ${formatPaceMinutes(duel.paceMin)}–${formatPaceMinutes(duel.paceMax)})`
+    paceMin !== MIN_PACE || paceMax !== MAX_PACE
+      ? ` (pace ${formatPaceMinutes(paceMin)}–${formatPaceMinutes(paceMax)})`
       : ''
   const singleRun = duel.single && (duel.metric === 'distance' || duel.metric === 'pace')
   const span = duel.startDate === duel.endDate ? ' trong ngày' : ' tích lũy'
@@ -285,7 +291,7 @@ export function duelGoalText(duel: Duel): string {
     case 'count':
       return `${top} chạy nhiều buổi nhất (mỗi buổi ≥ ${km(duel.minKm)})`
     case 'best_effort':
-      return `${top} có buổi ≥ ${km(duel.minKm)} nhanh nhất`
+      return `${top} có buổi ≥ ${km(duel.minKm)} nhanh nhất${paceRange}`
   }
 }
 
@@ -301,15 +307,10 @@ export function duelRules(duel: Duel): string[] {
         : 'Xếp hạng khi kết thúc: người đứng đầu thắng, bằng thành tích thì cùng hạng.',
     'Chỉ tính hoạt động chạy/đi bộ đồng bộ từ Strava trong thời gian thách đấu.',
   ]
-  if (duel.metric === 'pace' && duel.paceMin && duel.paceMax) {
-    rules.push(
-      `Chỉ tính buổi có pace từ ${formatPaceMinutes(duel.paceMin)} đến ${formatPaceMinutes(duel.paceMax)} phút/km.`,
-    )
-  } else {
-    rules.push(
-      `Buổi có pace ngoài ${formatPaceMinutes(MIN_PACE)}–${formatPaceMinutes(MAX_PACE)} phút/km không được tính.`,
-    )
-  }
+  const [paceMin, paceMax] = duelPaceRange(duel)
+  rules.push(
+    `Chỉ tính buổi có pace trung bình từ ${formatPaceMinutes(paceMin)} đến ${formatPaceMinutes(paceMax)} phút/km.`,
+  )
   if (duel.metric === 'best_effort') {
     rules.push('Pace tính theo pace trung bình của cả buổi.')
   } else if (duel.single && duel.metric !== 'count') {
@@ -327,6 +328,7 @@ export function computeDuelValue(duel: Duel, activities: Record<string, unknown>
   const start = parseChallengeDay(duel.startDate)
   const end = parseChallengeDay(duel.endDate)
   if (!start || !end) return null
+  const [paceMin, paceMax] = duelPaceRange(duel)
   if (duel.metric === 'best_effort') {
     let best: number | null = null
     for (const a of activities) {
@@ -336,7 +338,7 @@ export function computeDuelValue(duel: Duel, activities: Record<string, unknown>
       const dayMs = activityDayMs(String(a.startDate ?? ''))
       if (dayMs == null || dayMs < start.getTime() || dayMs > end.getTime()) continue
       const pace = convertPaceToMinutesPerKm(String(a.pace ?? ''))
-      if (pace < MIN_PACE || pace > MAX_PACE) continue
+      if (pace < paceMin || pace > paceMax) continue
       if (best == null || pace < best) best = pace
     }
     return best
@@ -350,19 +352,15 @@ export function computeDuelValue(duel: Duel, activities: Record<string, unknown>
       const dayMs = activityDayMs(String(a.startDate ?? ''))
       if (dayMs == null || dayMs < start.getTime() || dayMs > end.getTime()) continue
       const pace = convertPaceToMinutesPerKm(String(a.pace ?? ''))
-      const [lo, hi] =
-        duel.metric === 'pace' && duel.paceMin && duel.paceMax
-          ? [duel.paceMin, duel.paceMax]
-          : [MIN_PACE, MAX_PACE]
-      if (pace < lo || pace > hi) continue
+      if (pace < paceMin || pace > paceMax) continue
       longest = distance
     }
     return Number(longest.toFixed(2))
   }
   const result = calculateProgress(activities, start, end, {
     minActivityDistanceKm: duel.minKm > 0 ? duel.minKm : undefined,
-    paceMin: duel.metric === 'pace' ? duel.paceMin : undefined,
-    paceMax: duel.metric === 'pace' ? duel.paceMax : undefined,
+    paceMin,
+    paceMax,
   })
   return duel.metric === 'count' ? result.totalActivities : Number(result.totalDistanceKm.toFixed(2))
 }

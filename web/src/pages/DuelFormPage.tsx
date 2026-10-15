@@ -10,6 +10,7 @@ import {
   DUEL_METRIC_LABELS,
   DUEL_SECRETS_PATH,
   DUELS_PATH,
+  duelPaceRange,
   duelPhase,
   duelTimes,
   formatJoinDeadline,
@@ -44,10 +45,10 @@ type Draft = {
   password: string
 }
 
-const FORM_METRICS: DuelMetric[] = ['distance', 'pace', 'best_effort']
+const FORM_METRICS: DuelMetric[] = ['distance', 'best_effort']
 
 const METRIC_HINTS: Record<DuelMetric, string> = {
-  distance: 'Tính km chạy trong ngày.',
+  distance: 'Tính km chạy trong ngày, chỉ những buổi có pace nằm trong khoảng đặt ra.',
   pace: 'Tính km chạy trong ngày, chỉ những buổi có pace nằm trong khoảng đặt ra.',
   count: 'Đếm số buổi chạy đạt cự ly tối thiểu.',
   best_effort: 'Pace trung bình của buổi nhanh nhất có cự ly đạt yêu cầu.',
@@ -87,8 +88,8 @@ function emptyDraft(): Draft {
     single: false,
     target: '21',
     minKm: '1',
-    paceMin: '05:00',
-    paceMax: '07:00',
+    paceMin: '03:30',
+    paceMax: '15:00',
     winnerCount: '1',
     dayInput: addDaysInput(todayInputValue(), 1),
     stakeText: '',
@@ -102,7 +103,7 @@ function draftFromDuel(duel: Duel, password: string): Draft {
   return {
     title: duel.title,
     description: duel.description,
-    metric: duel.metric,
+    metric: duel.metric === 'pace' ? 'distance' : duel.metric,
     kind: duel.kind,
     single: duel.single,
     target:
@@ -112,8 +113,8 @@ function draftFromDuel(duel: Duel, password: string): Draft {
           : ''
         : String(duel.target || ''),
     minKm: String(duel.minKm || ''),
-    paceMin: duel.paceMin ? formatPaceMinutes(duel.paceMin) : '05:00',
-    paceMax: duel.paceMax ? formatPaceMinutes(duel.paceMax) : '07:00',
+    paceMin: formatPaceMinutes(duelPaceRange(duel)[0]),
+    paceMax: formatPaceMinutes(duelPaceRange(duel)[1]),
     winnerCount: String(duel.winnerCount),
     dayInput: dayToInput(duel.startDate),
     stakeText: duel.stakeText,
@@ -167,14 +168,10 @@ function DuelForm({ initial, editing }: { initial: Draft; editing: Duel | null }
       return setError('Nhập cự ly tối thiểu mỗi buổi.')
     }
     if (!(minKm >= 0) || minKm > 1000) return setError('Cự ly tối thiểu không hợp lệ.')
-    let paceMin: number | null = null
-    let paceMax: number | null = null
-    if (draft.metric === 'pace') {
-      paceMin = parsePaceInput(draft.paceMin)
-      paceMax = parsePaceInput(draft.paceMax)
-      if (!paceMin || !paceMax || paceMin >= paceMax || paceMax > 30) {
-        return setError('Khoảng pace không hợp lệ (VD: 05:00 đến 07:00).')
-      }
+    const paceMin = parsePaceInput(draft.paceMin)
+    const paceMax = parsePaceInput(draft.paceMax)
+    if (!paceMin || !paceMax || paceMin >= paceMax || paceMax > 30) {
+      return setError('Khoảng pace không hợp lệ (VD: 03:30 đến 15:00).')
     }
     const winnerCount = draft.kind === 'ranking' ? Math.floor(toNumber(draft.winnerCount)) : 1
     if (!(winnerCount >= 1 && winnerCount <= 50)) return setError('Số người thắng từ 1 đến 50.')
@@ -363,18 +360,27 @@ function DuelForm({ initial, editing }: { initial: Draft; editing: Duel | null }
           </label>
         )}
       </div>
-      {draft.metric === 'pace' && (
-        <div className="pr-edit-grid">
-          <label>
-            Pace từ (mm:ss)
-            <input value={draft.paceMin} onChange={(e) => patch({ paceMin: e.target.value })} />
-          </label>
-          <label>
-            Pace đến (mm:ss)
-            <input value={draft.paceMax} onChange={(e) => patch({ paceMax: e.target.value })} />
-          </label>
-        </div>
-      )}
+      <div className="pr-edit-grid">
+        <label>
+          Pace từ (mm:ss)
+          <input
+            value={draft.paceMin}
+            placeholder="03:30"
+            onChange={(e) => patch({ paceMin: e.target.value })}
+          />
+        </label>
+        <label>
+          Pace đến (mm:ss)
+          <input
+            value={draft.paceMax}
+            placeholder="15:00"
+            onChange={(e) => patch({ paceMax: e.target.value })}
+          />
+        </label>
+      </div>
+      <p className="tiny muted">
+        Chỉ tính buổi có pace trung bình trong khoảng này. Mặc định 03:30–15:00.
+      </p>
       <label>
         Ngày diễn ra
         <input

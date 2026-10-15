@@ -7,7 +7,7 @@ import { HomePage } from './pages/HomePage'
 import { RequireAdmin } from './components/RequireAdmin'
 import { PwaUpdatePrompt } from './components/PwaUpdatePrompt'
 import { brandLogoSrc, brandTitle } from './lib/brand'
-import { canUseDuels, canViewFinance } from './lib/permissions'
+import { canViewFinance } from './lib/permissions'
 
 /** Mỗi trang một chunk riêng; trang nằm trong named export. */
 function lazyPage<M extends Record<string, unknown>>(
@@ -148,7 +148,7 @@ function AppRoutes() {
         <Route
           path="duels"
           element={
-            <RequireAdmin allow={canUseDuels}>
+            <RequireAdmin>
               <DuelsPage />
             </RequireAdmin>
           }
@@ -156,7 +156,7 @@ function AppRoutes() {
         <Route
           path="duels/new"
           element={
-            <RequireAdmin allow={canUseDuels}>
+            <RequireAdmin>
               <DuelFormPage />
             </RequireAdmin>
           }
@@ -164,7 +164,7 @@ function AppRoutes() {
         <Route
           path="duels/:id"
           element={
-            <RequireAdmin allow={canUseDuels}>
+            <RequireAdmin>
               <DuelDetailPage />
             </RequireAdmin>
           }
@@ -172,7 +172,7 @@ function AppRoutes() {
         <Route
           path="duels/:id/edit"
           element={
-            <RequireAdmin allow={canUseDuels}>
+            <RequireAdmin>
               <DuelFormPage />
             </RequireAdmin>
           }

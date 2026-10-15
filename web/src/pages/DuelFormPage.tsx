@@ -48,10 +48,10 @@ type Draft = {
 const FORM_METRICS: DuelMetric[] = ['distance', 'best_effort']
 
 const METRIC_HINTS: Record<DuelMetric, string> = {
-  distance: 'Tính km chạy trong ngày, chỉ những buổi có pace nằm trong khoảng đặt ra.',
-  pace: 'Tính km chạy trong ngày, chỉ những buổi có pace nằm trong khoảng đặt ra.',
-  count: 'Đếm số buổi chạy đạt cự ly tối thiểu.',
-  best_effort: 'Pace trung bình của buổi nhanh nhất có cự ly đạt yêu cầu.',
+  distance: 'Tính km chạy trong ngày, chỉ những hoạt động có pace nằm trong khoảng đặt ra.',
+  pace: 'Tính km chạy trong ngày, chỉ những hoạt động có pace nằm trong khoảng đặt ra.',
+  count: 'Đếm số hoạt động đạt cự ly tối thiểu.',
+  best_effort: 'Pace trung bình của hoạt động nhanh nhất có cự ly đạt yêu cầu.',
 }
 
 function addDaysInput(iso: string, days: number): string {
@@ -160,12 +160,12 @@ function DuelForm({ initial, editing }: { initial: Draft; editing: Duel | null }
         return setError(isBestEffort ? 'Nhập pace mục tiêu (mm:ss).' : 'Nhập mục tiêu lớn hơn 0.')
       }
       if (draft.metric === 'count' && !Number.isInteger(target)) {
-        return setError('Số buổi phải là số nguyên.')
+        return setError('Số hoạt động phải là số nguyên.')
       }
     }
     const minKm = single ? 0 : toNumber(draft.minKm || '0')
     if ((draft.metric === 'count' || isBestEffort) && !(minKm > 0)) {
-      return setError('Nhập cự ly tối thiểu mỗi buổi.')
+      return setError('Nhập cự ly tối thiểu mỗi hoạt động.')
     }
     if (!(minKm >= 0) || minKm > 1000) return setError('Cự ly tối thiểu không hợp lệ.')
     const paceMin = parsePaceInput(draft.paceMin)
@@ -265,20 +265,20 @@ function DuelForm({ initial, editing }: { initial: Draft; editing: Duel | null }
               className={!draft.single ? 'chip active' : 'chip'}
               onClick={() => patch({ single: false })}
             >
-              Cộng dồn các buổi
+              Cộng dồn các hoạt động
             </button>
             <button
               type="button"
               className={draft.single ? 'chip active' : 'chip'}
               onClick={() => patch({ single: true })}
             >
-              Chỉ một buổi
+              Chỉ một hoạt động
             </button>
           </div>
           <p className="tiny muted">
             {draft.single
-              ? 'Chỉ tính buổi chạy liền dài nhất trong ngày.'
-              : 'Cộng km của tất cả các buổi chạy trong ngày.'}
+              ? 'Chỉ tính hoạt động dài nhất trong ngày.'
+              : 'Cộng km của tất cả các hoạt động trong ngày.'}
           </p>
         </>
       )}
@@ -350,7 +350,7 @@ function DuelForm({ initial, editing }: { initial: Draft; editing: Duel | null }
         )}
         {(isBestEffort || !single) && (
           <label>
-            {isBestEffort ? 'Cự ly buổi chạy ≥ (km)' : 'Mỗi buổi tối thiểu (km)'}
+            {isBestEffort ? 'Cự ly hoạt động ≥ (km)' : 'Mỗi hoạt động tối thiểu (km)'}
             <input
               value={draft.minKm}
               inputMode="decimal"
@@ -379,7 +379,7 @@ function DuelForm({ initial, editing }: { initial: Draft; editing: Duel | null }
         </label>
       </div>
       <p className="tiny muted">
-        Chỉ tính buổi có pace trung bình trong khoảng này. Mặc định 03:30–15:00.
+        Chỉ tính hoạt động có pace trung bình trong khoảng này. Mặc định 03:30–15:00.
       </p>
       <label>
         Ngày diễn ra

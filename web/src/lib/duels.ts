@@ -47,11 +47,11 @@ export type Duel = {
   createdAt: number
   metric: DuelMetric
   kind: DuelKind
-  /** Cự ly (và cự ly + pace): chỉ tính buổi dài nhất thay vì cộng dồn các buổi */
+  /** Cự ly (và cự ly + pace): chỉ tính hoạt động dài nhất thay vì cộng dồn các hoạt động */
   single: boolean
-  /** km (cự ly, pace), số buổi (số buổi), pace phút/km (buổi nhanh nhất + đạt mục tiêu) */
+  /** km (cự ly, pace), số hoạt động (đếm hoạt động), pace phút/km (hoạt động nhanh nhất + đạt mục tiêu) */
   target: number
-  /** Cự ly tối thiểu mỗi buổi; với "buổi nhanh nhất" là cự ly buổi chạy phải đạt */
+  /** Cự ly tối thiểu mỗi hoạt động; với "hoạt động nhanh nhất" là cự ly hoạt động phải đạt */
   minKm: number
   paceMin?: number
   paceMax?: number
@@ -209,8 +209,8 @@ export const DUEL_PHASE_LABELS: Record<DuelPhase, string> = {
 export const DUEL_METRIC_LABELS: Record<DuelMetric, string> = {
   distance: 'Cự ly',
   pace: 'Cự ly + pace',
-  count: 'Số buổi chạy',
-  best_effort: 'Buổi nhanh nhất',
+  count: 'Số hoạt động',
+  best_effort: 'Hoạt động nhanh nhất',
 }
 
 export function isJoinOpen(duel: Duel, now = Date.now()): boolean {
@@ -269,29 +269,29 @@ export function duelGoalText(duel: Duel): string {
   const singleRun = duel.single && (duel.metric === 'distance' || duel.metric === 'pace')
   const span = duel.startDate === duel.endDate ? ' trong ngày' : ' tích lũy'
   if (duel.kind === 'target') {
-    if (singleRun) return `Chạy một buổi ≥ ${km(duel.target)}${paceRange}`
+    if (singleRun) return `Một hoạt động ≥ ${km(duel.target)}${paceRange}`
     switch (duel.metric) {
       case 'distance':
         return `Chạy tổng ${km(duel.target)}${span}`
       case 'pace':
         return `Chạy tổng ${km(duel.target)}${span}${paceRange}`
       case 'count':
-        return `Chạy ${duel.target} buổi, mỗi buổi ≥ ${km(duel.minKm)}`
+        return `${duel.target} hoạt động, mỗi hoạt động ≥ ${km(duel.minKm)}`
       case 'best_effort':
-        return `Chạy một buổi ≥ ${km(duel.minKm)} với pace ≤ ${formatPaceMinutes(duel.target)}`
+        return `Một hoạt động ≥ ${km(duel.minKm)} với pace ≤ ${formatPaceMinutes(duel.target)}`
     }
   }
   const top = duel.winnerCount > 1 ? `${duel.winnerCount} người` : 'Ai'
-  if (singleRun) return `${top} có buổi chạy dài nhất${paceRange}`
+  if (singleRun) return `${top} có hoạt động dài nhất${paceRange}`
   switch (duel.metric) {
     case 'distance':
       return `${top} chạy nhiều km nhất`
     case 'pace':
       return `${top} chạy nhiều km nhất${paceRange}`
     case 'count':
-      return `${top} chạy nhiều buổi nhất (mỗi buổi ≥ ${km(duel.minKm)})`
+      return `${top} có nhiều hoạt động nhất (mỗi hoạt động ≥ ${km(duel.minKm)})`
     case 'best_effort':
-      return `${top} có buổi ≥ ${km(duel.minKm)} nhanh nhất${paceRange}`
+      return `${top} có hoạt động ≥ ${km(duel.minKm)} nhanh nhất${paceRange}`
   }
 }
 
@@ -309,21 +309,21 @@ export function duelRules(duel: Duel): string[] {
   ]
   const [paceMin, paceMax] = duelPaceRange(duel)
   rules.push(
-    `Chỉ tính buổi có pace trung bình từ ${formatPaceMinutes(paceMin)} đến ${formatPaceMinutes(paceMax)} phút/km.`,
+    `Chỉ tính hoạt động có pace trung bình từ ${formatPaceMinutes(paceMin)} đến ${formatPaceMinutes(paceMax)} phút/km.`,
   )
   if (duel.metric === 'best_effort') {
-    rules.push('Pace tính theo pace trung bình của cả buổi.')
+    rules.push('Pace tính theo pace trung bình của cả hoạt động.')
   } else if (duel.single && duel.metric !== 'count') {
-    rules.push('Chỉ tính một buổi chạy liền dài nhất, không cộng dồn các buổi.')
+    rules.push('Chỉ tính một hoạt động dài nhất, không cộng dồn các hoạt động.')
   } else if (duel.minKm > 0) {
-    rules.push(`Mỗi buổi phải ≥ ${km(duel.minKm)} mới được tính.`)
+    rules.push(`Mỗi hoạt động phải ≥ ${km(duel.minKm)} mới được tính.`)
   }
   rules.push(`Hạn tham gia: ${formatJoinDeadline(duel.joinUntil)}.`)
   rules.push('Người tham gia muốn rút lui phải được người tạo đồng ý.')
   return rules
 }
 
-/** Thành tích từ danh sách hoạt động Strava; `null` khi chưa có buổi hợp lệ (buổi nhanh nhất) */
+/** Thành tích từ danh sách hoạt động Strava; `null` khi chưa có hoạt động hợp lệ (hoạt động nhanh nhất) */
 export function computeDuelValue(duel: Duel, activities: Record<string, unknown>[]): number | null {
   const start = parseChallengeDay(duel.startDate)
   const end = parseChallengeDay(duel.endDate)
@@ -368,7 +368,7 @@ export function computeDuelValue(duel: Duel, activities: Record<string, unknown>
 export function formatDuelValue(duel: Duel, value: number | null | undefined): string {
   if (value === undefined) return '…'
   if (duel.metric === 'best_effort') return value == null ? 'Chưa có' : `${formatPaceMinutes(value)}/km`
-  if (duel.metric === 'count') return `${value ?? 0} buổi`
+  if (duel.metric === 'count') return `${value ?? 0} hoạt động`
   return km(value ?? 0)
 }
 

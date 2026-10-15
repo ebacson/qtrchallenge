@@ -10,6 +10,7 @@ import {
   DUEL_JOIN_KEYS_PATH,
   DUEL_SECRETS_PATH,
   DUELS_PATH,
+  duelDateText,
   duelGoalText,
   duelPercent,
   duelPhase,
@@ -332,7 +333,7 @@ export function DuelDetailPage() {
   async function share() {
     const url = `${window.location.origin}/duels/${id}`
     const pw = secret?.password
-    const content = `${d.title}\n${duelGoalText(d)} · ${d.startDate} → ${d.endDate}${pw ? `\nMật khẩu: ${pw}` : ''}\n${url}`
+    const content = `${d.title}\n${duelGoalText(d)} · ${duelDateText(d)}${pw ? `\nMật khẩu: ${pw}` : ''}\n${url}`
     try {
       if (navigator.share) {
         await navigator.share({ title: d.title, text: content })
@@ -397,7 +398,7 @@ export function DuelDetailPage() {
         <h1>{d.title}</h1>
         <p className="duel-goal">{duelGoalText(d)}</p>
         <p className="muted">
-          {d.startDate} → {d.endDate} · Tạo bởi {d.createdByName || '—'}
+          {duelDateText(d)} · Tạo bởi {d.createdByName || '—'}
         </p>
         <div className="btn-row">
           {editable && (

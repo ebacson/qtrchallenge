@@ -6,6 +6,7 @@ import {
   activeDuelCount,
   DUEL_PHASE_LABELS,
   DUELS_PATH,
+  duelDateText,
   duelGoalText,
   duelPhase,
   isJoinOpen,
@@ -45,7 +46,7 @@ function DuelCard({ duel, uid, now, codeHit }: { duel: Duel; uid: string; now: n
         <strong>{duel.title}</strong>
         <span className="tiny">{duelGoalText(duel)}</span>
         <span className="tiny muted">
-          {duel.startDate} → {duel.endDate} · {count} người · Tạo bởi {duel.createdByName || '—'}
+          {duelDateText(duel)} · {count} người · Tạo bởi {duel.createdByName || '—'}
         </span>
         {stake && <span className="tiny muted">Cam kết: {stake}</span>}
         {codeHit && <span className="tiny lucky-me">Mã {codeHit}</span>}

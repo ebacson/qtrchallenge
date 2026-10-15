@@ -4,10 +4,9 @@ import { push, ref, update } from 'firebase/database'
 import { DuelInvitePicker } from '../components/DuelInvitePicker'
 import { useAuth } from '../context/AuthContext'
 import { inputDateToChallengeDay, todayInputValue } from '../lib/adminOps'
-import { countInclusiveDays, formatPaceMinutes, parsePaceInput } from '../lib/challengeRules'
+import { formatPaceMinutes, parsePaceInput } from '../lib/challengeRules'
 import {
   activeDuelCount,
-  DAY_MS,
   DUEL_METRIC_LABELS,
   DUEL_SECRETS_PATH,
   DUELS_PATH,
@@ -16,7 +15,6 @@ import {
   formatJoinDeadline,
   joinUntilFor,
   MAX_ACTIVE_DUELS,
-  MAX_DUEL_DAYS,
   MAX_DUEL_FUND,
   parseDuel,
   parseDuels,
@@ -33,23 +31,24 @@ type Draft = {
   description: string
   metric: DuelMetric
   kind: DuelKind
+  single: boolean
   target: string
   minKm: string
   paceMin: string
   paceMax: string
   winnerCount: string
-  startInput: string
-  endInput: string
-  joinDays: number
+  dayInput: string
   stakeText: string
   fundAmount: string
   invited: string[]
   password: string
 }
 
+const FORM_METRICS: DuelMetric[] = ['distance', 'pace', 'best_effort']
+
 const METRIC_HINTS: Record<DuelMetric, string> = {
-  distance: 'Cộng dồn km các buổi chạy trong thời gian thách đấu.',
-  pace: 'Cộng dồn km, chỉ tính buổi có pace nằm trong khoảng đặt ra.',
+  distance: 'Tính km chạy trong ngày.',
+  pace: 'Tính km chạy trong ngày, chỉ những buổi có pace nằm trong khoảng đặt ra.',
   count: 'Đếm số buổi chạy đạt cự ly tối thiểu.',
   best_effort: 'Pace trung bình của buổi nhanh nhất có cự ly đạt yêu cầu.',
 }
@@ -80,20 +79,18 @@ function parseMoney(value: string): number {
 }
 
 function emptyDraft(): Draft {
-  const start = addDaysInput(todayInputValue(), 1)
   return {
     title: '',
     description: '',
     metric: 'distance',
     kind: 'target',
-    target: '100',
-    minKm: '5',
+    single: false,
+    target: '21',
+    minKm: '1',
     paceMin: '05:00',
     paceMax: '07:00',
     winnerCount: '1',
-    startInput: start,
-    endInput: addDaysInput(start, 13),
-    joinDays: 0,
+    dayInput: addDaysInput(todayInputValue(), 1),
     stakeText: '',
     fundAmount: '',
     invited: [],
@@ -107,6 +104,7 @@ function draftFromDuel(duel: Duel, password: string): Draft {
     description: duel.description,
     metric: duel.metric,
     kind: duel.kind,
+    single: duel.single,
     target:
       duel.metric === 'best_effort'
         ? duel.kind === 'target'
@@ -117,9 +115,7 @@ function draftFromDuel(duel: Duel, password: string): Draft {
     paceMin: duel.paceMin ? formatPaceMinutes(duel.paceMin) : '05:00',
     paceMax: duel.paceMax ? formatPaceMinutes(duel.paceMax) : '07:00',
     winnerCount: String(duel.winnerCount),
-    startInput: dayToInput(duel.startDate),
-    endInput: dayToInput(duel.endDate),
-    joinDays: duel.joinDays,
+    dayInput: dayToInput(duel.startDate),
     stakeText: duel.stakeText,
     fundAmount: duel.fundAmount ? String(duel.fundAmount) : '',
     invited: duel.invited,
@@ -140,14 +136,10 @@ function DuelForm({ initial, editing }: { initial: Draft; editing: Duel | null }
     setDraft((d) => ({ ...d, ...next }))
   }
 
-  const startDate = inputDateToChallengeDay(draft.startInput)
-  const endDate = inputDateToChallengeDay(draft.endInput)
-  const times = duelTimes(startDate, endDate)
-  const totalDays = times ? countInclusiveDays(startDate, endDate) : 0
-  // Thách đấu 1 ngày chỉ cho đăng ký trước ngày đó
-  const joinOptions = Array.from({ length: Math.max(1, Math.min(totalDays, 8)) }, (_, i) => i)
-  const joinDays = Math.min(draft.joinDays, joinOptions.length - 1)
+  const day = inputDateToChallengeDay(draft.dayInput)
+  const times = duelTimes(day, day)
   const isBestEffort = draft.metric === 'best_effort'
+  const single = draft.single && !isBestEffort
   const fund = parseMoney(draft.fundAmount)
 
   async function onSubmit(e: FormEvent) {
@@ -155,11 +147,9 @@ function DuelForm({ initial, editing }: { initial: Draft; editing: Duel | null }
     if (!user) return
     const title = draft.title.trim()
     if (!title) return setError('Nhập tên thách đấu.')
-    if (!times) return setError('Chọn ngày bắt đầu và kết thúc hợp lệ.')
-    if (times.startAt + DAY_MS <= nowMs()) return setError('Ngày bắt đầu phải từ hôm nay trở đi.')
-    if (totalDays > MAX_DUEL_DAYS) return setError(`Thách đấu dài tối đa ${MAX_DUEL_DAYS} ngày.`)
-    if (joinUntilFor(times.startAt, times.endAt, joinDays) <= nowMs()) {
-      return setError('Hạn tham gia đã qua. Chọn ngày bắt đầu muộn hơn hoặc hạn tham gia dài hơn.')
+    if (!times) return setError('Chọn ngày diễn ra.')
+    if (times.startAt <= nowMs()) {
+      return setError('Ngày diễn ra phải từ ngày mai trở đi để mọi người kịp đăng ký.')
     }
 
     let target = 0
@@ -172,7 +162,7 @@ function DuelForm({ initial, editing }: { initial: Draft; editing: Duel | null }
         return setError('Số buổi phải là số nguyên.')
       }
     }
-    const minKm = toNumber(draft.minKm || '0')
+    const minKm = single ? 0 : toNumber(draft.minKm || '0')
     if ((draft.metric === 'count' || isBestEffort) && !(minKm > 0)) {
       return setError('Nhập cự ly tối thiểu mỗi buổi.')
     }
@@ -200,17 +190,18 @@ function DuelForm({ initial, editing }: { initial: Draft; editing: Duel | null }
       description: draft.description.trim(),
       metric: draft.metric,
       kind: draft.kind,
+      single: single || null,
       target: draft.kind === 'target' ? target : 0,
       minKm,
       paceMin,
       paceMax,
       winnerCount,
-      startDate,
-      endDate,
+      startDate: day,
+      endDate: day,
       startAt: times.startAt,
       endAt: times.endAt,
-      joinDays,
-      joinUntil: joinUntilFor(times.startAt, times.endAt, joinDays),
+      joinDays: 0,
+      joinUntil: joinUntilFor(times.startAt, times.endAt, 0),
       stakeText: draft.stakeText.trim(),
       fundAmount: fund,
       hasPassword: password ? true : null,
@@ -267,10 +258,33 @@ function DuelForm({ initial, editing }: { initial: Draft; editing: Duel | null }
   return (
     <form className="auth-form panel duel-form" onSubmit={(e) => void onSubmit(e)}>
       <h2>1. Kiểu thách đấu</h2>
-      <div className="distance-chips">
-        {(['distance', 'pace', 'count', 'best_effort'] as DuelMetric[]).map(metricChip)}
-      </div>
+      <div className="distance-chips">{FORM_METRICS.map(metricChip)}</div>
       <p className="tiny muted">{METRIC_HINTS[draft.metric]}</p>
+      {!isBestEffort && (
+        <>
+          <div className="distance-chips">
+            <button
+              type="button"
+              className={!draft.single ? 'chip active' : 'chip'}
+              onClick={() => patch({ single: false })}
+            >
+              Cộng dồn các buổi
+            </button>
+            <button
+              type="button"
+              className={draft.single ? 'chip active' : 'chip'}
+              onClick={() => patch({ single: true })}
+            >
+              Chỉ một buổi
+            </button>
+          </div>
+          <p className="tiny muted">
+            {draft.single
+              ? 'Chỉ tính buổi chạy liền dài nhất trong ngày.'
+              : 'Cộng km của tất cả các buổi chạy trong ngày.'}
+          </p>
+        </>
+      )}
       <div className="distance-chips">
         <button
           type="button"
@@ -290,16 +304,16 @@ function DuelForm({ initial, editing }: { initial: Draft; editing: Duel | null }
       <p className="tiny muted">
         {draft.kind === 'target'
           ? 'Ai đạt mục tiêu là thắng, có thể nhiều người cùng thắng.'
-          : 'Kết thúc thì xếp hạng, người đứng đầu thắng.'}
+          : 'Hết ngày thì xếp hạng, người đứng đầu thắng.'}
       </p>
 
-      <h2>2. Mục tiêu và thời gian</h2>
+      <h2>2. Mục tiêu và ngày diễn ra</h2>
       <label>
         Tên thách đấu
         <input
           value={draft.title}
           maxLength={100}
-          placeholder="VD: Kèo 100 km tháng 11"
+          placeholder="VD: Kèo 50 km ngày 16/10"
           onChange={(e) => patch({ title: e.target.value })}
           required
         />
@@ -316,15 +330,11 @@ function DuelForm({ initial, editing }: { initial: Draft; editing: Duel | null }
       <div className="pr-edit-grid">
         {draft.kind === 'target' && (
           <label>
-            {draft.metric === 'count'
-              ? 'Số buổi cần chạy'
-              : isBestEffort
-                ? 'Pace mục tiêu (mm:ss)'
-                : 'Mục tiêu (km)'}
+            {isBestEffort ? 'Pace mục tiêu (mm:ss)' : 'Cự ly (km)'}
             <input
               value={draft.target}
               inputMode={isBestEffort ? 'text' : 'decimal'}
-              placeholder={isBestEffort ? '05:30' : draft.metric === 'count' ? '10' : '100'}
+              placeholder={isBestEffort ? '05:30' : '21'}
               onChange={(e) => patch({ target: e.target.value })}
             />
           </label>
@@ -341,15 +351,17 @@ function DuelForm({ initial, editing }: { initial: Draft; editing: Duel | null }
             />
           </label>
         )}
-        <label>
-          {isBestEffort ? 'Cự ly buổi chạy ≥ (km)' : 'Mỗi buổi tối thiểu (km)'}
-          <input
-            value={draft.minKm}
-            inputMode="decimal"
-            placeholder={draft.metric === 'distance' || draft.metric === 'pace' ? '1' : '5'}
-            onChange={(e) => patch({ minKm: e.target.value })}
-          />
-        </label>
+        {(isBestEffort || !single) && (
+          <label>
+            {isBestEffort ? 'Cự ly buổi chạy ≥ (km)' : 'Mỗi buổi tối thiểu (km)'}
+            <input
+              value={draft.minKm}
+              inputMode="decimal"
+              placeholder={isBestEffort ? '10' : '1'}
+              onChange={(e) => patch({ minKm: e.target.value })}
+            />
+          </label>
+        )}
       </div>
       {draft.metric === 'pace' && (
         <div className="pr-edit-grid">
@@ -363,47 +375,21 @@ function DuelForm({ initial, editing }: { initial: Draft; editing: Duel | null }
           </label>
         </div>
       )}
-      <div className="pr-edit-grid">
-        <label>
-          Từ ngày
-          <input
-            type="date"
-            value={draft.startInput}
-            min={todayInputValue()}
-            onChange={(e) => patch({ startInput: e.target.value })}
-            required
-          />
-        </label>
-        <label>
-          Đến ngày
-          <input
-            type="date"
-            value={draft.endInput}
-            min={draft.startInput}
-            onChange={(e) => patch({ endInput: e.target.value })}
-            required
-          />
-        </label>
-      </div>
-      <p className="tiny muted">
-        {totalDays ? `${totalDays} ngày` : '—'} (tối đa {MAX_DUEL_DAYS} ngày). Admin phải duyệt trước
-        ngày bắt đầu.
-      </p>
       <label>
-        Hạn tham gia
-        <select value={joinDays} onChange={(e) => patch({ joinDays: Number(e.target.value) })}>
-          {joinOptions.map((n) => (
-            <option key={n} value={n}>
-              {`${n === 0 ? 'Trước khi bắt đầu' : `Đến hết ngày thứ ${n}`}${
-                times ? ` (${formatJoinDeadline(joinUntilFor(times.startAt, times.endAt, n))})` : ''
-              }`}
-            </option>
-          ))}
-        </select>
+        Ngày diễn ra
+        <input
+          type="date"
+          value={draft.dayInput}
+          min={addDaysInput(todayInputValue(), 1)}
+          onChange={(e) => patch({ dayInput: e.target.value })}
+          required
+        />
       </label>
-      {totalDays === 1 && (
-        <p className="tiny muted">Thách đấu 1 ngày: phải đăng ký trước ngày diễn ra.</p>
-      )}
+      <p className="tiny muted">
+        Thách đấu diễn ra trong 1 ngày (00:00–23:59).
+        {times && ` Hạn đăng ký: ${formatJoinDeadline(joinUntilFor(times.startAt, times.endAt, 0))}.`}{' '}
+        Admin phải duyệt trước ngày diễn ra.
+      </p>
 
       <h2>3. Cam kết thưởng – phạt</h2>
       <label>

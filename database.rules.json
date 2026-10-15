@@ -137,6 +137,9 @@
         "kind": {
           ".validate": "newData.val() === 'target' || newData.val() === 'ranking'"
         },
+        "single": {
+          ".validate": "newData.isBoolean()"
+        },
         "target": {
           ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000"
         },

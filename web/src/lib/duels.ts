@@ -237,6 +237,11 @@ export function formatDateTime(ms: number): string {
   }).format(ms)
 }
 
+/** `joinUntil` là mốc 00:00 ngày kế tiếp (không tính), hiển thị thành 23:59 ngày cuối được tham gia */
+export function formatJoinDeadline(joinUntil: number): string {
+  return formatDateTime(joinUntil - 60_000)
+}
+
 function km(n: number): string {
   return `${Number(n.toFixed(2))} km`
 }
@@ -296,7 +301,7 @@ export function duelRules(duel: Duel): string[] {
   } else if (duel.minKm > 0) {
     rules.push(`Mỗi buổi phải ≥ ${km(duel.minKm)} mới được tính.`)
   }
-  rules.push(`Hạn tham gia: ${formatDateTime(duel.joinUntil)}.`)
+  rules.push(`Hạn tham gia: ${formatJoinDeadline(duel.joinUntil)}.`)
   rules.push('Người tham gia muốn rút lui phải được người tạo đồng ý.')
   return rules
 }

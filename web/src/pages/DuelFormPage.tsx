@@ -13,7 +13,7 @@ import {
   DUELS_PATH,
   duelPhase,
   duelTimes,
-  formatDateTime,
+  formatJoinDeadline,
   joinUntilFor,
   MAX_ACTIVE_DUELS,
   MAX_DUEL_DAYS,
@@ -391,7 +391,7 @@ function DuelForm({ initial, editing }: { initial: Draft; editing: Duel | null }
           {joinOptions.map((n) => (
             <option key={n} value={n}>
               {times
-                ? `Đến ${formatDateTime(joinUntilFor(times.startAt, times.endAt, n) - 60_000)}`
+                ? `Đến ${formatJoinDeadline(joinUntilFor(times.startAt, times.endAt, n))}`
                 : `Ngày thứ ${n + 1}`}
             </option>
           ))}

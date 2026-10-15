@@ -15,6 +15,7 @@ import {
   duelPhase,
   duelRules,
   formatDateTime,
+  formatJoinDeadline,
   formatDuelValue,
   isJoinOpen,
   MAX_ACTIVE_DUELS,
@@ -472,7 +473,7 @@ export function DuelDetailPage() {
         <section className="section panel">
           <h2>Tham gia</h2>
           {!joinOpen ? (
-            <p className="form-error">Đã hết hạn tham gia ({formatDateTime(d.joinUntil)}).</p>
+            <p className="form-error">Đã hết hạn tham gia ({formatJoinDeadline(d.joinUntil)}).</p>
           ) : invited ? (
             <>
               <p className="tiny">
@@ -510,7 +511,7 @@ export function DuelDetailPage() {
             </form>
           )}
           <p className="tiny muted">
-            Hạn tham gia: {formatDateTime(d.joinUntil)}. Muốn rút lui sau khi tham gia phải được người
+            Hạn tham gia: {formatJoinDeadline(d.joinUntil)}. Muốn rút lui sau khi tham gia phải được người
             tạo đồng ý.
           </p>
         </section>

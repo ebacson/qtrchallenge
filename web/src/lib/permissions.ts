@@ -5,6 +5,11 @@ export function canViewOthersActivities(profile: Role): boolean {
   return Boolean(profile?.admin || profile?.member)
 }
 
+/** Thách đấu: thành viên chính thức tạo và tham gia, admin duyệt. */
+export function canUseDuels(profile: Role): boolean {
+  return Boolean(profile?.admin || profile?.member)
+}
+
 /** Trang Tài chính: admin và thành viên chính thức xem được, chỉ admin sửa. */
 export function canViewFinance(profile: Role): boolean {
   return Boolean(profile?.admin || profile?.member)

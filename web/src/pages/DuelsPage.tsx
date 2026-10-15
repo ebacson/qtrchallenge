@@ -138,7 +138,7 @@ export function DuelsPage() {
           <input
             type="search"
             value={query}
-            placeholder="Tên thách đấu hoặc mã QTRD…"
+            placeholder="Tìm thách đấu…"
             onChange={(e) => setQuery(e.target.value)}
           />
         </label>

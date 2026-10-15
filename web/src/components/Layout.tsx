@@ -28,7 +28,7 @@ import { brandLogoSrc, brandTitle } from '../lib/brand'
 import { reloadApp } from '../lib/pwa'
 import { LUCKY_MENU_PATH, parseLuckyMenu } from '../lib/luckyDraw'
 import { formatBadgeCount, useUnreadNotificationCount } from '../lib/notifications'
-import { canViewFinance } from '../lib/permissions'
+import { canUseDuels, canViewFinance } from '../lib/permissions'
 import { useSharedValue } from '../lib/sharedValue'
 import type { UserProfile } from '../types'
 
@@ -56,6 +56,7 @@ const menuGroups: MenuGroup[] = [
     title: 'Cá nhân',
     items: [
       { to: '/activities', label: 'Hoạt động', icon: Activity },
+      { to: '/duels', label: 'Thách đấu', icon: Swords, visible: canUseDuels },
       { to: '/profile', label: 'Hồ sơ', icon: UserRound },
     ],
   },
@@ -65,7 +66,6 @@ const menuGroups: MenuGroup[] = [
     items: [
       { to: '/notifications', label: 'Thông báo', icon: Bell },
       { to: '/challenges', label: 'Thử thách', icon: Flag },
-      { to: '/duels', label: 'Thách đấu', icon: Swords, visible: (p) => Boolean(p?.admin) },
       { to: '/events', label: 'Sự kiện', icon: CalendarDays },
       { to: '/gallery', label: 'Hình ảnh', icon: Images },
       { to: '/members', label: 'Thành viên', icon: Users },

@@ -15,6 +15,7 @@ import {
   LogOut,
   RotateCw,
   ShieldCheck,
+  Swords,
   Trophy,
   UserCog,
   UserRound,
@@ -64,6 +65,7 @@ const menuGroups: MenuGroup[] = [
     items: [
       { to: '/notifications', label: 'Thông báo', icon: Bell },
       { to: '/challenges', label: 'Thử thách', icon: Flag },
+      { to: '/duels', label: 'Thách đấu', icon: Swords, visible: (p) => Boolean(p?.admin) },
       { to: '/events', label: 'Sự kiện', icon: CalendarDays },
       { to: '/gallery', label: 'Hình ảnh', icon: Images },
       { to: '/members', label: 'Thành viên', icon: Users },

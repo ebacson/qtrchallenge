@@ -4657,3 +4657,151 @@ code {
   padding: 8px 10px;
 }
 
+
+/* Thách đấu */
+.duel-phase {
+  align-self: flex-start;
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: rgba(107, 114, 128, 0.14);
+  color: var(--muted-status);
+}
+
+.duel-phase-pending,
+.duel-phase-upcoming {
+  background: rgba(217, 142, 4, 0.14);
+  color: var(--warn);
+}
+
+.duel-phase-ongoing {
+  background: rgba(27, 127, 78, 0.12);
+  color: var(--ok);
+}
+
+.duel-phase-rejected,
+.duel-phase-expired {
+  background: rgba(208, 16, 43, 0.1);
+  color: var(--danger);
+}
+
+.duel-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0 20px;
+  min-width: 0;
+}
+
+.duel-hero h1 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.duel-hero p {
+  margin: 0;
+}
+
+.duel-goal {
+  font-weight: 600;
+  color: var(--accent-deep);
+}
+
+.duel-form h2 {
+  font-size: 1.05rem;
+  margin: 8px 0 0;
+}
+
+.duel-description {
+  margin-top: 12px;
+}
+
+.duel-invite-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.duel-invite-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.duel-invite-head input {
+  flex: 1;
+  min-width: 0;
+}
+
+.duel-invite-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 2px 10px;
+}
+
+.duel-invite-list label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.duel-invite-list input {
+  width: auto;
+}
+
+.duel-invite-more {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.duel-request-list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.duel-request-list > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.duel-request-list > li:last-child {
+  border-bottom: 0;
+}
+
+.duel-request-list > li > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.duel-request-list .btn-row {
+  margin: 0;
+}
+
+.duel-review {
+  border-left: 4px solid var(--warn);
+}

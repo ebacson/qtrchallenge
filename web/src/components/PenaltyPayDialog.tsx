@@ -106,12 +106,39 @@ export function PenaltyPayDialog({
   amount: number
   onClose: () => void
 }) {
+  return (
+    <PayDialog
+      heading={`Nộp phạt ${formatVnd(amount)}`}
+      subtitle={`${challenge.name || 'Thử thách'} · ${name}`}
+      code={penaltyCode(challenge, uid)}
+      amount={amount}
+      fileName="nop-phat"
+      onClose={onClose}
+    />
+  )
+}
+
+/** Mã VietQR chuyển vào quỹ CLB với số tiền và nội dung (mã đối chiếu) điền sẵn */
+export function PayDialog({
+  heading,
+  subtitle,
+  code,
+  amount,
+  fileName,
+  onClose,
+}: {
+  heading: string
+  subtitle: string
+  code: string
+  amount: number
+  fileName: string
+  onClose: () => void
+}) {
   const { profile } = useAuth()
   const isAdmin = Boolean(profile?.admin)
   const bankRaw = useSharedValue<unknown>(BANK_PATH)
   const bank = parseBank(bankRaw)
   const momoUrl = momoFundUrl(useSharedValue<{ items?: unknown }>(FUND_PATH))
-  const code = penaltyCode(challenge, uid)
   const payload = vietQrPayload({ bin: bank.bin, accountNo: bank.accountNo, amount, memo: code })
   const [qr, setQr] = useState<{ payload: string; url: string } | null>(null)
   const qrUrl = qr?.payload === payload ? qr.url : ''
@@ -158,17 +185,15 @@ export function PenaltyPayDialog({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="pay-head">
-          <h3 id="pay-title">Nộp phạt {formatVnd(amount)}</h3>
+          <h3 id="pay-title">{heading}</h3>
           <button type="button" className="btn ghost compact" aria-label="Đóng" onClick={onClose}>
             <X size={16} aria-hidden />
           </button>
         </div>
-        <p className="tiny muted">
-          {challenge.name || 'Thử thách'} · {name}
-        </p>
+        <p className="tiny muted">{subtitle}</p>
 
         <div className="pay-qr">
-          {qrUrl ? <img src={qrUrl} alt={`Mã VietQR nộp phạt ${code}`} /> : <span>Đang tạo mã…</span>}
+          {qrUrl ? <img src={qrUrl} alt={`Mã VietQR ${code}`} /> : <span>Đang tạo mã…</span>}
         </div>
         <p className="tiny muted pay-hint">
           Mở app ngân hàng hoặc MoMo, chọn Quét mã QR. Số tiền và nội dung đã được điền sẵn, vui
@@ -205,7 +230,7 @@ export function PenaltyPayDialog({
             <a
               className="btn ghost compact"
               href={qrUrl}
-              download={`nop-phat-${code}.png`}
+              download={`${fileName}-${code}.png`}
             >
               <Download size={14} aria-hidden /> Lưu ảnh QR
             </a>

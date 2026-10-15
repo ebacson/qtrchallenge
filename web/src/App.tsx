@@ -58,6 +58,9 @@ const LuckyDrawListPage = lazyPage(
   'LuckyDrawListPage',
 )
 const LuckyDrawPage = lazyPage(() => import('./pages/LuckyDrawPage'), 'LuckyDrawPage')
+const DuelsPage = lazyPage(() => import('./pages/DuelsPage'), 'DuelsPage')
+const DuelDetailPage = lazyPage(() => import('./pages/DuelDetailPage'), 'DuelDetailPage')
+const DuelFormPage = lazyPage(() => import('./pages/DuelFormPage'), 'DuelFormPage')
 const ChallengeDrawPage = lazyPage(
   () => import('./pages/ChallengeDrawPage'),
   'ChallengeDrawPage',
@@ -142,6 +145,38 @@ function AppRoutes() {
         />
         <Route path="admin/gifts" element={<Navigate to="/gifts" replace />} />
         <Route path="admin/draw-test" element={<Navigate to="/lucky-draw" replace />} />
+        <Route
+          path="duels"
+          element={
+            <RequireAdmin>
+              <DuelsPage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="duels/new"
+          element={
+            <RequireAdmin>
+              <DuelFormPage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="duels/:id"
+          element={
+            <RequireAdmin>
+              <DuelDetailPage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="duels/:id/edit"
+          element={
+            <RequireAdmin>
+              <DuelFormPage />
+            </RequireAdmin>
+          }
+        />
         <Route path="lucky-draw" element={<LuckyDrawListPage />} />
         <Route path="lucky-draw/:id" element={<LuckyDrawPage />} />
         <Route

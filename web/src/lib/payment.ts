@@ -50,15 +50,24 @@ function fnv1a(text: string): number {
  * Viết liền, không ký tự đặc biệt vì một số ngân hàng bỏ ký tự đặc biệt trong nội dung chuyển khoản.
  */
 export function penaltyCode(challenge: Pick<Challenge, 'id' | 'startDate'>, uid: string): string {
-  const [, month = '', year = ''] = challenge.startDate.trim().split('-')
+  return paymentCode('QTRP', challenge.startDate, `${challenge.id}:${uid}`)
+}
+
+/** Mã góp quỹ thách đấu cá nhân, dạng `QTRD2610AB12C`, cùng cách tạo với mã nộp phạt */
+export function duelCode(duel: { id: string; startDate: string }, uid: string): string {
+  return paymentCode('QTRD', duel.startDate, `duel:${duel.id}:${uid}`)
+}
+
+function paymentCode(prefix: string, startDate: string, key: string): string {
+  const [, month = '', year = ''] = startDate.trim().split('-')
   const period = year.length === 4 && month ? `${year.slice(2)}${month.padStart(2, '0')}` : '0000'
-  let hash = fnv1a(`${challenge.id}:${uid}`)
+  let hash = fnv1a(key)
   let suffix = ''
   for (let i = 0; i < CODE_LENGTH; i++) {
     suffix += CODE_ALPHABET[hash % CODE_ALPHABET.length]
     hash = Math.floor(hash / CODE_ALPHABET.length)
   }
-  return `QTRP${period}${suffix}`
+  return `${prefix}${period}${suffix}`
 }
 
 function compactCode(value: string): string {

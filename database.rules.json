@@ -109,6 +109,161 @@
       ".read": "auth != null",
       ".write": "auth != null && root.child('users').child(auth.uid).child('admin').val() === true"
     },
+    "duels": {
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('admin').val() === true || root.child('users').child(auth.uid).child('member').val() === true)",
+      "$duelId": {
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('admin').val() === true || (root.child('users').child(auth.uid).child('member').val() === true && !data.exists() && newData.child('createdBy').val() === auth.uid && newData.child('approval').child('status').val() === 'pending' && !newData.child('approval').child('by').exists() && newData.child('participants').child(auth.uid).exists() && !newData.child('declined').exists() && !newData.child('withdrawRequests').exists() && !newData.child('result').exists() && !newData.child('stakeDone').exists() && !newData.child('fundPayments').exists()) || (data.child('createdBy').val() === auth.uid && (data.child('approval').child('status').val() === 'pending' || data.child('approval').child('status').val() === 'rejected') && (!newData.exists() || (newData.child('createdBy').val() === auth.uid && newData.child('approval').child('status').val() === 'pending' && !newData.child('approval').child('by').exists() && newData.child('participants').child(auth.uid).exists() && !newData.child('declined').exists() && !newData.child('withdrawRequests').exists() && !newData.child('result').exists() && !newData.child('stakeDone').exists() && !newData.child('fundPayments').exists()))) || (data.child('createdBy').val() === auth.uid && !newData.exists() && now < data.child('startAt').val()))",
+        "title": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 100"
+        },
+        "description": {
+          ".validate": "newData.isString() && newData.val().length <= 2000"
+        },
+        "createdBy": {
+          ".validate": "newData.isString() && (newData.val() === data.val() || (!data.exists() && newData.val() === auth.uid))"
+        },
+        "createdByName": {
+          ".validate": "newData.isString() && newData.val().length <= 100"
+        },
+        "createdAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "updatedAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "metric": {
+          ".validate": "newData.val() === 'distance' || newData.val() === 'pace' || newData.val() === 'count' || newData.val() === 'best_effort'"
+        },
+        "kind": {
+          ".validate": "newData.val() === 'target' || newData.val() === 'ranking'"
+        },
+        "target": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000"
+        },
+        "minKm": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000"
+        },
+        "paceMin": {
+          ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= 30"
+        },
+        "paceMax": {
+          ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= 30"
+        },
+        "winnerCount": {
+          ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 50"
+        },
+        "startDate": {
+          ".validate": "newData.isString() && newData.val().matches(/^[0-9]{2}-[0-9]{2}-[0-9]{4}$/)"
+        },
+        "endDate": {
+          ".validate": "newData.isString() && newData.val().matches(/^[0-9]{2}-[0-9]{2}-[0-9]{4}$/)"
+        },
+        "startAt": {
+          ".validate": "newData.isNumber() && (newData.val() === data.val() || newData.val() + 86400000 > now)"
+        },
+        "endAt": {
+          ".validate": "newData.isNumber() && newData.val() > newData.parent().child('startAt').val() && newData.val() - newData.parent().child('startAt').val() <= 2678400000"
+        },
+        "joinUntil": {
+          ".validate": "newData.isNumber() && newData.val() >= newData.parent().child('startAt').val() && newData.val() <= newData.parent().child('endAt').val()"
+        },
+        "joinDays": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 31"
+        },
+        "stakeText": {
+          ".validate": "newData.isString() && newData.val().length <= 300"
+        },
+        "fundAmount": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 500000"
+        },
+        "hasPassword": {
+          ".write": "auth != null && root.child('duels').child($duelId).child('createdBy').val() === auth.uid",
+          ".validate": "newData.isBoolean()"
+        },
+        "approval": {
+          ".validate": "newData.hasChildren(['status']) && (newData.child('status').val() === 'pending' || newData.child('status').val() === 'approved' || newData.child('status').val() === 'rejected')",
+          "status": {
+            ".validate": "newData.isString()"
+          },
+          "by": {
+            ".validate": "newData.isString()"
+          },
+          "at": {
+            ".validate": "newData.isNumber()"
+          },
+          "reason": {
+            ".validate": "newData.isString() && newData.val().length <= 300"
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
+        "invited": {
+          "$uid": {
+            ".write": "auth != null && root.child('duels').child($duelId).child('createdBy').val() === auth.uid && root.child('duels').child($duelId).child('approval').child('status').val() === 'approved' && now < root.child('duels').child($duelId).child('joinUntil').val()",
+            ".validate": "newData.val() === true"
+          }
+        },
+        "participants": {
+          "$uid": {
+            ".write": "auth != null && ((auth.uid === $uid && !data.exists() && newData.exists() && root.child('users').child(auth.uid).child('member').val() === true && root.child('duels').child($duelId).child('approval').child('status').val() === 'approved' && now < root.child('duels').child($duelId).child('joinUntil').val() && (root.child('duels').child($duelId).child('invited').child($uid).val() === true || !root.child('duel_secrets').child($duelId).child('password').exists() || newData.parent().parent().parent().parent().child('duel_join_keys').child($duelId).child($uid).val() === root.child('duel_secrets').child($duelId).child('password').val())) || (!newData.exists() && $uid !== auth.uid && root.child('duels').child($duelId).child('createdBy').val() === auth.uid && root.child('duels').child($duelId).child('withdrawRequests').child($uid).exists() && !root.child('duels').child($duelId).child('result').exists()))",
+            ".validate": "newData.hasChildren(['name', 'joinedAt']) && newData.child('name').isString() && newData.child('name').val().length <= 100 && newData.child('joinedAt').isNumber() && ($uid === newData.parent().parent().child('createdBy').val() || newData.parent().parent().child('approval').child('status').val() === 'approved')"
+          }
+        },
+        "declined": {
+          "$uid": {
+            ".write": "auth != null && ((auth.uid === $uid && root.child('duels').child($duelId).child('invited').child($uid).val() === true && !root.child('duels').child($duelId).child('participants').child($uid).exists()) || (!newData.exists() && root.child('duels').child($duelId).child('createdBy').val() === auth.uid))",
+            ".validate": "newData.isNumber()"
+          }
+        },
+        "withdrawRequests": {
+          "$uid": {
+            ".write": "auth != null && ((auth.uid === $uid && root.child('duels').child($duelId).child('participants').child($uid).exists() && root.child('duels').child($duelId).child('createdBy').val() !== $uid && !root.child('duels').child($duelId).child('result').exists() && (!newData.exists() || now < root.child('duels').child($duelId).child('endAt').val())) || (!newData.exists() && root.child('duels').child($duelId).child('createdBy').val() === auth.uid))",
+            ".validate": "newData.hasChildren(['at']) && newData.child('at').isNumber() && (!newData.child('reason').exists() || (newData.child('reason').isString() && newData.child('reason').val().length <= 300))"
+          }
+        },
+        "result": {
+          ".write": "auth != null && !data.exists() && root.child('duels').child($duelId).child('createdBy').val() === auth.uid && root.child('duels').child($duelId).child('approval').child('status').val() === 'approved' && now >= root.child('duels').child($duelId).child('endAt').val()",
+          ".validate": "newData.hasChildren(['lockedAt', 'lockedBy', 'size']) && newData.child('lockedAt').isNumber() && newData.child('lockedBy').val() === auth.uid && newData.child('size').isNumber()"
+        },
+        "stakeDone": {
+          "$uid": {
+            ".write": "auth != null && root.child('duels').child($duelId).child('result').exists() && ((root.child('duels').child($duelId).child('createdBy').val() === auth.uid && $uid !== auth.uid) || ($uid === root.child('duels').child($duelId).child('createdBy').val() && root.child('duels').child($duelId).child('result').child('size').val() === 2 && root.child('duels').child($duelId).child('result').child('rows').child(auth.uid).child('won').val() === true))",
+            ".validate": "newData.hasChildren(['at', 'by']) && newData.child('at').isNumber() && newData.child('by').val() === auth.uid"
+          }
+        },
+        "fundPayments": {
+          "$uid": {
+            ".validate": "newData.hasChildren(['amount', 'code', 'confirmedAt', 'confirmedBy']) && newData.child('amount').isNumber() && newData.child('code').isString() && newData.child('confirmedAt').isNumber() && newData.child('confirmedBy').isString()"
+          }
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "duel_secrets": {
+      "$duelId": {
+        ".read": "auth != null && (root.child('users').child(auth.uid).child('admin').val() === true || root.child('duels').child($duelId).child('createdBy').val() === auth.uid)",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('admin').val() === true || root.child('duels').child($duelId).child('createdBy').val() === auth.uid || (!root.child('duels').child($duelId).exists() && newData.parent().parent().child('duels').child($duelId).child('createdBy').val() === auth.uid))",
+        ".validate": "newData.hasChildren(['password']) && newData.child('password').isString() && newData.child('password').val().length > 0 && newData.child('password').val().length <= 50",
+        "password": {
+          ".validate": "newData.isString()"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "duel_join_keys": {
+      "$duelId": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('admin').val() === true)",
+          ".validate": "newData.isString() && newData.val().length <= 50"
+        }
+      }
+    },
     "EVENT": {
       ".read": "auth != null",
       ".write": "auth != null && root.child('users').child(auth.uid).child('admin').val() === true"

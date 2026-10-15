@@ -253,6 +253,9 @@ export function duelGoalText(duel: Duel): string {
       ? ` (pace ${formatPaceMinutes(duel.paceMin)}–${formatPaceMinutes(duel.paceMax)})`
       : ''
   if (duel.kind === 'target') {
+    if ((duel.metric === 'distance' || duel.metric === 'pace') && duel.minKm >= duel.target) {
+      return `Chạy một buổi ≥ ${km(duel.minKm)}${paceRange}`
+    }
     switch (duel.metric) {
       case 'distance':
         return `Đạt ${km(duel.target)} tích lũy`
@@ -298,6 +301,8 @@ export function duelRules(duel: Duel): string[] {
   }
   if (duel.metric === 'best_effort') {
     rules.push('Pace tính theo pace trung bình của cả buổi.')
+  } else if (duel.kind === 'target' && duel.metric !== 'count' && duel.minKm >= duel.target) {
+    rules.push(`Phải có ít nhất một buổi chạy liền ≥ ${km(duel.minKm)}; các buổi ngắn hơn không được cộng dồn.`)
   } else if (duel.minKm > 0) {
     rules.push(`Mỗi buổi phải ≥ ${km(duel.minKm)} mới được tính.`)
   }

@@ -5,8 +5,11 @@ const DAY_MS = 86_400_000
 /** Chỉ dùng Run/Trail gần đây để ước race road */
 const RACE_TYPES = new Set(['Run', 'TrailRun'])
 const LOOKBACK_MS = 84 * DAY_MS
-const MIN_KM = 3
-const MAX_KM = 45
+/** Nguồn cho 5K / 10K */
+const SHORT_MIN_KM = 5
+/** Nguồn cho HM / FM */
+const LONG_MIN_KM = 10
+const MAX_KM = 50
 /** Peter Riegel */
 const RIEGEL_EXP = 1.06
 
@@ -16,13 +19,15 @@ export type RaceTarget = {
   id: RaceTargetId
   label: string
   km: number
+  /** short = cần buổi ≥ 5 km; long = cần buổi > 10 km */
+  group: 'short' | 'long'
 }
 
 export const RACE_TARGETS: RaceTarget[] = [
-  { id: '5k', label: '5 km', km: 5 },
-  { id: '10k', label: '10 km', km: 10 },
-  { id: 'hm', label: 'Half Marathon', km: 21.0975 },
-  { id: 'fm', label: 'Full Marathon', km: 42.195 },
+  { id: '5k', label: '5 km', km: 5, group: 'short' },
+  { id: '10k', label: '10 km', km: 10, group: 'short' },
+  { id: 'hm', label: 'Half Marathon', km: 21.0975, group: 'long' },
+  { id: 'fm', label: 'Full Marathon', km: 42.195, group: 'long' },
 ]
 
 export type ActivityLike = {
@@ -36,16 +41,16 @@ export type RacePrediction = {
   id: RaceTargetId
   label: string
   km: number
-  timeSec: number
+  timeSec: number | null
   timeLabel: string
   paceLabel: string
 }
 
 export type RacePredictResult = {
   predictions: RacePrediction[]
-  /** Mô tả nguồn ước tính */
-  sourceLabel: string
 } | null
+
+type Cand = { km: number; timeSec: number }
 
 function riegelTimeSec(t1Sec: number, d1Km: number, d2Km: number): number {
   if (!(t1Sec > 0) || !(d1Km > 0) || !(d2Km > 0)) return NaN
@@ -62,60 +67,90 @@ export function formatDuration(totalSec: number): string {
   return `${m}:${String(sec).padStart(2, '0')}`
 }
 
-/**
- * Ước 5K/10K/HM/FM từ buổi Run/Trail tốt nhất (theo tương đương 10K)
- * trong ~12 tuần gần đây, công thức Riegel.
- */
-export function predictRaceTimes(
-  activities: ActivityLike[],
-  now = Date.now(),
-): RacePredictResult {
+function collectCandidates(activities: ActivityLike[], now: number): Cand[] {
   const cutoff = now - LOOKBACK_MS
-  type Cand = { km: number; timeSec: number; dayMs: number; pred10k: number }
-  const cands: Cand[] = []
-
+  const out: Cand[] = []
   for (const a of activities) {
     if (!RACE_TYPES.has(a.type)) continue
     const dayMs = activityDayMs(a.startDate)
     if (dayMs == null || dayMs < cutoff) continue
     const km = Number(a.distance) || 0
-    if (km < MIN_KM || km > MAX_KM) continue
+    if (km < SHORT_MIN_KM || km > MAX_KM) continue
     const paceMin = paceToMinutes(a.pace)
-    if (!(paceMin > 0)) continue
-    // Lọc pace cực đoan (sprint / GPS lỗi)
-    if (paceMin < 2.5 || paceMin > 12) continue
-    const timeSec = paceMin * 60 * km
-    const pred10k = riegelTimeSec(timeSec, km, 10)
-    if (!Number.isFinite(pred10k)) continue
-    cands.push({ km, timeSec, dayMs, pred10k })
+    if (!(paceMin > 0) || paceMin < 2.5 || paceMin > 12) continue
+    out.push({ km, timeSec: paceMin * 60 * km })
   }
+  return out
+}
 
+/** Chọn buổi tốt nhất theo thời gian tương đương tại `scoreKm` (Riegel). */
+function pickBest(cands: Cand[], scoreKm: number, preferKm: number): Cand | null {
   if (!cands.length) return null
-
-  // Ưu tiên buổi gần cự ly trung bình (5–25 km) khi điểm 10K tương đương gần nhau
-  cands.sort((a, b) => {
-    if (a.pred10k !== b.pred10k) return a.pred10k - b.pred10k
-    const aMid = Math.abs(a.km - 12)
-    const bMid = Math.abs(b.km - 12)
-    return aMid - bMid
+  const ranked = [...cands].sort((a, b) => {
+    const sa = riegelTimeSec(a.timeSec, a.km, scoreKm)
+    const sb = riegelTimeSec(b.timeSec, b.km, scoreKm)
+    if (sa !== sb) return sa - sb
+    return Math.abs(a.km - preferKm) - Math.abs(b.km - preferKm)
   })
-  const best = cands[0]
+  return ranked[0] ?? null
+}
 
-  const predictions = RACE_TARGETS.map((t) => {
-    const timeSec = riegelTimeSec(best.timeSec, best.km, t.km)
-    const paceMin = timeSec / 60 / t.km
+function predictionFrom(
+  target: RaceTarget,
+  source: Cand | null,
+): RacePrediction {
+  if (!source) {
     return {
-      id: t.id,
-      label: t.label,
-      km: t.km,
-      timeSec,
-      timeLabel: formatDuration(timeSec),
-      paceLabel: formatPaceMinutes(paceMin),
+      id: target.id,
+      label: target.label,
+      km: target.km,
+      timeSec: null,
+      timeLabel: '—',
+      paceLabel: '—',
     }
-  })
+  }
+  const timeSec = riegelTimeSec(source.timeSec, source.km, target.km)
+  if (!Number.isFinite(timeSec)) {
+    return {
+      id: target.id,
+      label: target.label,
+      km: target.km,
+      timeSec: null,
+      timeLabel: '—',
+      paceLabel: '—',
+    }
+  }
+  return {
+    id: target.id,
+    label: target.label,
+    km: target.km,
+    timeSec,
+    timeLabel: formatDuration(timeSec),
+    paceLabel: formatPaceMinutes(timeSec / 60 / target.km),
+  }
+}
 
-  const sourcePace = formatPaceMinutes(best.timeSec / 60 / best.km)
-  const sourceLabel = `Từ buổi ~${best.km.toFixed(1)} km @ ${sourcePace}/km (12 tuần gần đây)`
+/**
+ * 5K/10K: từ buổi ≥ 5 km.
+ * HM/FM: từ buổi > 10 km.
+ * Công thức Riegel, ~12 tuần gần đây.
+ */
+export function predictRaceTimes(
+  activities: ActivityLike[],
+  now = Date.now(),
+): RacePredictResult {
+  const all = collectCandidates(activities, now)
+  const shortCands = all.filter((c) => c.km >= SHORT_MIN_KM)
+  const longCands = all.filter((c) => c.km > LONG_MIN_KM)
 
-  return { predictions, sourceLabel }
+  const shortSource = pickBest(shortCands, 10, 8)
+  const longSource = pickBest(longCands, 21.0975, 18)
+
+  if (!shortSource && !longSource) return null
+
+  const predictions = RACE_TARGETS.map((t) =>
+    predictionFrom(t, t.group === 'short' ? shortSource : longSource),
+  )
+
+  return { predictions }
 }

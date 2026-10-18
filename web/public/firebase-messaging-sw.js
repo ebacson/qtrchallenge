@@ -4,7 +4,7 @@ importScripts('https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js
 importScripts('https://www.gstatic.com/firebasejs/12.19.0/firebase-messaging-compat.js')
 
 firebase.initializeApp({
-  apiKey: 'AIzaSyBUiucVL3eUGadg4sPE-Vmsc6qQ50K1MAo',
+  apiKey: 'AIzaSyCN7epp-CSUD6ak8kGiSwT6xJzAMbKrNGk',
   authDomain: 'echiptime.firebaseapp.com',
   databaseURL: 'https://echiptime-default-rtdb.firebaseio.com',
   projectId: 'echiptime',

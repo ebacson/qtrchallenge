@@ -44,6 +44,8 @@ export default defineConfig(({ mode, command }) => {
         // Giữ public/manifest.webmanifest (display: browser) để OAuth Strava vẫn chạy trong Safari
         manifest: false,
         workbox: {
+          // FCM background handler (firebase-messaging-sw.js trong public/)
+          importScripts: ['/firebase-messaging-sw.js'],
           globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,webp,ico,webmanifest}'],
           globIgnores: ['404.html', 'strava/**'],
           navigateFallback: 'index.html',

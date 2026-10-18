@@ -3,11 +3,13 @@ import { getAuth } from 'firebase-admin/auth'
 import { getDatabase } from 'firebase-admin/database'
 import type { PubSub } from '@google-cloud/pubsub'
 import { onRequest } from 'firebase-functions/v2/https'
+import { onValueCreated } from 'firebase-functions/v2/database'
 import { onMessagePublished } from 'firebase-functions/v2/pubsub'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { setGlobalOptions } from 'firebase-functions/v2'
 import * as logger from 'firebase-functions/logger'
 import { deleteUserCompletely, DeleteUserError } from './adminDeleteUser'
+import { sendPushToUsers } from './fcmSend'
 import { handleStravaRoute } from './stravaCore'
 import {
   handleStravaEvent,
@@ -274,6 +276,98 @@ export const stravaWebhook = onRequest(
     } catch (err) {
       logger.error('stravaWebhook: publish failed', err)
       res.status(500).json({ error: 'Publish failed' })
+    }
+  },
+)
+
+/** Khi admin đăng thông báo CLB → gửi FCM tới mọi thiết bị đã bật. */
+export const onClubNotificationCreated = onValueCreated(
+  {
+    ref: '/notifications/{id}',
+    instance: 'echiptime-default-rtdb',
+    region: 'us-central1',
+    memory: '512MiB',
+    timeoutSeconds: 120,
+  },
+  async (event) => {
+    const data = event.data.val() as { title?: unknown; content?: unknown } | null
+    if (!data) return
+    const title = String(data.title ?? '').trim() || 'Thông báo CLB'
+    const body = String(data.content ?? '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 180)
+    try {
+      const result = await sendPushToUsers({
+        title,
+        body: body || title,
+        url: '/notifications',
+        tag: `noti-${event.params.id}`,
+      })
+      logger.info('onClubNotificationCreated push', { id: event.params.id, ...result })
+    } catch (err) {
+      logger.error('onClubNotificationCreated push failed', err)
+    }
+  },
+)
+
+/** Admin gửi thử push (trang /admin/test-push). */
+export const adminSendPush = onRequest(
+  {
+    cors: false,
+    timeoutSeconds: 120,
+    memory: '512MiB',
+    maxInstances: 2,
+  },
+  async (req, res) => {
+    const origin = corsOrigin(req.get('origin') || undefined)
+    res.set('Vary', 'Origin')
+    if (origin) {
+      res.set('Access-Control-Allow-Origin', origin)
+      res.set('Access-Control-Allow-Methods', 'POST,OPTIONS')
+      res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    }
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('')
+      return
+    }
+    if (req.method !== 'POST') {
+      res.status(405).json({ error: 'Method not allowed' })
+      return
+    }
+
+    const match = /^Bearer (.+)$/.exec(req.get('authorization') ?? '')
+    if (!match) {
+      res.status(401).json({ error: 'Chưa đăng nhập.' })
+      return
+    }
+    let uid: string
+    try {
+      uid = (await getAuth().verifyIdToken(match[1])).uid
+    } catch {
+      res.status(401).json({ error: 'Phiên đăng nhập không hợp lệ, hãy đăng nhập lại.' })
+      return
+    }
+    const isAdmin = (await getDatabase().ref(`users/${uid}/admin`).get()).val() === true
+    if (!isAdmin) {
+      res.status(403).json({ error: 'Chỉ Admin mới được gửi thử thông báo đẩy.' })
+      return
+    }
+
+    const body = typeof req.body === 'object' && req.body ? (req.body as Record<string, unknown>) : {}
+    const title = String(body.title ?? 'QTR Challenge — thử').trim() || 'QTR Challenge — thử'
+    const text = String(body.body ?? 'Đây là thông báo thử từ admin.').trim()
+    const onlySelf = body.onlySelf === true
+    try {
+      const result = await sendPushToUsers(
+        { title, body: text, url: String(body.url ?? '/notifications'), tag: 'qtr-test-push' },
+        onlySelf ? { onlyUid: uid } : undefined,
+      )
+      res.json({ ok: true, ...result })
+    } catch (err) {
+      logger.error('adminSendPush failed', err)
+      res.status(500).json({ error: err instanceof Error ? err.message : 'Gửi thất bại' })
     }
   },
 )

@@ -4805,3 +4805,16 @@ code {
 .duel-review {
   border-left: 4px solid var(--warn);
 }
+
+.push-notify-panel .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.push-inline-icon {
+  display: inline-block;
+  vertical-align: -3px;
+  margin-right: 4px;
+}

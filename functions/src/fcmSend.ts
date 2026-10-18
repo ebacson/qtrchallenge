@@ -1,0 +1,91 @@
+import { getDatabase } from 'firebase-admin/database'
+import { getMessaging, type MulticastMessage } from 'firebase-admin/messaging'
+import * as logger from 'firebase-functions/logger'
+
+export type PushPayload = {
+  title: string
+  body: string
+  url?: string
+  tag?: string
+}
+
+type TokenRow = { uid: string; tokenId: string; token: string }
+
+async function collectTokens(onlyUid?: string): Promise<TokenRow[]> {
+  const db = getDatabase()
+  const root = onlyUid
+    ? { [onlyUid]: (await db.ref(`fcm_tokens/${onlyUid}`).get()).val() }
+    : ((await db.ref('fcm_tokens').get()).val() as Record<string, unknown> | null)
+  const out: TokenRow[] = []
+  for (const [uid, byId] of Object.entries(root ?? {})) {
+    if (!byId || typeof byId !== 'object') continue
+    for (const [tokenId, raw] of Object.entries(byId as Record<string, unknown>)) {
+      const row = raw && typeof raw === 'object' ? (raw as { token?: unknown }) : null
+      const token = typeof row?.token === 'string' ? row.token.trim() : ''
+      if (token) out.push({ uid, tokenId, token })
+    }
+  }
+  return out
+}
+
+async function removeToken(uid: string, tokenId: string): Promise<void> {
+  await getDatabase().ref(`fcm_tokens/${uid}/${tokenId}`).remove()
+}
+
+/** Gửi FCM tới mọi thiết bị đã đăng ký (hoặc một uid). Xóa token chết (404/410/unregistered). */
+export async function sendPushToUsers(
+  payload: PushPayload,
+  opts?: { onlyUid?: string },
+): Promise<{ sent: number; failed: number; removed: number; devices: number }> {
+  const title = payload.title.trim() || 'QTR Challenge'
+  const body = payload.body.trim()
+  const url = payload.url?.trim() || '/notifications'
+  const tag = payload.tag?.trim() || 'qtr-push'
+  const rows = await collectTokens(opts?.onlyUid)
+  if (!rows.length) return { sent: 0, failed: 0, removed: 0, devices: 0 }
+
+  const messaging = getMessaging()
+  let sent = 0
+  let failed = 0
+  let removed = 0
+
+  for (let i = 0; i < rows.length; i += 500) {
+    const batch = rows.slice(i, i + 500)
+    const message: MulticastMessage = {
+      tokens: batch.map((r) => r.token),
+      notification: { title, body },
+      data: { title, body, url, tag },
+      webpush: {
+        fcmOptions: { link: url },
+        notification: {
+          title,
+          body,
+          icon: '/icon-192.png',
+          badge: '/favicon.png',
+        },
+      },
+    }
+    const res = await messaging.sendEachForMulticast(message)
+    sent += res.successCount
+    failed += res.failureCount
+    res.responses.forEach((r, idx) => {
+      if (r.success) return
+      const code = r.error?.code || ''
+      const dead =
+        code.includes('registration-token-not-registered') ||
+        code.includes('invalid-registration-token') ||
+        code.includes('not-found')
+      if (dead) {
+        const row = batch[idx]
+        void removeToken(row.uid, row.tokenId).catch((err) =>
+          logger.warn('remove dead fcm token failed', { uid: row.uid, err }),
+        )
+        removed += 1
+      } else {
+        logger.warn('fcm send failed', { code, message: r.error?.message })
+      }
+    })
+  }
+
+  return { sent, failed, removed, devices: rows.length }
+}

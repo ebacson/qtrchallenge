@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { onValue, ref } from 'firebase/database'
+import { EnablePushNotifications } from '../components/EnablePushNotifications'
 import { StravaConnectPanel } from '../components/StravaConnectPanel'
 import { StravaBadge } from '../components/StravaLogo'
 import { useAuth } from '../context/AuthContext'
@@ -211,6 +212,9 @@ export function ProfilePage() {
             <Link className="btn ghost compact" to="/lucky-draw">
               Quay số may mắn
             </Link>
+            <Link className="btn ghost compact" to="/admin/test-push">
+              Thử thông báo đẩy
+            </Link>
           </div>
         </div>
       )}
@@ -256,6 +260,8 @@ export function ProfilePage() {
           </div>
         </div>
       </header>
+
+      <EnablePushNotifications />
 
       <section className="section panel">
         <h2 className="strava-heading">

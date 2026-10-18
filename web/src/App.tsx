@@ -51,6 +51,7 @@ const EditChallengePage = lazyPage(
 )
 const AdminUsersPage = lazyPage(() => import('./pages/AdminUsersPage'), 'AdminUsersPage')
 const AdminRecordsPage = lazyPage(() => import('./pages/AdminRecordsPage'), 'AdminRecordsPage')
+const TestPushPage = lazyPage(() => import('./pages/TestPushPage'), 'TestPushPage')
 const FinancePage = lazyPage(() => import('./pages/FinancePage'), 'FinancePage')
 const GiftsPage = lazyPage(() => import('./pages/GiftsPage'), 'GiftsPage')
 const LuckyDrawListPage = lazyPage(
@@ -140,6 +141,14 @@ function AppRoutes() {
           element={
             <RequireAdmin>
               <AdminRecordsPage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="admin/test-push"
+          element={
+            <RequireAdmin>
+              <TestPushPage />
             </RequireAdmin>
           }
         />

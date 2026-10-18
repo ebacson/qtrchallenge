@@ -79,6 +79,15 @@
         }
       }
     },
+    "fcm_tokens": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('admin').val() === true)",
+        "$tokenId": {
+          ".write": "auth != null && auth.uid === $uid",
+          ".validate": "newData.hasChildren(['token', 'updatedAt']) && newData.child('token').isString() && newData.child('token').val().length > 0 && newData.child('token').val().length <= 4096 && newData.child('updatedAt').isNumber()"
+        }
+      }
+    },
     "deleted_users": {
       ".read": "auth != null"
     },

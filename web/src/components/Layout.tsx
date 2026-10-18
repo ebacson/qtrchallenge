@@ -29,6 +29,7 @@ import { reloadApp } from '../lib/pwa'
 import { LUCKY_MENU_PATH, parseLuckyMenu } from '../lib/luckyDraw'
 import { formatBadgeCount, useUnreadNotificationCount } from '../lib/notifications'
 import { canUseDuels, canViewFinance } from '../lib/permissions'
+import { listenForegroundMessages } from '../lib/pushNotifications'
 import { useSharedValue } from '../lib/sharedValue'
 import type { UserProfile } from '../types'
 
@@ -121,6 +122,9 @@ export function Layout() {
       : navigator.clearAppBadge()
     result.catch(() => {})
   }, [unreadNotifications])
+
+  // FCM khi tab đang mở (không xin quyền — chỉ lắng nghe nếu đã granted)
+  useEffect(() => listenForegroundMessages(), [])
 
   useEffect(
     () => () => {

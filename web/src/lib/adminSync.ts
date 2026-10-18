@@ -76,3 +76,23 @@ export async function runAdminDeleteUser(idToken: string, uid: string): Promise<
     'Xóa thất bại',
   )) as DeleteUserSummary
 }
+
+export type SendPushSummary = {
+  ok: boolean
+  sent: number
+  failed: number
+  removed: number
+  devices: number
+}
+
+export async function runAdminSendPush(
+  idToken: string,
+  body: { title: string; body: string; url?: string; onlySelf?: boolean },
+): Promise<SendPushSummary> {
+  return (await callAdminFunction(
+    'adminSendPush',
+    idToken,
+    body,
+    'Gửi thông báo đẩy thất bại',
+  )) as SendPushSummary
+}

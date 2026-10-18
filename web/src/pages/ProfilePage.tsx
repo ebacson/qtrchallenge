@@ -213,7 +213,7 @@ export function ProfilePage() {
               Quay số may mắn
             </Link>
             <Link className="btn ghost compact" to="/admin/test-push">
-              Thử thông báo đẩy
+              Thử thông báo
             </Link>
           </div>
         </div>

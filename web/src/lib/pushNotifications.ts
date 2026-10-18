@@ -53,7 +53,7 @@ export async function hasStoredToken(uid: string): Promise<boolean> {
 
 /** Xin quyền + lấy FCM token + lưu RTDB. Không gọi lúc load trang. */
 export async function subscribeUser(uid: string): Promise<string> {
-  if (!(await isPushSupported())) throw new Error('Trình duyệt không hỗ trợ thông báo đẩy.')
+  if (!(await isPushSupported())) throw new Error('Trình duyệt không hỗ trợ thông báo.')
   if (isIOS() && !isPWAInstalled()) {
     throw new Error('Trên iPhone/iPad cần thêm web vào Màn hình chính rồi mở từ icon đó.')
   }

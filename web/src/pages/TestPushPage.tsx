@@ -46,8 +46,8 @@ export function TestPushPage() {
         ← Hồ sơ
       </Link>
       <header className="page-header">
-        <h1>Thử thông báo đẩy</h1>
-        <p className="lede">Admin gửi FCM thử. Bật thông báo trên thiết bị này trước, rồi đóng tab và gửi.</p>
+        <h1>Thử thông báo</h1>
+        <p className="lede">Admin gửi thử. Bật thông báo trên thiết bị này trước, rồi đóng tab và gửi.</p>
       </header>
 
       <EnablePushNotifications />

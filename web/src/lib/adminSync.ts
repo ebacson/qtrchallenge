@@ -93,6 +93,6 @@ export async function runAdminSendPush(
     'adminSendPush',
     idToken,
     body,
-    'Gửi thông báo đẩy thất bại',
+    'Gửi thông báo thất bại',
   )) as SendPushSummary
 }

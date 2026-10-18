@@ -62,6 +62,9 @@ export function EnablePushNotifications() {
     return (
       <section className="section panel">
         <h2>Thông báo</h2>
+        <p className="tiny muted">
+          Nhận nhắc đúng lúc — thách đấu, thử thách, quỹ & tin CLB — ngay cả khi bạn không mở app.
+        </p>
         <p className="tiny muted">Trình duyệt hoặc thiết bị này không hỗ trợ thông báo.</p>
       </section>
     )
@@ -70,6 +73,9 @@ export function EnablePushNotifications() {
   return (
     <section className="section panel push-notify-panel">
       <h2>Thông báo</h2>
+      <p className="tiny muted push-benefit">
+        Nhận nhắc đúng lúc — thách đấu, thử thách, quỹ & tin CLB — ngay cả khi bạn không mở app.
+      </p>
       {browser === 'ios-install' && (
         <p className="lede tiny">
           <Smartphone size={16} aria-hidden className="push-inline-icon" />

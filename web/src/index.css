@@ -4824,6 +4824,10 @@ code {
   border-left: 4px solid var(--warn);
 }
 
+.push-notify-panel .push-benefit {
+  margin: 0 0 0.65rem;
+}
+
 .push-notify-panel .btn {
   display: inline-flex;
   align-items: center;

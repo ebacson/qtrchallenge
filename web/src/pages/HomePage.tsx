@@ -17,7 +17,7 @@ const shortcuts = [
   { to: '/members', title: 'Thành viên', desc: 'Danh sách runners' },
   { to: '/stats', title: 'Thống kê', desc: 'Km, pace & thưởng/phạt' },
   { to: '/events', title: 'Events', desc: 'Giải & kết quả' },
-  { to: '/profile', title: 'Strava', desc: 'Kết nối & sync trong Profile' },
+  { to: '/duels', title: 'Thách đấu', desc: 'Mời & theo dõi duel' },
 ]
 
 const ACTIVITY_COUNT_TTL_MS = 5 * 60_000

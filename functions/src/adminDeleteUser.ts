@@ -181,6 +181,7 @@ export async function deleteUserCompletely(
   updates[`users/${targetUid}`] = null
   updates[`${USER_PROFILES_PATH}/${targetUid}`] = null
   updates[`fcm_tokens/${targetUid}`] = null
+  updates[`presence/${targetUid}`] = null
   // Chỉ giữ tên (không email/SĐT) để các bản ghi cũ trỏ tới uid này vẫn hiện đúng người
   updates[`deleted_users/${targetUid}`] = {
     fullName: fullName || 'Thành viên',

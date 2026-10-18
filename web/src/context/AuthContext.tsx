@@ -18,6 +18,7 @@ import {
 } from 'firebase/auth'
 import { get, onValue, ref, update } from 'firebase/database'
 import { auth, db } from '../lib/firebase'
+import { startPresence } from '../lib/presence'
 import { resetSharedValues } from '../lib/sharedValue'
 import { PROFILE_FIELDS, USER_PROFILES_PATH } from '../lib/userProfile'
 import type { UserProfile } from '../types'
@@ -81,6 +82,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
     return unsub
   }, [])
+
+  useEffect(() => {
+    if (!user) return
+    return startPresence(user.uid)
+  }, [user])
 
   useEffect(() => {
     if (!user) return

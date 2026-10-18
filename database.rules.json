@@ -88,6 +88,13 @@
         }
       }
     },
+    "presence": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('admin').val() === true",
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "!newData.exists() || (newData.hasChildren(['at']) && newData.child('at').isNumber())"
+      }
+    },
     "deleted_users": {
       ".read": "auth != null"
     },

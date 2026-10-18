@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { QrCode } from 'lucide-react'
 import { ActivityTrendPanel } from '../components/ActivityTrendPanel'
 import { PenaltyPayDialog } from '../components/PenaltyPayDialog'
+import { RacePredictPanel } from '../components/RacePredictPanel'
 import { useAuth } from '../context/AuthContext'
 import { paceToMinutes as trendPaceToMinutes } from '../lib/activityTrends'
 import { useSharedValue } from '../lib/sharedValue'
@@ -327,6 +328,8 @@ export function StatsPage() {
           </div>
 
           <ActivityTrendPanel activities={acts} />
+
+          <RacePredictPanel activities={acts} />
 
           <ChallengeStats />
 

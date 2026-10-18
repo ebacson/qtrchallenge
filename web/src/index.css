@@ -625,6 +625,59 @@ select {
   fill: var(--ink-soft, #64748b);
 }
 
+.race-predict-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 0.75rem;
+}
+
+@media (min-width: 720px) {
+  .race-predict-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.race-predict-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.race-predict-card h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.race-predict-card dl {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.race-predict-card dl > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.race-predict-card dt {
+  font-size: 0.7rem;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.race-predict-card dd {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
 .cta-row {
   display: flex;
   flex-wrap: wrap;

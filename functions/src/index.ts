@@ -3,13 +3,16 @@ import { getAuth } from 'firebase-admin/auth'
 import { getDatabase } from 'firebase-admin/database'
 import type { PubSub } from '@google-cloud/pubsub'
 import { onRequest } from 'firebase-functions/v2/https'
-import { onValueCreated } from 'firebase-functions/v2/database'
+import { onValueCreated, onValueWritten } from 'firebase-functions/v2/database'
 import { onMessagePublished } from 'firebase-functions/v2/pubsub'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { setGlobalOptions } from 'firebase-functions/v2'
 import * as logger from 'firebase-functions/logger'
 import { deleteUserCompletely, DeleteUserError } from './adminDeleteUser'
 import { sendPushToUsers } from './fcmSend'
+import { handleDuelWritten, logDuelWrittenErr } from './onDuelWritten'
+import { runPushDailyJobs } from './pushDaily'
+import { onPenaltyPaymentWritten } from './pushPenalties'
 import { handleStravaRoute } from './stravaCore'
 import {
   handleStravaEvent,
@@ -309,6 +312,57 @@ export const onClubNotificationCreated = onValueCreated(
     } catch (err) {
       logger.error('onClubNotificationCreated push failed', err)
     }
+  },
+)
+
+const rtdb = {
+  instance: 'echiptime-default-rtdb' as const,
+  region: 'us-central1' as const,
+  memory: '512MiB' as const,
+  timeoutSeconds: 120,
+}
+
+/** Mọi thay đổi thách đấu → push (một function để tiết kiệm quota Cloud Run). */
+export const onDuelWritten = onValueWritten(
+  { ...rtdb, ref: '/duels/{duelId}', memory: '1GiB' },
+  async (event) => {
+    try {
+      await handleDuelWritten(event.params.duelId, event.data.before.val(), event.data.after.val())
+    } catch (err) {
+      logDuelWrittenErr(err)
+    }
+  },
+)
+
+/** Miễn phạt / nộp phạt → cập nhật trạng thái nhắc. */
+export const onChallengePenaltyPaymentWritten = onValueWritten(
+  { ...rtdb, ref: '/challenges/{challengeId}/penaltyPayments/{uid}' },
+  async (event) => {
+    try {
+      await onPenaltyPaymentWritten(
+        event.params.challengeId,
+        event.params.uid,
+        event.data.before.val() as Record<string, unknown> | null,
+        event.data.after.val() as Record<string, unknown> | null,
+      )
+    } catch (err) {
+      logger.error('onChallengePenaltyPaymentWritten', err)
+    }
+  },
+)
+
+/** 8:00 sáng VN: quét phạt mới, nhắc đến hạn, thách đấu sắp diễn ra. */
+export const pushDaily = onSchedule(
+  {
+    schedule: '0 8 * * *',
+    timeZone: 'Asia/Ho_Chi_Minh',
+    memory: '1GiB',
+    timeoutSeconds: 540,
+    maxInstances: 1,
+    retryCount: 0,
+  },
+  async () => {
+    await runPushDailyJobs()
   },
 )
 

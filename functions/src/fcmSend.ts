@@ -35,6 +35,34 @@ async function removeToken(uid: string, tokenId: string): Promise<void> {
   await getDatabase().ref(`fcm_tokens/${uid}/${tokenId}`).remove()
 }
 
+/** Gửi FCM tới một uid (mọi thiết bị của họ). */
+export async function sendPushToUid(
+  uid: string,
+  payload: PushPayload,
+): Promise<{ sent: number; failed: number; removed: number; devices: number }> {
+  return sendPushToUsers(payload, { onlyUid: uid })
+}
+
+/** Gửi FCM tới nhiều uid (gộp token, tránh trùng). */
+export async function sendPushToUids(
+  uids: string[],
+  payload: PushPayload,
+): Promise<{ sent: number; failed: number; removed: number; devices: number }> {
+  const unique = [...new Set(uids.filter(Boolean))]
+  let sent = 0
+  let failed = 0
+  let removed = 0
+  let devices = 0
+  for (const uid of unique) {
+    const r = await sendPushToUid(uid, payload)
+    sent += r.sent
+    failed += r.failed
+    removed += r.removed
+    devices += r.devices
+  }
+  return { sent, failed, removed, devices }
+}
+
 /** Gửi FCM tới mọi thiết bị đã đăng ký (hoặc một uid). Xóa token chết (404/410/unregistered). */
 export async function sendPushToUsers(
   payload: PushPayload,

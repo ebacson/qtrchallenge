@@ -669,6 +669,12 @@ export function parseRewardTiers(raw: unknown): RewardTier[] | undefined {
   return list.length ? list : undefined
 }
 
+/** Người trúng đã công bố: bỏ người Admin vừa quay nhưng hiệu ứng quay chưa dừng */
+export function revealedWinners(draw: RewardDraw): string[] {
+  if (draw.confirmedAt || draw.revealed == null) return draw.winners
+  return draw.winners.slice(0, draw.revealed)
+}
+
 export function parseRewardDraws(raw: unknown): RewardDraw[] | undefined {
   const list = listValues(raw).flatMap((o) => {
     const target = String(o.target ?? '')
@@ -683,6 +689,7 @@ export function parseRewardDraws(raw: unknown): RewardDraw[] | undefined {
         prizes: Array.isArray(o.prizes) ? o.prizes.map((p) => String(p ?? '')) : [],
         drawnAt: Number(o.drawnAt) || 0,
         drawnBy: String(o.drawnBy ?? ''),
+        ...(o.revealed != null ? { revealed: Math.max(0, Math.floor(Number(o.revealed) || 0)) } : {}),
         ...(Number(o.confirmedAt) > 0
           ? { confirmedAt: Number(o.confirmedAt), confirmedBy: String(o.confirmedBy ?? '') }
           : {}),
@@ -706,6 +713,7 @@ export function parsePenaltyPayments(
       confirmedBy: String(o.confirmedBy ?? ''),
       ...(o.waived === true ? { waived: true, reason: String(o.reason ?? '') } : {}),
       ...(o.memberName ? { memberName: String(o.memberName) } : {}),
+      ...(o.code ? { code: String(o.code) } : {}),
     }
   }
   return Object.keys(out).length ? out : undefined
@@ -844,4 +852,44 @@ export function challengeProgressPercent(challenge: Challenge): number {
     )
   }
   return progressPercent(challenge.progress, challenge.userTarget)
+}
+
+/** Thành viên tự tăng mục tiêu được đến hết ngày này (giờ VN) của tháng bắt đầu thử thách */
+export const TARGET_UPGRADE_LAST_DAY = 23
+
+function kmOf(value: unknown): number {
+  const n = Number(String(value ?? '').replace(/[^0-9.]/g, ''))
+  return Number.isFinite(n) ? n : 0
+}
+
+/** Mốc (ms) hết hạn tự tăng mục tiêu; null nếu thử thách bắt đầu sau ngày đó */
+export function targetUpgradeDeadlineMs(startDate: string): number | null {
+  const p = parseDayParts(startDate)
+  if (!p || p.d > TARGET_UPGRADE_LAST_DAY) return null
+  return parseChallengeDayEndInclusiveMs(`${TARGET_UPGRADE_LAST_DAY}-${p.m}-${p.y}`)
+}
+
+/**
+ * Các mục tiêu thành viên được tự tăng lên: thử thách tính km đang diễn ra, chưa hết hạn, đã đạt
+ * 100% mục tiêu hiện tại và chưa tăng lần nào (`upgradedFrom`). Chỉ các mức cao hơn số km đã chạy,
+ * để mục tiêu mới luôn còn phải chạy thêm.
+ */
+export function upgradeTargetOptions(
+  challenge: Challenge,
+  row: Record<string, unknown> | null | undefined,
+  now = Date.now(),
+): string[] {
+  if (!row || row.upgradedFrom) return []
+  if (challenge.challengeMode === 'day_quota' || challenge.challengeMode === 'activity_count') {
+    return []
+  }
+  if (calculateStatus(challenge.startDate, challenge.endDate, now) !== STATUS_ONGOING) return []
+  const deadline = targetUpgradeDeadlineMs(challenge.startDate)
+  if (deadline == null || now >= deadline) return []
+  const current = kmOf(row.userTarget)
+  const done = kmOf(row.progress)
+  if (!(current > 0) || done < current) return []
+  return challenge.targetDistances
+    .filter((t) => kmOf(t) > done)
+    .sort((a, b) => kmOf(a) - kmOf(b))
 }

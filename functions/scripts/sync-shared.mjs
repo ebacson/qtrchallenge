@@ -8,6 +8,7 @@ const FILES = [
   ['../web/src/lib/levelCalculator.ts', 'src/shared/levelCalculator.ts'],
   ['../web/src/lib/progressCompute.ts', 'src/shared/progressCompute.ts'],
   ['../web/src/lib/userProfile.ts', 'src/shared/userProfile.ts'],
+  ['../web/src/lib/rewardPenalty.ts', 'src/shared/rewardPenalty.ts'],
   ['../web/src/types/index.ts', 'src/types/index.ts'],
 ]
 

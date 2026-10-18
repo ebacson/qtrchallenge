@@ -91,6 +91,8 @@ export interface RewardDraw {
   prizes: string[]
   drawnAt: number
   drawnBy: string
+  /** Số người trúng đã quay xong hiệu ứng (người sau đó đang quay, chưa công bố); thiếu = tất cả */
+  revealed?: number
   /** Admin xác nhận kết quả: từ đó không được quay lại hay xóa */
   confirmedAt?: number
   confirmedBy?: string
@@ -107,6 +109,8 @@ export interface PenaltyPayment {
   reason?: string
   /** Tên thành viên lúc ghi nhận, để sổ sách vẫn hiện đúng tên khi tài khoản đã bị xóa */
   memberName?: string
+  /** Mã nộp phạt (nội dung chuyển khoản) lúc xác nhận */
+  code?: string
 }
 
 export interface Challenge {

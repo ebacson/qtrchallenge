@@ -6,11 +6,7 @@ import {
   MemberTypeFilter,
   type MemberType,
 } from '../components/MemberTypeFilter'
-import {
-  matchesOnlineFilter,
-  MemberOnlineFilter,
-  type OnlineFilter,
-} from '../components/MemberOnlineFilter'
+import { MemberOnlineFilter } from '../components/MemberOnlineFilter'
 import { useAuth } from '../context/AuthContext'
 import { deleteUserAvatar } from '../lib/adminOps'
 import { runAdminDeleteUser, runAdminFullSync, type FullSyncSummary } from '../lib/adminSync'
@@ -103,7 +99,7 @@ export function AdminUsersPage() {
   const loading = profiles === null
   const [q, setQ] = useState('')
   const [memberType, setMemberType] = useState<MemberType>('all')
-  const [onlineFilter, setOnlineFilter] = useState<OnlineFilter>('all')
+  const [onlineOnly, setOnlineOnly] = useState(false)
   const presence = useSharedValue<Record<string, { at?: number }>>(PRESENCE_PATH)
   const onlineIds = useMemo(() => new Set(Object.keys(presence ?? {})), [presence])
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -200,7 +196,7 @@ export function AdminUsersPage() {
     const needle = q.trim().toLowerCase()
     return users.filter((u) => {
       if (!matchesMemberType(u.member, memberType)) return false
-      if (!matchesOnlineFilter(onlineIds.has(u.id), onlineFilter)) return false
+      if (onlineOnly && !onlineIds.has(u.id)) return false
       if (!needle) return true
       return (
         u.fullName.toLowerCase().includes(needle) ||
@@ -209,7 +205,7 @@ export function AdminUsersPage() {
         u.phone.replace(/\s/g, '').includes(needle.replace(/\s/g, ''))
       )
     })
-  }, [users, q, memberType, onlineFilter, onlineIds])
+  }, [users, q, memberType, onlineOnly, onlineIds])
 
   /** Cảnh báo khoản phạt chưa nộp trước khi chuyển Tự do hoặc xóa */
   function unpaidPenaltyWarning(target: AdminUser, action: 'chuyển' | 'xóa' = 'chuyển'): string {
@@ -468,13 +464,7 @@ export function AdminUsersPage() {
       )}
 
       <MemberTypeFilter value={memberType} onChange={setMemberType} items={users} />
-      <MemberOnlineFilter
-        value={onlineFilter}
-        onChange={setOnlineFilter}
-        total={users.length}
-        onlineCount={onlineCount}
-        offlineCount={Math.max(0, users.length - onlineCount)}
-      />
+      <MemberOnlineFilter active={onlineOnly} onChange={setOnlineOnly} onlineCount={onlineCount} />
 
       <label className="search-field">
         Tìm kiếm
@@ -518,11 +508,9 @@ export function AdminUsersPage() {
                       >
                         {u.member ? 'Chính thức' : 'Tự do'}
                       </span>
-                      <span
-                        className={`presence-badge ${onlineIds.has(u.id) ? 'online' : 'offline'}`}
-                      >
-                        {onlineIds.has(u.id) ? 'Online' : 'Offline'}
-                      </span>
+                      {onlineIds.has(u.id) && (
+                        <span className="presence-badge online">Online</span>
+                      )}
                       <span className="level-badge level-bronze">
                         Lv {u.level}
                       </span>

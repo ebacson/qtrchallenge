@@ -44,7 +44,7 @@ export function ActivityTrendPanel({ trends }: { trends: TrendSummary }) {
     return (
       <section className="section panel">
         <h2>Xu hướng</h2>
-        <p className="tiny muted">Chưa đủ hoạt động Run / TrailRun / Walk để vẽ xu hướng.</p>
+        <p className="tiny muted">Chưa đủ hoạt động Run / TrailRun / Walk để đánh giá xu hướng.</p>
       </section>
     )
   }

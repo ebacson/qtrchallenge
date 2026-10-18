@@ -145,13 +145,14 @@ function AppRoutes() {
           }
         />
         <Route
-          path="admin/test-push"
+          path="admin/send-push"
           element={
             <RequireAdmin>
               <TestPushPage />
             </RequireAdmin>
           }
         />
+        <Route path="admin/test-push" element={<Navigate to="/admin/send-push" replace />} />
         <Route path="admin/gifts" element={<Navigate to="/gifts" replace />} />
         <Route path="admin/draw-test" element={<Navigate to="/lucky-draw" replace />} />
         <Route

@@ -212,8 +212,8 @@ export function ProfilePage() {
             <Link className="btn ghost compact" to="/lucky-draw">
               Quay số may mắn
             </Link>
-            <Link className="btn ghost compact" to="/admin/test-push">
-              Thử thông báo
+            <Link className="btn ghost compact" to="/admin/send-push">
+              Gửi thông báo
             </Link>
           </div>
         </div>

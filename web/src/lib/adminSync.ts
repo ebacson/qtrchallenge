@@ -87,7 +87,15 @@ export type SendPushSummary = {
 
 export async function runAdminSendPush(
   idToken: string,
-  body: { title: string; body: string; url?: string; onlySelf?: boolean },
+  body: {
+    title: string
+    body: string
+    url?: string
+    /** Gửi tới các uid đã chọn */
+    uids?: string[]
+    /** Gửi tới mọi thiết bị đã bật thông báo */
+    broadcast?: boolean
+  },
 ): Promise<SendPushSummary> {
   return (await callAdminFunction(
     'adminSendPush',

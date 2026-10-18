@@ -4032,6 +4032,24 @@ code {
   gap: 8px;
 }
 
+.push-audience {
+  margin: 0 0 0.75rem;
+  padding: 0;
+  border: none;
+}
+
+.push-audience legend {
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.push-audience .admin-pr-verify {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.25rem;
+}
+
 .auth-form label.admin-pr-verify {
   flex-direction: row;
   align-items: center;

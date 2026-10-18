@@ -417,7 +417,7 @@ export const pushDaily = onSchedule(
   },
 )
 
-/** Admin gửi thử push (trang /admin/test-push). */
+/** Admin gửi push (trang /admin/send-push). */
 export const adminSendPush = onRequest(
   {
     cors: false,
@@ -456,18 +456,34 @@ export const adminSendPush = onRequest(
     }
     const isAdmin = (await getDatabase().ref(`users/${uid}/admin`).get()).val() === true
     if (!isAdmin) {
-      res.status(403).json({ error: 'Chỉ Admin mới được gửi thử thông báo đẩy.' })
+      res.status(403).json({ error: 'Chỉ Admin mới được gửi thông báo đẩy.' })
       return
     }
 
     const body = typeof req.body === 'object' && req.body ? (req.body as Record<string, unknown>) : {}
-    const title = String(body.title ?? 'QTR Challenge — thử').trim() || 'QTR Challenge — thử'
-    const text = String(body.body ?? 'Đây là thông báo thử từ admin.').trim()
-    const onlySelf = body.onlySelf === true
+    const title = String(body.title ?? 'QTR Challenge').trim() || 'QTR Challenge'
+    const text = String(body.body ?? '').trim()
+    if (!text) {
+      res.status(400).json({ error: 'Thiếu nội dung thông báo.' })
+      return
+    }
+    const rawUids = Array.isArray(body.uids) ? body.uids : []
+    const uids = [
+      ...new Set(rawUids.map((u) => String(u ?? '').trim()).filter((u) => u.length > 0 && u.length < 128)),
+    ]
+    const broadcast = body.broadcast === true
+    if (!broadcast && !uids.length) {
+      res.status(400).json({ error: 'Chọn ít nhất một thành viên, hoặc gửi tất cả.' })
+      return
+    }
+    if (uids.length > 500) {
+      res.status(400).json({ error: 'Tối đa 500 người mỗi lần gửi.' })
+      return
+    }
     try {
       const result = await sendPushToUsers(
-        { title, body: text, url: String(body.url ?? '/notifications'), tag: 'qtr-test-push' },
-        onlySelf ? { onlyUid: uid } : undefined,
+        { title, body: text, url: String(body.url ?? '/notifications'), tag: 'qtr-admin-push' },
+        broadcast ? undefined : { onlyUids: uids },
       )
       res.json({ ok: true, ...result })
     } catch (err) {

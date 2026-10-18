@@ -9,7 +9,7 @@ export function RacePredictPanel({ activities }: { activities: ActivityLike[] })
       <h2>Dự đoán thành tích</h2>
       {!result ? (
         <p className="tiny muted">
-          Cần ít nhất một buổi Run / TrailRun ≥ 3 km trong 12 tuần gần đây để ước tính.
+          Chưa đủ dữ liệu để ước tính.
         </p>
       ) : (
         <div className="race-predict-grid">

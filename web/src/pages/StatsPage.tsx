@@ -1,10 +1,11 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { QrCode } from 'lucide-react'
+import { ActivityTrendPanel } from '../components/ActivityTrendPanel'
 import { PenaltyPayDialog } from '../components/PenaltyPayDialog'
 import { useAuth } from '../context/AuthContext'
+import { buildActivityTrends, paceToMinutes as trendPaceToMinutes } from '../lib/activityTrends'
 import { useSharedValue } from '../lib/sharedValue'
-import { timeToSeconds } from '../lib/prRanking'
 import { STATUS_FINISHED, STATUS_ONGOING } from '../lib/challengeRules'
 import { useMyChallengeEntries, type MyChallengeEntry } from '../lib/myChallengeStats'
 import { completionPercent, formatVnd, REWARD_START_YEAR } from '../lib/rewardPenalty'
@@ -19,8 +20,7 @@ type Act = {
 const STAT_TYPES = new Set(['Run', 'TrailRun', 'Walk'])
 
 function paceToMinutes(pace: string): number {
-  const sec = timeToSeconds(pace.length === 5 ? `0:${pace}` : pace)
-  return sec === Number.POSITIVE_INFINITY ? -1 : sec / 60
+  return trendPaceToMinutes(pace)
 }
 
 type ChallengeEntry = MyChallengeEntry
@@ -284,6 +284,8 @@ export function StatsPage() {
     }
   }, [acts])
 
+  const trends = useMemo(() => buildActivityTrends(acts), [acts])
+
   return (
     <div className="page">
       <header className="page-header">
@@ -325,6 +327,8 @@ export function StatsPage() {
               <span>Level</span>
             </div>
           </div>
+
+          <ActivityTrendPanel trends={trends} />
 
           <ChallengeStats />
 

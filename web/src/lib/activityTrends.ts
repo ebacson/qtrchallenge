@@ -1,4 +1,4 @@
-import { activityDayMs } from './challengeRules'
+import { activityDayMs, parseChallengeDayStartMs } from './challengeRules'
 
 const DAY_MS = 86_400_000
 const WEEK_MS = 7 * DAY_MS
@@ -6,6 +6,7 @@ const WEEK_MS = 7 * DAY_MS
 const VOLUME_DELTA = 0.1
 const PACE_DELTA = 0.03
 
+export type TrendPeriod = 'week' | 'month' | 'year'
 export type TrendDirection = 'up' | 'down' | 'stable' | 'unknown'
 
 export type ActivityLike = {
@@ -15,9 +16,8 @@ export type ActivityLike = {
   startDate: string
 }
 
-export type WeekBucket = {
-  /** ms đầu tuần (Thứ 2 00:00 VN) */
-  weekStartMs: number
+export type PeriodBucket = {
+  startMs: number
   label: string
   km: number
   sessions: number
@@ -26,13 +26,46 @@ export type WeekBucket = {
 }
 
 export type TrendSummary = {
+  period: TrendPeriod
   volume: { direction: TrendDirection; label: string; detail: string }
   pace: { direction: TrendDirection; label: string; detail: string }
   sessions: { direction: TrendDirection; label: string; detail: string }
-  weeks: WeekBucket[]
+  buckets: PeriodBucket[]
+  /** Số cột cuối được tô đậm (nhóm “gần đây”) */
+  recentBarCount: number
+  chartCaption: string
 }
 
 const STAT_TYPES = new Set(['Run', 'TrailRun', 'Walk'])
+
+const PERIOD_META: Record<
+  TrendPeriod,
+  {
+    unit: string
+    bucketCount: number
+    compareCount: number
+    chartCaption: string
+  }
+> = {
+  week: {
+    unit: 'tuần',
+    bucketCount: 12,
+    compareCount: 4,
+    chartCaption: 'Km / tuần',
+  },
+  month: {
+    unit: 'tháng',
+    bucketCount: 12,
+    compareCount: 3,
+    chartCaption: 'Km / tháng',
+  },
+  year: {
+    unit: 'năm',
+    bucketCount: 5,
+    compareCount: 1,
+    chartCaption: 'Km / năm',
+  },
+}
 
 export function paceToMinutes(pace: string): number {
   const parts = pace.trim().split(':').map(Number)
@@ -52,7 +85,28 @@ export function formatPaceMinutes(mins: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-/** Đầu tuần Thứ 2 00:00 VN từ một ngày activity (ms) */
+function vnYmdParts(ms: number): { y: number; m: number; d: number } {
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(ms))
+  const [y, m, d] = fmt.split('-').map(Number)
+  return { y, m, d }
+}
+
+function dayStartFromParts(y: number, m: number, d: number): number {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return parseChallengeDayStartMs(`${pad(d)}-${pad(m)}-${y}`) ?? 0
+}
+
+function todayStartMs(now: number): number {
+  const { y, m, d } = vnYmdParts(now)
+  return dayStartFromParts(y, m, d)
+}
+
+/** Đầu tuần Thứ 2 00:00 VN */
 export function weekStartFromDayMs(dayMs: number): number {
   const vn = new Date(dayMs + 7 * 60 * 60 * 1000)
   const dow = vn.getUTCDay()
@@ -60,17 +114,51 @@ export function weekStartFromDayMs(dayMs: number): number {
   return dayMs - mondayOffset * DAY_MS
 }
 
-function weekLabel(weekStartMs: number): string {
-  const vn = new Date(weekStartMs + 7 * 60 * 60 * 1000)
-  const d = vn.getUTCDate()
-  const m = vn.getUTCMonth() + 1
-  return `${d}/${m}`
+function monthStartFromDayMs(dayMs: number): number {
+  const { y, m } = vnYmdParts(dayMs)
+  return dayStartFromParts(y, m, 1)
+}
+
+function yearStartFromDayMs(dayMs: number): number {
+  const { y } = vnYmdParts(dayMs)
+  return dayStartFromParts(y, 1, 1)
+}
+
+function addMonths(startMs: number, delta: number): number {
+  const { y, m } = vnYmdParts(startMs)
+  const idx = y * 12 + (m - 1) + delta
+  const ny = Math.floor(idx / 12)
+  const nm = (idx % 12) + 1
+  return dayStartFromParts(ny, nm, 1)
+}
+
+function addYears(startMs: number, delta: number): number {
+  const { y } = vnYmdParts(startMs)
+  return dayStartFromParts(y + delta, 1, 1)
+}
+
+function periodStart(dayMs: number, period: TrendPeriod): number {
+  if (period === 'week') return weekStartFromDayMs(dayMs)
+  if (period === 'month') return monthStartFromDayMs(dayMs)
+  return yearStartFromDayMs(dayMs)
+}
+
+function shiftPeriod(startMs: number, period: TrendPeriod, delta: number): number {
+  if (period === 'week') return startMs + delta * WEEK_MS
+  if (period === 'month') return addMonths(startMs, delta)
+  return addYears(startMs, delta)
+}
+
+function bucketLabel(startMs: number, period: TrendPeriod): string {
+  const { y, m, d } = vnYmdParts(startMs)
+  if (period === 'week') return `${d}/${m}`
+  if (period === 'month') return `${m}/${String(y).slice(2)}`
+  return String(y)
 }
 
 function directionFromDelta(
   recent: number,
   previous: number,
-  /** true = giá trị lớn hơn là “tốt/tăng” (km, buổi); false = nhỏ hơn là tốt hơn (pace) */
   higherIsUp: boolean,
 ): TrendDirection {
   if (!(previous > 0) && !(recent > 0)) return 'unknown'
@@ -79,7 +167,6 @@ function directionFromDelta(
   const threshold = higherIsUp ? VOLUME_DELTA : PACE_DELTA
   if (Math.abs(delta) < threshold) return 'stable'
   if (higherIsUp) return delta > 0 ? 'up' : 'down'
-  // pace: giảm phút = nhanh hơn → coi là "up" (cải thiện)
   return delta < 0 ? 'up' : 'down'
 }
 
@@ -109,45 +196,36 @@ function avg(nums: number[]): number {
   return nums.reduce((a, b) => a + b, 0) / nums.length
 }
 
-/** 12 tuần gần nhất + so 4 tuần gần vs 4 tuần trước */
 export function buildActivityTrends(
   activities: ActivityLike[],
+  period: TrendPeriod = 'week',
   now = Date.now(),
-  weekCount = 12,
 ): TrendSummary {
-  const todayStart = (() => {
-    const fmt = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Asia/Ho_Chi_Minh',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(new Date(now))
-    // en-CA → yyyy-MM-dd; activityDayMs expects dd-MM-yyyy
-    const [y, m, d] = fmt.split('-')
-    return activityDayMs(`${d}-${m}-${y}`) ?? weekStartFromDayMs(now)
-  })()
-  const thisWeek = weekStartFromDayMs(todayStart)
+  const meta = PERIOD_META[period]
+  const today = todayStartMs(now)
+  const current = periodStart(today, period)
 
-  const weeks: WeekBucket[] = []
-  for (let i = weekCount - 1; i >= 0; i--) {
-    const weekStartMs = thisWeek - i * WEEK_MS
-    weeks.push({
-      weekStartMs,
-      label: weekLabel(weekStartMs),
+  const buckets: PeriodBucket[] = []
+  for (let i = meta.bucketCount - 1; i >= 0; i--) {
+    const startMs = shiftPeriod(current, period, -i)
+    buckets.push({
+      startMs,
+      label: bucketLabel(startMs, period),
       km: 0,
       sessions: 0,
       avgPaceMin: 0,
     })
   }
-  const byStart = new Map(weeks.map((w) => [w.weekStartMs, w]))
+
+  const byStart = new Map(buckets.map((b) => [b.startMs, b]))
   const paceSums = new Map<number, { sum: number; n: number }>()
 
   for (const a of activities) {
     if (!STAT_TYPES.has(a.type)) continue
     const dayMs = activityDayMs(a.startDate)
     if (dayMs == null) continue
-    const ws = weekStartFromDayMs(dayMs)
-    const bucket = byStart.get(ws)
+    const key = periodStart(dayMs, period)
+    const bucket = byStart.get(key)
     if (!bucket) continue
     const km = Number(a.distance) || 0
     if (km > 0) {
@@ -156,26 +234,28 @@ export function buildActivityTrends(
     }
     const p = paceToMinutes(a.pace)
     if (p > 0 && km > 0) {
-      const acc = paceSums.get(ws) ?? { sum: 0, n: 0 }
+      const acc = paceSums.get(key) ?? { sum: 0, n: 0 }
       acc.sum += p
       acc.n += 1
-      paceSums.set(ws, acc)
+      paceSums.set(key, acc)
     }
   }
-  for (const w of weeks) {
-    const acc = paceSums.get(w.weekStartMs)
-    w.avgPaceMin = acc && acc.n > 0 ? acc.sum / acc.n : 0
-    w.km = Math.round(w.km * 10) / 10
+
+  for (const b of buckets) {
+    const acc = paceSums.get(b.startMs)
+    b.avgPaceMin = acc && acc.n > 0 ? acc.sum / acc.n : 0
+    b.km = Math.round(b.km * 10) / 10
   }
 
-  const recent = weeks.slice(-4)
-  const previous = weeks.slice(-8, -4)
-  const recentKm = avg(recent.map((w) => w.km))
-  const prevKm = avg(previous.map((w) => w.km))
-  const recentSessions = avg(recent.map((w) => w.sessions))
-  const prevSessions = avg(previous.map((w) => w.sessions))
-  const recentPace = avg(recent.map((w) => w.avgPaceMin).filter((p) => p > 0))
-  const prevPace = avg(previous.map((w) => w.avgPaceMin).filter((p) => p > 0))
+  const n = meta.compareCount
+  const recent = buckets.slice(-n)
+  const previous = buckets.slice(-2 * n, -n)
+  const recentKm = avg(recent.map((b) => b.km))
+  const prevKm = avg(previous.map((b) => b.km))
+  const recentSessions = avg(recent.map((b) => b.sessions))
+  const prevSessions = avg(previous.map((b) => b.sessions))
+  const recentPace = avg(recent.map((b) => b.avgPaceMin).filter((p) => p > 0))
+  const prevPace = avg(previous.map((b) => b.avgPaceMin).filter((p) => p > 0))
 
   const volDir = directionFromDelta(recentKm, prevKm, true)
   const sessDir = directionFromDelta(recentSessions, prevSessions, true)
@@ -187,30 +267,36 @@ export function buildActivityTrends(
     return d === 0 ? '' : ` (${d > 0 ? '+' : ''}${d}%)`
   }
 
+  const unit = meta.unit
+  const needMore = `Cần thêm hoạt động vài ${unit} gần đây.`
+
   return {
-    weeks,
+    period,
+    buckets,
+    recentBarCount: n,
+    chartCaption: meta.chartCaption,
     volume: {
       direction: volDir,
       label: volumeLabel(volDir),
       detail:
         volDir === 'unknown'
-          ? 'Cần thêm hoạt động vài tuần gần đây.'
-          : `${recentKm.toFixed(1)} km/tuần · trước ${prevKm.toFixed(1)}${pct(recentKm, prevKm)}`,
+          ? needMore
+          : `${recentKm.toFixed(1)} km/${unit} · trước ${prevKm.toFixed(1)}${pct(recentKm, prevKm)}`,
     },
     sessions: {
       direction: sessDir,
       label: sessionsLabel(sessDir),
       detail:
         sessDir === 'unknown'
-          ? 'Cần thêm hoạt động vài tuần gần đây.'
-          : `${recentSessions.toFixed(1)} buổi/tuần · trước ${prevSessions.toFixed(1)}${pct(recentSessions, prevSessions)}`,
+          ? needMore
+          : `${recentSessions.toFixed(1)} buổi/${unit} · trước ${prevSessions.toFixed(1)}${pct(recentSessions, prevSessions)}`,
     },
     pace: {
       direction: paceDir,
       label: paceLabel(paceDir),
       detail:
         paceDir === 'unknown'
-          ? 'Cần pace hợp lệ trong vài tuần gần đây.'
+          ? `Cần pace hợp lệ trong vài ${unit} gần đây.`
           : `${formatPaceMinutes(recentPace)}/km · trước ${formatPaceMinutes(prevPace)}`,
     },
   }

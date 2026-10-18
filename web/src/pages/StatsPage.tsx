@@ -4,7 +4,7 @@ import { QrCode } from 'lucide-react'
 import { ActivityTrendPanel } from '../components/ActivityTrendPanel'
 import { PenaltyPayDialog } from '../components/PenaltyPayDialog'
 import { useAuth } from '../context/AuthContext'
-import { buildActivityTrends, paceToMinutes as trendPaceToMinutes } from '../lib/activityTrends'
+import { paceToMinutes as trendPaceToMinutes } from '../lib/activityTrends'
 import { useSharedValue } from '../lib/sharedValue'
 import { STATUS_FINISHED, STATUS_ONGOING } from '../lib/challengeRules'
 import { useMyChallengeEntries, type MyChallengeEntry } from '../lib/myChallengeStats'
@@ -284,8 +284,6 @@ export function StatsPage() {
     }
   }, [acts])
 
-  const trends = useMemo(() => buildActivityTrends(acts), [acts])
-
   return (
     <div className="page">
       <header className="page-header">
@@ -328,7 +326,7 @@ export function StatsPage() {
             </div>
           </div>
 
-          <ActivityTrendPanel trends={trends} />
+          <ActivityTrendPanel activities={acts} />
 
           <ChallengeStats />
 

@@ -18,7 +18,6 @@ import {
 } from 'firebase/auth'
 import { get, onValue, ref, update } from 'firebase/database'
 import { auth, db } from '../lib/firebase'
-import { unsubscribeUser } from '../lib/pushNotifications'
 import { resetSharedValues } from '../lib/sharedValue'
 import { PROFILE_FIELDS, USER_PROFILES_PATH } from '../lib/userProfile'
 import type { UserProfile } from '../types'
@@ -165,15 +164,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  /** Không hủy FCM khi logout — user chỉ tắt thông báo thủ công trong Hồ sơ. */
   const logout = useCallback(async () => {
-    const uid = auth.currentUser?.uid
-    if (uid) {
-      try {
-        await unsubscribeUser(uid)
-      } catch {
-        // Vẫn đăng xuất dù tắt push trên thiết bị lỗi
-      }
-    }
     await signOut(auth)
   }, [])
 

@@ -105,17 +105,17 @@ export function listenForegroundMessages(onPayload?: (title: string, body: strin
     try {
       const messaging = getMessaging(app)
       unsub = onMessage(messaging, (payload) => {
-        const title = payload.notification?.title || payload.data?.title || 'QTR Challenge'
-        const body = payload.notification?.body || payload.data?.body || ''
+        const title = payload.data?.title || payload.notification?.title || 'QTR Challenge'
+        const body = payload.data?.body || payload.notification?.body || ''
+        const url = payload.data?.url || '/notifications'
+        const tag = payload.data?.tag || 'qtr-push'
         onPayload?.(title, body)
-        if (Notification.permission === 'granted') {
-          const url = payload.data?.url || '/notifications'
-          const n = new Notification(title, { body, icon: '/icon-192.png', data: { url } })
-          n.onclick = () => {
-            window.focus()
-            if (url.startsWith('/')) window.location.assign(url)
-            n.close()
-          }
+        if (Notification.permission !== 'granted') return
+        const n = new Notification(title, { body, icon: '/icon-192.png', tag, data: { url } })
+        n.onclick = () => {
+          window.focus()
+          if (url.startsWith('/')) window.location.assign(url)
+          n.close()
         }
       })
     } catch {

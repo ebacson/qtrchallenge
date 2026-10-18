@@ -16,17 +16,18 @@ firebase.initializeApp({
 const messaging = firebase.messaging()
 
 messaging.onBackgroundMessage((payload) => {
-  const title = payload.notification?.title || payload.data?.title || 'QTR Challenge'
-  const body = payload.notification?.body || payload.data?.body || ''
+  const title = payload.data?.title || payload.notification?.title || 'QTR Challenge'
+  const body = payload.data?.body || payload.notification?.body || ''
   const url = payload.data?.url || '/notifications'
-  const options = {
+  const tag = payload.data?.tag || 'qtr-push'
+  return self.registration.showNotification(title, {
     body,
     icon: '/icon-192.png',
     badge: '/favicon.png',
     data: { url },
-    tag: payload.data?.tag || 'qtr-push',
-  }
-  self.registration.showNotification(title, options)
+    tag,
+    renotify: true,
+  })
 })
 
 self.addEventListener('notificationclick', (event) => {

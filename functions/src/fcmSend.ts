@@ -17,12 +17,15 @@ async function collectTokens(onlyUid?: string): Promise<TokenRow[]> {
     ? { [onlyUid]: (await db.ref(`fcm_tokens/${onlyUid}`).get()).val() }
     : ((await db.ref('fcm_tokens').get()).val() as Record<string, unknown> | null)
   const out: TokenRow[] = []
+  const seen = new Set<string>()
   for (const [uid, byId] of Object.entries(root ?? {})) {
     if (!byId || typeof byId !== 'object') continue
     for (const [tokenId, raw] of Object.entries(byId as Record<string, unknown>)) {
       const row = raw && typeof raw === 'object' ? (raw as { token?: unknown }) : null
       const token = typeof row?.token === 'string' ? row.token.trim() : ''
-      if (token) out.push({ uid, tokenId, token })
+      if (!token || seen.has(token)) continue
+      seen.add(token)
+      out.push({ uid, tokenId, token })
     }
   }
   return out
@@ -51,18 +54,14 @@ export async function sendPushToUsers(
 
   for (let i = 0; i < rows.length; i += 500) {
     const batch = rows.slice(i, i + 500)
+    // Chỉ gửi `data` — không kèm `notification` để trình duyệt/FCM không tự hiện thêm một bản
+    // (SW `onBackgroundMessage` / client `onMessage` tự showNotification).
     const message: MulticastMessage = {
       tokens: batch.map((r) => r.token),
-      notification: { title, body },
       data: { title, body, url, tag },
       webpush: {
         fcmOptions: { link: url },
-        notification: {
-          title,
-          body,
-          icon: '/icon-192.png',
-          badge: '/favicon.png',
-        },
+        headers: { Urgency: 'high' },
       },
     }
     const res = await messaging.sendEachForMulticast(message)

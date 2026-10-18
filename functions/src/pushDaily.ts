@@ -1,9 +1,11 @@
 import * as logger from 'firebase-functions/logger'
+import { scanChallengeCalendar } from './pushChallenges'
 import { notifyUpcomingDuels, processDuelReminder } from './pushDuels'
+import { processDuesReminder, scanUnpaidDues } from './pushDues'
 import { processPenaltyReminder, scanUnpaidPenalties } from './pushPenalties'
 import { listDueReminders, patchPushState } from './pushState'
 
-/** Chạy mỗi ngày: nhắc đến hạn + thách đấu sắp diễn ra + quét phạt mới. */
+/** Chạy mỗi ngày: nhắc đến hạn + thách đấu/thử thách/quỹ sắp tới + quét phạt mới. */
 export async function runPushDailyJobs(): Promise<void> {
   const now = Date.now()
   try {
@@ -14,10 +16,24 @@ export async function runPushDailyJobs(): Promise<void> {
   }
 
   try {
+    const calendar = await scanChallengeCalendar(now)
+    logger.info('pushDaily challenge calendar', calendar)
+  } catch (err) {
+    logger.error('pushDaily challenge calendar failed', err)
+  }
+
+  try {
     const penalties = await scanUnpaidPenalties(now)
     logger.info('pushDaily penalty scan', penalties)
   } catch (err) {
     logger.error('pushDaily penalty scan failed', err)
+  }
+
+  try {
+    const dues = await scanUnpaidDues(now)
+    logger.info('pushDaily dues scan', dues)
+  } catch (err) {
+    logger.error('pushDaily dues scan failed', err)
   }
 
   try {
@@ -27,6 +43,7 @@ export async function runPushDailyJobs(): Promise<void> {
       try {
         let ok = false
         if (row.kind === 'penalty') ok = await processPenaltyReminder(key, row)
+        else if (row.kind === 'dues') ok = await processDuesReminder(key, row)
         else if (
           row.kind === 'duel_invite' ||
           row.kind === 'duel_withdraw' ||

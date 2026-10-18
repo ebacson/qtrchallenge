@@ -14,6 +14,7 @@ import {
   STATUS_FINISHED,
   STATUS_ONGOING,
 } from './shared/challengeRules'
+import { notifyLevelUp, notifyStravaAuthError } from './pushPersonal'
 import { calculateLevelFromChallenges } from './shared/levelCalculator'
 import { computeUserChallengeUpdate } from './shared/progressCompute'
 import { pickProfile, PROFILE_FIELDS, USER_PROFILES_PATH } from './shared/userProfile'
@@ -389,6 +390,19 @@ export async function syncSingleUser(uid: string, fetchStrava: boolean): Promise
         [`${USER_PROFILES_PATH}/${uid}/level`]: level,
       })
       levelChanged = true
+      try {
+        await notifyLevelUp(uid, level)
+      } catch (err) {
+        logger.error('notifyLevelUp failed', { uid, level, err })
+      }
+    }
+  }
+
+  if (stravaError) {
+    try {
+      await notifyStravaAuthError(uid, stravaError)
+    } catch (err) {
+      logger.error('notifyStravaAuthError failed', { uid, err })
     }
   }
 

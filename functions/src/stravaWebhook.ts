@@ -1,5 +1,6 @@
 import { getDatabase } from 'firebase-admin/database'
 import * as logger from 'firebase-functions/logger'
+import { notifyStravaDeauthorized } from './pushPersonal'
 import { USER_PROFILES_PATH } from './shared/userProfile'
 import { syncSingleUser } from './syncAll'
 
@@ -85,6 +86,17 @@ export async function handleStravaEvent(event: StravaWebhookEvent): Promise<void
   const athleteId = String(event.owner_id)
   if (event.object_type === 'athlete') {
     logger.info('Strava athlete event', { athleteId, updates: event.updates })
+    const authorized = event.updates?.authorized
+    if (authorized === 'false' || authorized === false) {
+      const uid = await findUidByAthlete(athleteId)
+      if (uid) {
+        try {
+          await notifyStravaDeauthorized(uid)
+        } catch (err) {
+          logger.error('notifyStravaDeauthorized failed', { uid, err })
+        }
+      }
+    }
     return
   }
 

@@ -11,7 +11,9 @@ import * as logger from 'firebase-functions/logger'
 import { deleteUserCompletely, DeleteUserError } from './adminDeleteUser'
 import { sendPushToUsers } from './fcmSend'
 import { handleDuelWritten, logDuelWrittenErr } from './onDuelWritten'
+import { onChallengeCreated, onRewardDrawWritten } from './pushChallenges'
 import { runPushDailyJobs } from './pushDaily'
+import { onDuesMemberWritten } from './pushDues'
 import { onPenaltyPaymentWritten } from './pushPenalties'
 import { handleStravaRoute } from './stravaCore'
 import {
@@ -351,7 +353,56 @@ export const onChallengePenaltyPaymentWritten = onValueWritten(
   },
 )
 
-/** 8:00 sáng VN: quét phạt mới, nhắc đến hạn, thách đấu sắp diễn ra. */
+/** Thử thách mới → broadcast. */
+export const onChallengeCreatedPush = onValueCreated(
+  { ...rtdb, ref: '/challenges/{challengeId}' },
+  async (event) => {
+    try {
+      await onChallengeCreated(
+        event.params.challengeId,
+        event.data.val() as Record<string, unknown> | null,
+      )
+    } catch (err) {
+      logger.error('onChallengeCreatedPush', err)
+    }
+  },
+)
+
+/** Xác nhận quay thưởng → báo người trúng. */
+export const onRewardDrawWrittenPush = onValueWritten(
+  { ...rtdb, ref: '/challenges/{challengeId}/rewardDraws/{index}' },
+  async (event) => {
+    try {
+      await onRewardDrawWritten(
+        event.params.challengeId,
+        event.params.index,
+        event.data.before.val() as Record<string, unknown> | null,
+        event.data.after.val() as Record<string, unknown> | null,
+      )
+    } catch (err) {
+      logger.error('onRewardDrawWrittenPush', err)
+    }
+  },
+)
+
+/** Nộp / miễn quỹ CLB → báo thành viên. */
+export const onDuesMemberWrittenPush = onValueWritten(
+  { ...rtdb, ref: '/finance/dues/{year}/members/{uid}' },
+  async (event) => {
+    try {
+      await onDuesMemberWritten(
+        event.params.year,
+        event.params.uid,
+        event.data.before.val() as Record<string, unknown> | null,
+        event.data.after.val() as Record<string, unknown> | null,
+      )
+    } catch (err) {
+      logger.error('onDuesMemberWrittenPush', err)
+    }
+  },
+)
+
+/** 8:00 sáng VN: quét phạt/quỹ, nhắc đến hạn, thử thách/thách đấu sắp tới. */
 export const pushDaily = onSchedule(
   {
     schedule: '0 8 * * *',

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { AdminMemberDetailDialog } from '../components/AdminMemberDetailDialog'
 import { AdminUserAchievements } from '../components/AdminUserAchievements'
 import {
   matchesMemberType,
@@ -100,6 +101,7 @@ export function AdminUsersPage() {
   const [q, setQ] = useState('')
   const [memberType, setMemberType] = useState<MemberType>('all')
   const [onlineOnly, setOnlineOnly] = useState(false)
+  const [detailUid, setDetailUid] = useState<string | null>(null)
   const presence = useSharedValue<Record<string, { at?: number }>>(PRESENCE_PATH)
   // Node presence không được heartbeat quá lâu được coi là offline (node mồ côi)
   const [presenceNow, setPresenceNow] = useState(() => Date.now())
@@ -223,6 +225,8 @@ export function AdminUsersPage() {
       )
     })
   }, [users, q, memberType, onlineOnly, onlineIds])
+
+  const detailUser = detailUid ? (users.find((u) => u.id === detailUid) ?? null) : null
 
   /** Cảnh báo khoản phạt chưa nộp trước khi chuyển Tự do hoặc xóa */
   function unpaidPenaltyWarning(target: AdminUser, action: 'chuyển' | 'xóa' = 'chuyển'): string {
@@ -630,6 +634,13 @@ export function AdminUsersPage() {
                   <button
                     type="button"
                     className="btn ghost compact"
+                    onClick={() => setDetailUid(u.id)}
+                  >
+                    Chi tiết
+                  </button>
+                  <button
+                    type="button"
+                    className="btn ghost compact"
                     disabled={busy || isSelf}
                     onClick={() => void setFlag(u, 'admin', !u.admin)}
                   >
@@ -662,6 +673,10 @@ export function AdminUsersPage() {
             )
           })}
         </ul>
+      )}
+
+      {detailUser && (
+        <AdminMemberDetailDialog member={detailUser} onClose={() => setDetailUid(null)} />
       )}
     </div>
   )

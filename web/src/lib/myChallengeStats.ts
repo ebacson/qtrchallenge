@@ -36,6 +36,80 @@ export type MyChallengeEntry = {
   prizes: MyPrize[]
 }
 
+export type MemberForStats = {
+  member?: boolean
+  memberSince?: number
+  memberUntil?: number
+}
+
+/** Thử thách (đã bắt đầu) của một uid kèm tiền phạt và phần thưởng, mới nhất trước. */
+export function buildMemberChallengeEntries(
+  raw: Record<string, Record<string, unknown>> | null,
+  uid: string,
+  person: MemberForStats,
+): MyChallengeEntry[] {
+  const isMember = Boolean(person.member)
+  const { memberSince, memberUntil } = person
+  const list: MyChallengeEntry[] = []
+  for (const [id, val] of Object.entries(raw ?? {})) {
+    const challenge = parseChallenge(id, val)
+    if (challenge.status === STATUS_UPCOMING) continue
+    const row = ((val.user_challenges ?? {}) as Record<string, Record<string, unknown> | null>)[
+      uid
+    ]
+    const joined = row != null
+    // Thưởng – phạt: thành viên chính thức (kể cả đã chuyển Tự do sau khi thử thách kết thúc),
+    // thử thách đã kết thúc từ REWARD_START_YEAR
+    const penalized =
+      countsAsOfficial({ member: isMember, memberUntil }, challenge) &&
+      challenge.status === STATUS_FINISHED &&
+      isRewardEligible(challenge)
+    const payment = challenge.penaltyPayments?.[uid]
+    let completion: ParticipantCompletion | null = null
+    let penalty = 0
+    let originalPenalty = 0
+    let waived = false
+
+    if (joined) {
+      completion = participantCompletion(challenge, row ?? {})
+      if (completion && penalized) {
+        completion = applyPenaltyWaiver(challenge, uid, completion)
+        penalty = completion.penalty
+        originalPenalty = completion.waived?.originalPenalty ?? completion.penalty
+        waived = Boolean(completion.waived)
+      }
+    } else {
+      if (!penalized) continue
+      const absent = absentPenaltyFor(challenge, uid, memberSince)
+      if (!(absent.originalPenalty > 0)) continue
+      penalty = absent.penalty
+      originalPenalty = absent.originalPenalty
+      waived = Boolean(absent.waived)
+    }
+
+    const prizes: MyPrize[] = []
+    for (const draw of challenge.rewardDraws ?? []) {
+      revealedWinners(draw).forEach((winnerUid, i) => {
+        if (winnerUid === uid) prizes.push({ target: draw.target, prize: draw.prizes[i] ?? '' })
+      })
+    }
+
+    list.push({
+      challenge,
+      year: parseChallengeDay(challenge.startDate)?.getFullYear() ?? 0,
+      endMs: parseChallengeDay(challenge.endDate)?.getTime() ?? 0,
+      joined,
+      completion,
+      penalty,
+      originalPenalty,
+      paid: Boolean(payment) && !waived,
+      waived,
+      prizes,
+    })
+  }
+  return list.sort((a, b) => b.endMs - a.endMs)
+}
+
 /**
  * Thử thách (đã bắt đầu) của người dùng hiện tại kèm tiền phạt và phần thưởng, mới nhất trước.
  * `null` khi đang tải.
@@ -50,64 +124,7 @@ export function useMyChallengeEntries(): MyChallengeEntry[] | null {
   return useMemo(() => {
     if (!user) return []
     if (raw === undefined) return null
-    const list: MyChallengeEntry[] = []
-    for (const [id, val] of Object.entries(raw ?? {})) {
-      const challenge = parseChallenge(id, val)
-      if (challenge.status === STATUS_UPCOMING) continue
-      const row = ((val.user_challenges ?? {}) as Record<string, Record<string, unknown> | null>)[
-        user.uid
-      ]
-      const joined = row != null
-      // Thưởng – phạt: thành viên chính thức (kể cả đã chuyển Tự do sau khi thử thách kết thúc),
-      // thử thách đã kết thúc từ REWARD_START_YEAR
-      const penalized =
-        countsAsOfficial({ member: isMember, memberUntil }, challenge) &&
-        challenge.status === STATUS_FINISHED &&
-        isRewardEligible(challenge)
-      const payment = challenge.penaltyPayments?.[user.uid]
-      let completion: ParticipantCompletion | null = null
-      let penalty = 0
-      let originalPenalty = 0
-      let waived = false
-
-      if (joined) {
-        completion = participantCompletion(challenge, row ?? {})
-        if (completion && penalized) {
-          completion = applyPenaltyWaiver(challenge, user.uid, completion)
-          penalty = completion.penalty
-          originalPenalty = completion.waived?.originalPenalty ?? completion.penalty
-          waived = Boolean(completion.waived)
-        }
-      } else {
-        if (!penalized) continue
-        const absent = absentPenaltyFor(challenge, user.uid, memberSince)
-        if (!(absent.originalPenalty > 0)) continue
-        penalty = absent.penalty
-        originalPenalty = absent.originalPenalty
-        waived = Boolean(absent.waived)
-      }
-
-      const prizes: MyPrize[] = []
-      for (const draw of challenge.rewardDraws ?? []) {
-        revealedWinners(draw).forEach((uid, i) => {
-          if (uid === user.uid) prizes.push({ target: draw.target, prize: draw.prizes[i] ?? '' })
-        })
-      }
-
-      list.push({
-        challenge,
-        year: parseChallengeDay(challenge.startDate)?.getFullYear() ?? 0,
-        endMs: parseChallengeDay(challenge.endDate)?.getTime() ?? 0,
-        joined,
-        completion,
-        penalty,
-        originalPenalty,
-        paid: Boolean(payment) && !waived,
-        waived,
-        prizes,
-      })
-    }
-    return list.sort((a, b) => b.endMs - a.endMs)
+    return buildMemberChallengeEntries(raw, user.uid, { member: isMember, memberSince, memberUntil })
   }, [raw, user, isMember, memberSince, memberUntil])
 }
 

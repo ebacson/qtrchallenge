@@ -4724,6 +4724,53 @@ code {
   padding: 16px 18px 18px;
 }
 
+.member-detail-sheet {
+  width: min(880px, 100%);
+  padding: 20px 22px 22px;
+}
+
+.member-detail-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.member-detail-identity h3 {
+  margin: 0;
+}
+
+.member-detail-identity p {
+  margin: 2px 0 0;
+}
+
+.member-detail-info {
+  margin-top: 14px;
+}
+
+.member-detail-block {
+  margin-top: 22px;
+}
+
+.member-detail-block > h4 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+}
+
+.member-detail-block .stat-row {
+  margin: 10px 0;
+}
+
+.member-detail-sheet .section {
+  margin-top: 18px;
+}
+
+@media (max-width: 640px) {
+  .member-detail-sheet {
+    padding: 16px 14px 18px;
+  }
+}
+
 .pay-head {
   display: flex;
   align-items: center;

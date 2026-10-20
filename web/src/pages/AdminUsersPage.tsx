@@ -645,7 +645,7 @@ export function AdminUsersPage() {
                     disabled={busy || isSelf}
                     onClick={() => void setFlag(u, 'member', !u.member)}
                   >
-                    {u.member ? 'Chuyển sang Tự do' : 'Phê duyệt Chính thức'}
+                    {u.member ? 'Chuyển Tự do' : 'Phê duyệt Chính thức'}
                   </button>
                   <button
                     type="button"
@@ -653,7 +653,7 @@ export function AdminUsersPage() {
                     disabled={busy || isSelf || u.admin}
                     onClick={() => void deleteMemberCompletely(u)}
                   >
-                    Xóa hoàn toàn
+                    Xóa
                   </button>
                   <button
                     type="button"

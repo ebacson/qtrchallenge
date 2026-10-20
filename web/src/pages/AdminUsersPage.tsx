@@ -634,13 +634,6 @@ export function AdminUsersPage() {
                   <button
                     type="button"
                     className="btn ghost compact"
-                    onClick={() => setDetailUid(u.id)}
-                  >
-                    Chi tiết
-                  </button>
-                  <button
-                    type="button"
-                    className="btn ghost compact"
                     disabled={busy || isSelf}
                     onClick={() => void setFlag(u, 'admin', !u.admin)}
                   >
@@ -661,6 +654,13 @@ export function AdminUsersPage() {
                     onClick={() => void deleteMemberCompletely(u)}
                   >
                     Xóa hoàn toàn
+                  </button>
+                  <button
+                    type="button"
+                    className="btn ghost compact admin-user-detail-btn"
+                    onClick={() => setDetailUid(u.id)}
+                  >
+                    Chi tiết
                   </button>
                 </div>
 

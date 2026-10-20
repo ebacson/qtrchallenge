@@ -4139,6 +4139,10 @@ code {
   margin-top: 12px;
 }
 
+.admin-user-detail-btn {
+  margin-left: auto;
+}
+
 .admin-achievements {
   margin-top: 12px;
   padding-top: 12px;

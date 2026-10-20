@@ -69,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const healedFor = useRef<string | null>(null)
+  const presenceStopRef = useRef<(() => Promise<void>) | null>(null)
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (next) => {
@@ -85,7 +86,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!user) return
-    return startPresence(user.uid)
+    const stop = startPresence(user.uid)
+    presenceStopRef.current = stop
+    return () => {
+      if (presenceStopRef.current === stop) presenceStopRef.current = null
+      void stop()
+    }
   }, [user])
 
   useEffect(() => {
@@ -170,8 +176,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  /** Không hủy FCM khi logout — user chỉ tắt thông báo thủ công trong Hồ sơ. */
+  /**
+   * Xóa presence TRƯỚC signOut (sau khi mất auth, rules từ chối xóa → còn Online giả).
+   * Không hủy FCM khi logout — user chỉ tắt thông báo thủ công trong Hồ sơ.
+   */
   const logout = useCallback(async () => {
+    const stop = presenceStopRef.current
+    presenceStopRef.current = null
+    if (stop) {
+      try {
+        await stop()
+      } catch {
+        /* vẫn đăng xuất dù xóa presence lỗi */
+      }
+    }
     await signOut(auth)
   }, [])
 

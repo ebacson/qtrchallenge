@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AdminUserAchievements } from '../components/AdminUserAchievements'
 import {
@@ -10,7 +10,7 @@ import { MemberOnlineFilter } from '../components/MemberOnlineFilter'
 import { useAuth } from '../context/AuthContext'
 import { deleteUserAvatar } from '../lib/adminOps'
 import { runAdminDeleteUser, runAdminFullSync, type FullSyncSummary } from '../lib/adminSync'
-import { PRESENCE_PATH } from '../lib/presence'
+import { PRESENCE_PATH, PRESENCE_STALE_MS } from '../lib/presence'
 import { useSharedValue } from '../lib/sharedValue'
 import { formatVnd, unpaidPenaltiesOf } from '../lib/rewardPenalty'
 import { formatMemberSince } from '../lib/userProfile'
@@ -101,7 +101,24 @@ export function AdminUsersPage() {
   const [memberType, setMemberType] = useState<MemberType>('all')
   const [onlineOnly, setOnlineOnly] = useState(false)
   const presence = useSharedValue<Record<string, { at?: number }>>(PRESENCE_PATH)
-  const onlineIds = useMemo(() => new Set(Object.keys(presence ?? {})), [presence])
+  // Node presence không được heartbeat quá lâu được coi là offline (node mồ côi)
+  const [presenceNow, setPresenceNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = setInterval(() => setPresenceNow(Date.now()), 30_000)
+    return () => clearInterval(timer)
+  }, [])
+  const onlineIds = useMemo(
+    () =>
+      new Set(
+        Object.entries(presence ?? {})
+          .filter(([, row]) => {
+            const at = Number(row?.at) || 0
+            return at > 0 && presenceNow - at <= PRESENCE_STALE_MS
+          })
+          .map(([uid]) => uid),
+      ),
+    [presence, presenceNow],
+  )
   const [busyId, setBusyId] = useState<string | null>(null)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
